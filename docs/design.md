@@ -401,10 +401,10 @@ Each milestone is done only when every box below is ticked, its phase doc is wri
 
 **M1 Chat with one cloud model**
 
-- [ ] Type a message and get a streamed reply from one OpenAI-compatible provider
-- [ ] Stop cancels a reply midway
-- [ ] Code blocks render with a copy button
-- [ ] Adapter tests cover success, 401, 429, and a dropped stream
+- [x] Type a message and get a streamed reply from one OpenAI-compatible provider
+- [x] Stop cancels a reply midway
+- [x] Code blocks render with a copy button
+- [x] Adapter tests cover success, 401, 429, and a dropped stream
 
 For M1 only, the key comes from a git-ignored local config file. M2 replaces it with the keychain.
 

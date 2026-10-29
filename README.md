@@ -6,7 +6,7 @@ The name stands for AI Independent Development Platform, at least for now. The m
 
 ## Status
 
-Early. The app shell is in place: a Tauri window, typed calls from the UI into Rust, tests and CI. You can't chat with a model yet; that's the next milestone.
+Early. You can chat with one OpenAI-compatible provider (OpenAI, OpenRouter, Groq, DeepSeek or a local server). Replies stream in, Stop works, and code blocks have a Copy button. For now the provider details live in a local config file, which the setup guide describes. Next come the keychain, a screen for adding providers, and Anthropic support, then the coding workspace.
 
 Windows is the first platform. macOS and Linux follow after v0.1.
 
@@ -59,7 +59,7 @@ npm ci
 npm run tauri dev
 ```
 
-The first run compiles the Rust side and takes a few minutes. After that a window titled A.I.D.P opens. The [setup guide](docs/setup.md) has the longer version, including a fix for the "Filename too long" error Git sometimes hits on Windows.
+The first run compiles the Rust side and takes a few minutes. After that a window titled A.I.D.P opens and tells you which provider config file to create. The [setup guide](docs/setup.md) has the longer version, including a fix for the "Filename too long" error Git sometimes hits on Windows.
 
 To build the release app without an installer:
 
@@ -108,8 +108,8 @@ The repo also ships a few agent skills (Tauri, Rust, React, Vitest, plus some pl
 
 v0.1 is split into seven milestones, and each one ends with an app that runs. The first two build the model layer the workspace needs.
 
-1. M0, setup: app shell, checks, CI and docs. Nearly done.
-2. M1: streamed chat with one OpenAI-compatible provider, including Stop.
+1. M0, setup: app shell, checks, CI and docs. Done.
+2. M1: streamed chat with one OpenAI-compatible provider, including Stop. Done.
 3. M2: keys in the keychain, adding and testing providers, and Anthropic support.
 4. M3: the coding workspace. File tree, editor, the AI panel, and edits as diffs.
 5. M4: agent tools and a terminal. The model can read, search and edit files and run commands, each with your approval.
