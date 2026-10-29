@@ -1,12 +1,8 @@
-use crate::config::{self, ConfigError, Transport};
-use crate::gateway::{
-    openai_compat::OpenAiCompat, ChatEvent, ChatMessage, ChatRequest, ModelProvider,
-};
-use serde::Serialize;
-use specta::Type;
+use crate::connections::{AppError, Services};
+use crate::gateway::{ChatEvent, ChatMessage};
 use std::sync::{Mutex, PoisonError};
 use tauri::ipc::Channel;
-use tauri::{AppHandle, Manager, State};
+use tauri::State;
 use tokio_util::sync::CancellationToken;
 
 #[derive(Default)]
@@ -33,71 +29,32 @@ impl ChatState {
     }
 }
 
-#[derive(Serialize, Type, Clone, Debug, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub struct ChatConfigView {
-    pub model: String,
-    pub host: String,
-    pub insecure: bool,
-}
-
-#[tauri::command]
-#[specta::specta]
-pub fn chat_config(app: AppHandle) -> Result<ChatConfigView, ConfigError> {
-    let config_dir = app
-        .path()
-        .app_config_dir()
-        .map_err(|e| ConfigError::Invalid {
-            message: e.to_string(),
-        })?;
-    let cfg = config::load(&config_dir)?;
-    let host = reqwest::Url::parse(&cfg.base_url)
-        .ok()
-        .and_then(|u| u.host_str().map(String::from))
-        .unwrap_or_else(|| cfg.base_url.clone());
-    let insecure = cfg.transport == Transport::LocalHttp;
-
-    Ok(ChatConfigView {
-        model: cfg.model,
-        host,
-        insecure,
-    })
-}
-
 #[tauri::command]
 #[specta::specta]
 pub async fn send_message(
-    app: AppHandle,
-    state: State<'_, ChatState>,
+    chat: State<'_, ChatState>,
+    services: State<'_, Services>,
+    connection_id: u32,
+    model_id: String,
     messages: Vec<ChatMessage>,
     on_event: Channel<ChatEvent>,
-) -> Result<(), ConfigError> {
-    // Register first, so a Stop pressed while the config loads isn't lost.
-    let cancel = state.begin();
-    let config_dir = app
-        .path()
-        .app_config_dir()
-        .map_err(|e| ConfigError::Invalid {
-            message: e.to_string(),
-        })?;
-    let cfg = config::load(&config_dir)?;
-    let provider = OpenAiCompat::new(reqwest::Client::new(), cfg.base_url, cfg.api_key);
-    let req = ChatRequest {
-        model: cfg.model,
-        messages,
-    };
+) -> Result<(), AppError> {
+    let cancel = chat.begin();
+    let result = services
+        .stream(connection_id, model_id, messages, on_event.clone(), cancel)
+        .await;
 
-    let result = provider.stream_chat(req, on_event.clone(), cancel).await;
     match result {
         Ok(usage) => {
             let _ = on_event.send(ChatEvent::Done(usage));
+            Ok(())
         }
-        Err(err) => {
-            let _ = on_event.send(ChatEvent::Error(err));
+        Err(AppError::Provider { error }) => {
+            let _ = on_event.send(ChatEvent::Error(error));
+            Ok(())
         }
+        Err(cmd_err) => Err(cmd_err),
     }
-
-    Ok(())
 }
 
 #[tauri::command]
@@ -122,4 +79,3 @@ mod tests {
         assert!(b.is_cancelled());
     }
 }
-

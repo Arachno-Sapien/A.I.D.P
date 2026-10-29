@@ -22,7 +22,6 @@ describe("useChatStore", () => {
     useChatStore.setState({
       messages: [],
       streaming: false,
-      configError: null,
     });
   });
 
@@ -98,7 +97,7 @@ describe("useChatStore", () => {
 
   it("ignores send while a reply is streaming", async () => {
     useChatStore.setState({ streaming: true });
-    await useChatStore.getState().send("x");
+    await useChatStore.getState().send("x", { connectionId: 1, modelId: "m1" });
     expect(commands.sendMessage).not.toHaveBeenCalled();
   });
 
@@ -119,9 +118,11 @@ describe("useChatStore", () => {
       streaming: false,
     });
 
-    await useChatStore.getState().send("d");
+    await useChatStore.getState().send("d", { connectionId: 1, modelId: "m1" });
 
     expect(commands.sendMessage).toHaveBeenCalledWith(
+      1,
+      "m1",
       [
         { role: "user", content: "a" },
         { role: "user", content: "c" },
@@ -141,9 +142,11 @@ describe("useChatStore", () => {
       streaming: false,
     });
 
-    await useChatStore.getState().send("b");
+    await useChatStore.getState().send("b", { connectionId: 1, modelId: "m1" });
 
     expect(commands.sendMessage).toHaveBeenCalledWith(
+      1,
+      "m1",
       [
         { role: "user", content: "a" },
         { role: "user", content: "b" },
@@ -151,5 +154,21 @@ describe("useChatStore", () => {
       expect.anything(),
     );
   });
-});
 
+  it("shows a command error on the reply", async () => {
+    vi.mocked(commands.sendMessage).mockResolvedValueOnce({
+      status: "error",
+      error: { kind: "keyMissing" },
+    });
+
+    await useChatStore.getState().send("hi", { connectionId: 1, modelId: "m1" });
+
+    const state = useChatStore.getState();
+    expect(state.streaming).toBe(false);
+    expect(state.messages.length).toBe(2);
+    const assistant = state.messages[1];
+    expect(assistant.role).toBe("assistant");
+    expect(assistant.status).toBe("error");
+    expect(assistant.commandError).toEqual({ kind: "keyMissing" });
+  });
+});

@@ -4,7 +4,7 @@ import { errorText } from "./errorText";
 describe("errorText", () => {
   it("formats invalidKey", () => {
     expect(errorText({ kind: "invalidKey" })).toBe(
-      "The provider rejected the API key. Check api_key in config.local.json.",
+      "The provider rejected the API key. Check the key and try again.",
     );
   });
 
@@ -22,7 +22,7 @@ describe("errorText", () => {
 
   it("formats modelNotFound", () => {
     expect(errorText({ kind: "modelNotFound" })).toBe(
-      "The provider doesn't know this model. Check model in config.local.json.",
+      "The provider doesn't know this model. Pick another model.",
     );
   });
 
@@ -48,4 +48,3 @@ describe("errorText", () => {
     expect(errorText({ kind: "cancelled" })).toBe("Stopped.");
   });
 });
-

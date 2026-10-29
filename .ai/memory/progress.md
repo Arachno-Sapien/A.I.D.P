@@ -34,13 +34,17 @@ The M1 key file (`config.local.json`, `src-tauri/src/config.rs` and the "Configu
 
 ## In progress
 
-Nothing in progress. Review fixes for Tasks 1 to 5 are committed (Claude Code, Opus 5.5, 2026-10-30).
-Next step: plan Task 6 (`src-tauri/src/commands/connections.rs`, app state in `lib.rs`, chat rewrite, delete `config.rs`).
+Task: M2 Task 8: UI: first-run flow, Models page, model picker (step 6 adds `remark-gfm`)
+Tool + model: Antigravity (Gemini 3.8 Flash)
+Date: 2026-10-30
+Completed files in Tasks 6-8 commit:
+- Task 6 done: `src-tauri/src/commands/connections.rs`, `src-tauri/src/commands/mod.rs`, `src-tauri/src/commands/chat.rs`, `src-tauri/src/lib.rs`, `src-tauri/src/config.rs` (deleted), `src/lib/bindings.ts` (regenerated), `src/lib/bindings.test.ts`
+- Task 7 done: `src/features/models/providers.ts`, `src/features/chat/errorText.ts`, `src/features/chat/errorText.test.ts`, `src/features/chat/appErrorText.ts`, `src/features/chat/appErrorText.test.ts`, `src/features/models/store.ts`, `src/features/models/store.test.ts`, `src/features/chat/store.ts`, `src/features/chat/store.test.ts`
+- Task 8 done: `src/features/models/ChooseModels.tsx`, `src/features/models/AddConnectionDialog.tsx`, `src/features/models/AddConnectionDialog.test.tsx`, `src/features/models/ModelsScreen.tsx`, `src/features/models/ModelsScreen.test.tsx`, `src/features/chat/ChatScreen.tsx`, `src/features/chat/ChatScreen.test.tsx`, `src/App.tsx`
+Next step: Step 6 of Task 8: add remark-gfm for tables in replies, then Task 9 (Docs).
 
 ## Next 3 tasks
 
-Tasks 6, 7 and 8 go in **one commit**: Task 6 alone breaks the frontend typecheck, and a red tree must not be committed.
-
-1. Task 6: Commands, app state, chat rewrite; delete the config path.
-2. Task 7: Frontend data layer and error copy.
-3. Task 8: UI: first-run flow, Models page, model picker (step 6 adds `remark-gfm`).
+1. Task 8 step 6: `remark-gfm` tables in replies (decision D1).
+2. Task 9: Docs (`docs/security.md`, `docs/decisions/0007-connections-storage.md`, `docs/setup.md`, `AGENTS.md`, `docs/design.md`, `.ai/memory/known-issues.md`, `CHANGELOG.md`, `docs/phases/M2.md`).
+3. Task 10: Human check, review, close.

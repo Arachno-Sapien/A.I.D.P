@@ -4,17 +4,37 @@ import { invoke as __TAURI_INVOKE, Channel } from "@tauri-apps/api/core";
 
 /** Commands */
 export const commands = {
-	chatConfig: () => typedError<ChatConfigView, ConfigError>(__TAURI_INVOKE("chat_config")),
-	sendMessage: (messages: ChatMessage[], onEvent: Channel<ChatEvent_Deserialize>) => typedError<null, ConfigError>(__TAURI_INVOKE("send_message", { messages, onEvent })),
+	listConnections: () => typedError<ConnectionView_Serialize[], AppError_Serialize>(__TAURI_INVOKE("list_connections")),
+	addConnection: (input: NewConnection) => typedError<AddedConnection_Serialize, AppError_Serialize>(__TAURI_INVOKE("add_connection", { input })),
+	testConnection: (id: number) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("test_connection", { id })),
+	availableModels: (id: number) => typedError<ModelInfo_Serialize[], AppError_Serialize>(__TAURI_INVOKE("available_models", { id })),
+	replaceKey: (id: number, apiKey: string) => typedError<ConnectionView_Serialize, AppError_Serialize>(__TAURI_INVOKE("replace_key", { id, apiKey })),
+	deleteConnection: (id: number) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("delete_connection", { id })),
+	setModels: (connectionId: number, models: ModelInfo_Deserialize[]) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("set_models", { connectionId, models })),
+	chatModels: () => typedError<ChatModel[], AppError_Serialize>(__TAURI_INVOKE("chat_models")),
+	setDefaultModel: (connectionId: number, modelId: string) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("set_default_model", { connectionId, modelId })),
+	sendMessage: (connectionId: number, modelId: string, messages: ChatMessage[], onEvent: Channel<ChatEvent_Deserialize>) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("send_message", { connectionId, modelId, messages, onEvent })),
 	stopReply: () => __TAURI_INVOKE<void>("stop_reply"),
 };
 
 /* Types */
-export type ChatConfigView = {
-	model: string,
-	host: string,
-	insecure: boolean,
+export type AddedConnection = AddedConnection_Serialize | AddedConnection_Deserialize;
+
+export type AddedConnection_Deserialize = {
+	connection: ConnectionView_Deserialize,
+	available: ModelInfo_Deserialize[],
 };
+
+export type AddedConnection_Serialize = {
+	connection: ConnectionView_Serialize,
+	available: ModelInfo_Serialize[],
+};
+
+export type AppError = AppError_Serialize | AppError_Deserialize;
+
+export type AppError_Deserialize = { kind: "provider"; error: ProviderError_Deserialize } | { kind: "notFound" } | { kind: "keyMissing" } | { kind: "invalidInput"; message: string } | { kind: "insecureUrl"; url: string } | { kind: "keychain"; message: string } | { kind: "storage"; message: string };
+
+export type AppError_Serialize = { kind: "provider"; error: ProviderError_Serialize } | { kind: "notFound" } | { kind: "keyMissing" } | { kind: "invalidInput"; message: string } | { kind: "insecureUrl"; url: string } | { kind: "keychain"; message: string } | { kind: "storage"; message: string };
 
 export type ChatEvent = ChatEvent_Serialize | ChatEvent_Deserialize;
 
@@ -27,7 +47,58 @@ export type ChatMessage = {
 	content: string,
 };
 
-export type ConfigError = { kind: "missing"; path: string } | { kind: "invalid"; message: string } | { kind: "insecureUrl"; url: string };
+export type ChatModel = {
+	connectionId: number,
+	connectionLabel: string,
+	modelId: string,
+	displayName: string,
+	isDefault: boolean,
+};
+
+export type ConnectionKind = "openaiCompat" | "anthropic";
+
+export type ConnectionView = ConnectionView_Serialize | ConnectionView_Deserialize;
+
+export type ConnectionView_Deserialize = {
+	id: number,
+	kind: ConnectionKind,
+	label: string,
+	baseUrl: string,
+	keyHint: string,
+	lastTestedAt?: number | null,
+	lastTestOk?: boolean | null,
+};
+
+export type ConnectionView_Serialize = {
+	id: number,
+	kind: ConnectionKind,
+	label: string,
+	baseUrl: string,
+	keyHint: string,
+	lastTestedAt: number | null,
+	lastTestOk: boolean | null,
+};
+
+export type ModelInfo = ModelInfo_Serialize | ModelInfo_Deserialize;
+
+export type ModelInfo_Deserialize = {
+	id: string,
+	displayName: string,
+	contextWindow?: number | null,
+};
+
+export type ModelInfo_Serialize = {
+	id: string,
+	displayName: string,
+	contextWindow: number | null,
+};
+
+export type NewConnection = {
+	kind: ConnectionKind,
+	label: string,
+	baseUrl: string,
+	apiKey: string,
+};
 
 export type ProviderError = ProviderError_Serialize | ProviderError_Deserialize;
 

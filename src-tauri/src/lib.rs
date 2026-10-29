@@ -1,10 +1,12 @@
 pub mod commands;
-pub mod config;
 pub mod connections;
 pub mod db;
 pub mod gateway;
 pub mod secrets;
 
+use std::sync::Arc;
+use std::time::Duration;
+use tauri::Manager;
 use tauri_specta::{collect_commands, Builder};
 
 pub fn is_app_url(url: &tauri::Url) -> bool {
@@ -28,7 +30,15 @@ pub fn is_app_url(url: &tauri::Url) -> bool {
 
 fn specta_builder() -> Builder<tauri::Wry> {
     Builder::<tauri::Wry>::new().commands(collect_commands![
-        commands::chat::chat_config,
+        commands::connections::list_connections,
+        commands::connections::add_connection,
+        commands::connections::test_connection,
+        commands::connections::available_models,
+        commands::connections::replace_key,
+        commands::connections::delete_connection,
+        commands::connections::set_models,
+        commands::connections::chat_models,
+        commands::connections::set_default_model,
         commands::chat::send_message,
         commands::chat::stop_reply,
     ])
@@ -42,6 +52,21 @@ pub fn run() -> tauri::Result<()> {
                 .on_navigation(|_window, url| is_app_url(url))
                 .build(),
         )
+        .setup(|app| {
+            let app_data_dir = app.path().app_data_dir()?;
+            std::fs::create_dir_all(&app_data_dir)?;
+            let db_path = app_data_dir.join("aidp.db");
+            let db = db::open(&db_path)?;
+            let http = reqwest::Client::builder()
+                .connect_timeout(Duration::from_secs(10))
+                .build()?;
+            app.manage(connections::Services::new(
+                db,
+                Arc::new(secrets::Keychain),
+                http,
+            ));
+            Ok(())
+        })
         .manage(commands::chat::ChatState::default())
         .invoke_handler(builder.invoke_handler())
         .run(tauri::generate_context!())

@@ -2,10 +2,10 @@ import { Channel } from "@tauri-apps/api/core";
 import { create } from "zustand";
 import {
   commands,
+  type AppError,
   type ChatEvent,
   type ChatEvent_Deserialize,
   type ChatMessage,
-  type ConfigError,
   type ProviderError,
 } from "../../lib/bindings";
 
@@ -17,13 +17,16 @@ export interface UiMessage {
   text: string;
   status: MessageStatus;
   error?: ProviderError;
+  commandError?: AppError;
 }
 
 export interface ChatStore {
   messages: UiMessage[];
   streaming: boolean;
-  configError: ConfigError | null;
-  send(text: string): Promise<void>;
+  send(
+    text: string,
+    model: { connectionId: number; modelId: string },
+  ): Promise<void>;
   stop(): Promise<void>;
   applyEvent(id: string, ev: ChatEvent): void;
   clear(): void;
@@ -32,9 +35,11 @@ export interface ChatStore {
 export const useChatStore = create<ChatStore>((set, get) => ({
   messages: [],
   streaming: false,
-  configError: null,
 
-  send: async (text: string) => {
+  send: async (
+    text: string,
+    model: { connectionId: number; modelId: string },
+  ) => {
     const trimmed = text.trim();
     if (!trimmed || get().streaming) {
       return;
@@ -68,7 +73,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     set((state) => ({
       messages: [...state.messages, userMessage, assistantPlaceholder],
       streaming: true,
-      configError: null,
     }));
 
     const channel = new Channel<ChatEvent_Deserialize>();
@@ -76,11 +80,19 @@ export const useChatStore = create<ChatStore>((set, get) => ({
       get().applyEvent(assistantId, ev);
     };
 
-    const res = await commands.sendMessage(history, channel);
+    const res = await commands.sendMessage(
+      model.connectionId,
+      model.modelId,
+      history,
+      channel,
+    );
     if (res.status === "error") {
       set((state) => ({
-        configError: res.error,
-        messages: state.messages.filter((m) => m.id !== assistantId),
+        messages: state.messages.map((m) =>
+          m.id === assistantId
+            ? { ...m, status: "error", commandError: res.error }
+            : m,
+        ),
         streaming: false,
       }));
     }
@@ -122,7 +134,6 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   },
 
   clear: () => {
-    set({ messages: [], streaming: false, configError: null });
+    set({ messages: [], streaming: false });
   },
 }));
-
