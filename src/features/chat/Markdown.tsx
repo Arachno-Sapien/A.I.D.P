@@ -40,43 +40,45 @@ function CodeBlock({ code, language }: { code: string; language: string }) {
   );
 }
 
+// The reply-md class carries the heading, list and spacing styles in App.css.
 export function Markdown({ text }: { text: string }) {
   return (
-    <ReactMarkdown
-      skipHtml
-      components={{
-        code: ({
-          className,
-          children,
-          ...props
-        }: ComponentPropsWithoutRef<"code">) => {
-          const raw = String(children ?? "");
-          const isBlock = Boolean(
-            className?.startsWith("language-") || raw.includes("\n"),
-          );
+    <div className="reply-md">
+      <ReactMarkdown
+        skipHtml
+        components={{
+          code: ({
+            className,
+            children,
+            ...props
+          }: ComponentPropsWithoutRef<"code">) => {
+            const raw = String(children ?? "");
+            const isBlock = Boolean(
+              className?.startsWith("language-") || raw.includes("\n"),
+            );
 
-          if (isBlock) {
-            const match = /language-(\w+)/.exec(className || "");
-            const language = match ? match[1] : "";
-            const code = raw.replace(/\n$/, "");
-            return <CodeBlock code={code} language={language} />;
-          }
+            if (isBlock) {
+              const match = /language-(\w+)/.exec(className || "");
+              const language = match ? match[1] : "";
+              const code = raw.replace(/\n$/, "");
+              return <CodeBlock code={code} language={language} />;
+            }
 
-          return (
-            <code className={className} {...props}>
+            return (
+              <code className={className} {...props}>
+                {children}
+              </code>
+            );
+          },
+          a: ({ href, children }) => (
+            <span title={href} className="underline">
               {children}
-            </code>
-          );
-        },
-        a: ({ href, children }) => (
-          <span title={href} className="underline">
-            {children}
-          </span>
-        ),
-      }}
-    >
-      {text}
-    </ReactMarkdown>
+            </span>
+          ),
+        }}
+      >
+        {text}
+      </ReactMarkdown>
+    </div>
   );
 }
-

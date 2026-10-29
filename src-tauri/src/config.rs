@@ -84,7 +84,8 @@ pub fn load(dir: &Path) -> Result<LocalConfig, ConfigError> {
     let content = std::fs::read_to_string(&file_path)
         .map_err(|e| ConfigError::Invalid { message: e.to_string() })?;
 
-    let raw: RawConfig = serde_json::from_str(&content)
+    // Some editors save UTF-8 with a byte-order mark, which serde_json rejects.
+    let raw: RawConfig = serde_json::from_str(content.trim_start_matches('\u{feff}'))
         .map_err(|e| ConfigError::Invalid { message: e.to_string() })?;
 
     if raw.base_url.trim().is_empty()
@@ -152,6 +153,19 @@ mod tests {
         let cfg = load(&dir).unwrap();
         assert_eq!(cfg.base_url, "https://api.example.com/v1");
         assert_eq!(cfg.transport, Transport::Https);
+    }
+
+    #[test]
+    fn loads_a_file_saved_with_a_byte_order_mark() {
+        let dir = dir_with(
+            "bom",
+            Some(
+                "\u{feff}{ \"base_url\": \"https://api.example.com/v1\", \"model\": \"gpt-4o\", \"api_key\": \"sk-1234\" }",
+            ),
+        );
+        let cfg = load(&dir).unwrap();
+        assert_eq!(cfg.base_url, "https://api.example.com/v1");
+        assert_eq!(cfg.model, "gpt-4o");
     }
 
     #[test]

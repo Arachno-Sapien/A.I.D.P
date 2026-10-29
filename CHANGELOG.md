@@ -23,6 +23,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - App display name is now **A.I.D.P** (window title, page title, heading). Internal names stay `aidp`.
+- Replies show headings, lists, quotes and inline code with proper spacing.
+
+### Fixed
+- `config.local.json` still loads when an editor saves it with a byte-order mark.
 
 ### Security
 - Strict Content Security Policy (`default-src 'self' ipc: http://ipc.localhost`) in production with development-only CSP for Vite HMR.

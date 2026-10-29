@@ -1,1 +1,45 @@
 @import "tailwindcss";
+
+/*
+ * Tailwind's reset strips the look of headings, lists and spacing.
+ * This gives model replies (src/features/chat/Markdown.tsx) theirs back.
+ */
+.reply-md > * + * {
+  @apply mt-3;
+}
+.reply-md > * + h1,
+.reply-md > * + h2,
+.reply-md > * + h3,
+.reply-md > * + h4 {
+  @apply mt-5;
+}
+.reply-md h1 {
+  @apply text-xl font-semibold;
+}
+.reply-md h2 {
+  @apply text-lg font-semibold;
+}
+.reply-md h3,
+.reply-md h4 {
+  @apply text-base font-semibold;
+}
+.reply-md ul {
+  @apply list-disc pl-6;
+}
+.reply-md ol {
+  @apply list-decimal pl-6;
+}
+.reply-md li + li,
+.reply-md li > ul,
+.reply-md li > ol {
+  @apply mt-1;
+}
+.reply-md blockquote {
+  @apply border-l-2 border-neutral-700 pl-3 text-neutral-400;
+}
+.reply-md hr {
+  @apply border-neutral-700;
+}
+.reply-md :not(pre) > code {
+  @apply rounded bg-neutral-800 px-1 py-0.5 text-[0.9em];
+}

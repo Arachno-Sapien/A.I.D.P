@@ -42,5 +42,16 @@ describe("Markdown", () => {
     const span = getByText("site");
     expect(span.getAttribute("title")).toBe("https://example.com");
   });
+
+  it("renders headings and lists inside the reply wrapper", () => {
+    const { container } = render(
+      <Markdown text={"## Title\n\n1. one\n2. two"} />,
+    );
+
+    const wrapper = container.firstElementChild as HTMLElement;
+    expect(wrapper.className).toBe("reply-md");
+    expect(wrapper.querySelector("h2")?.textContent).toBe("Title");
+    expect(wrapper.querySelectorAll("ol > li")).toHaveLength(2);
+  });
 });
 
