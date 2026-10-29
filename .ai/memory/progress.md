@@ -4,9 +4,9 @@ Updated: 2026-10-29 by Antigravity (Gemini 3.8 Flash)
 
 ## Current milestone: M0 Setup
 
-- [ ] `npm run tauri dev` opens an empty window on Windows
-- [ ] CI runs clippy, tests, and typecheck on every push
-- [ ] AGENTS.md holds the stack, folder, security, documentation, and memory rules; docs/ and .ai/memory/ exist with templates. *AGENTS.md and .ai/memory/ done; docs/ not yet*
+- [x] `npm run tauri dev` opens an empty window on Windows (and `npm run tauri build -- --no-bundle` produces release binary)
+- [ ] CI runs clippy, tests, and typecheck on every push (workflow defined in `.github/workflows/ci.yml`; awaiting remote repo confirmation from human)
+- [x] AGENTS.md holds the stack, folder, security, documentation, and memory rules; docs/ and .ai/memory/ exist with templates.
 - [ ] Rust book chapters 1 to 9 read (human)
 
 ## Dev machine (checked 2026-10-29)
@@ -26,25 +26,22 @@ Updated: 2026-10-29 by Antigravity (Gemini 3.8 Flash)
 - AGENTS.md (shared rules), CLAUDE.md and GEMINI.md (pointers), .ai/memory/
 - 8 agent skills in `.agents/skills/` + `.claude/skills/`, recorded in `skills-lock.json` (AGENTS.md section 12)
 - Repo hygiene: `.gitattributes` (LF), `.gitignore` (ignoring `.serena/`), M0 plan reviewed and approved
+- Scaffolded Tauri 2 + React 19 + TypeScript + Vite (`aidp`, `com.aidp.desktop`)
+- Typed IPC with `tauri-specta` exporting `src/lib/bindings.ts` via unit test
+- Hardened security: strict production CSP, opener plugin removed, clippy denying unwrap/expect
+- Added Windows Common-Controls v6 linker directive in `src-tauri/build.rs` to fix `STATUS_ENTRYPOINT_NOT_FOUND`
+- Frontend testing with Vitest (`src/lib/bindings.test.ts`), full 4-part gate passing
+- Tailwind CSS v4 styling with `@tailwindcss/vite`
+- Verified release build (`src-tauri/target/release/aidp.exe`)
+- Documentation: `docs/design.md` (moved), `docs/setup.md`, `docs/phases/M0.md`, `docs/decisions/0001-use-tauri.md`, `docs/decisions/0002-bindings-exported-by-test.md`, `CHANGELOG.md`
+- GitHub Actions CI workflow (`.github/workflows/ci.yml`) running the 4-part gate and checking for `bindings.ts` drift
 
 ## In progress
 
-Plan: `docs/superpowers/plans/2026-10-29-m0-setup.md`
-Current task: Task 6 (Review and close-out)
-Provisional app name: `aidp`, identifier: `com.aidp.desktop`
-Agent: Antigravity (Gemini 3.8 Flash)
-Date: 2026-10-29
-Next step: Task 6: Review diff, tick M0 boxes in progress.md, write session log
+None. To claim: task / tool + model / date started / next step.
 
 ## Next 3 tasks
 
-1. Task 1: Scaffold Tauri 2 + React + TS outside repo, copy in, remove opener, set strict CSP & clippy lints.
-2. Task 2: Configure typed IPC via tauri-specta, add Vitest with bindings test, verify gate and commit Tasks 1 & 2.
-3. Task 3: Configure Tailwind CSS v4, verify dev window and release build.
-
-## Rest of M0
-
-- Add Tailwind, Zustand, tauri-specta (bindings exported to `src/lib/bindings.ts` on debug start)
-- `.github/workflows/ci.yml` running the gate (AGENTS.md section 8) on `windows-latest`
-- Move the design doc to `docs/design.md` and update the link at the top of AGENTS.md
-- `docs/setup.md`, `docs/phases/M0.md`, `docs/decisions/0001-use-tauri.md`, `CHANGELOG.md`
+1. Human input: confirm GitHub repository name and visibility (public/private) to add remote and push CI workflow.
+2. Human: complete reading Rust book chapters 1 to 9 to close Milestone M0.
+3. Milestone M1: Start cloud model chat plan with OpenAI-compatible adapter.
