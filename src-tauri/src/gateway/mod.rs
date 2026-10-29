@@ -4,10 +4,60 @@ use specta::Type;
 use tauri::ipc::Channel;
 use tokio_util::sync::CancellationToken;
 
+pub mod anthropic;
 pub mod http;
 pub mod openai_compat;
 pub mod sse;
 pub mod url;
+
+#[derive(
+    Serialize,
+    Deserialize,
+    Type,
+    Copy,
+    Clone,
+    Debug,
+    PartialEq,
+    Eq,
+)]
+#[serde(rename_all = "camelCase")]
+pub enum ConnectionKind {
+    OpenaiCompat,
+    Anthropic,
+}
+
+impl ConnectionKind {
+    pub fn as_db(&self) -> &'static str {
+        match self {
+            Self::OpenaiCompat => "openai_compat",
+            Self::Anthropic => "anthropic",
+        }
+    }
+
+    pub fn from_db(s: &str) -> Option<Self> {
+        match s {
+            "openai_compat" => Some(Self::OpenaiCompat),
+            "anthropic" => Some(Self::Anthropic),
+            _ => None,
+        }
+    }
+}
+
+pub fn provider(
+    kind: ConnectionKind,
+    client: reqwest::Client,
+    base_url: String,
+    key: secrecy::SecretString,
+) -> Box<dyn ModelProvider> {
+    match kind {
+        ConnectionKind::OpenaiCompat => {
+            Box::new(openai_compat::OpenAiCompat::new(client, base_url, key))
+        }
+        ConnectionKind::Anthropic => {
+            Box::new(anthropic::Anthropic::new(client, base_url, key))
+        }
+    }
+}
 
 #[derive(Serialize, Deserialize, Type, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]

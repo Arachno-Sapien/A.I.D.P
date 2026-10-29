@@ -1,61 +1,17 @@
 #![allow(clippy::unwrap_used)]
 
+mod common;
+
 use aidp_lib::gateway::{
-    openai_compat::OpenAiCompat, ChatEvent, ChatMessage, ChatRequest, ModelProvider, ProviderError,
-    Role, Usage,
+    openai_compat::OpenAiCompat, ModelProvider, ProviderError, Usage,
 };
+use common::{capture, deltas, req, sse};
 use secrecy::SecretString;
 use serde_json::json;
-use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
-use tauri::ipc::{Channel, InvokeResponseBody};
 use tokio_util::sync::CancellationToken;
 use wiremock::matchers::{body_partial_json, header, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
-
-fn capture() -> (Channel<ChatEvent>, Arc<Mutex<Vec<ChatEvent>>>) {
-    let events = Arc::new(Mutex::new(Vec::new()));
-    let events_clone = Arc::clone(&events);
-    let channel = Channel::new(move |body| {
-        let event: ChatEvent = match body {
-            InvokeResponseBody::Json(s) => serde_json::from_str(&s).unwrap(),
-            InvokeResponseBody::Raw(b) => serde_json::from_slice(&b).unwrap(),
-        };
-        events_clone.lock().unwrap().push(event);
-        Ok(())
-    });
-    (channel, events)
-}
-
-fn deltas(events: &Mutex<Vec<ChatEvent>>) -> Vec<String> {
-    events
-        .lock()
-        .unwrap()
-        .iter()
-        .filter_map(|e| match e {
-            ChatEvent::Delta(text) => Some(text.clone()),
-            _ => None,
-        })
-        .collect()
-}
-
-fn req() -> ChatRequest {
-    ChatRequest {
-        model: "test-model".to_string(),
-        messages: vec![ChatMessage {
-            role: Role::User,
-            content: "hi".to_string(),
-        }],
-    }
-}
-
-fn sse(payloads: &[&str]) -> String {
-    payloads
-        .iter()
-        .map(|p| format!("data: {p}\n\n"))
-        .collect::<Vec<_>>()
-        .join("")
-}
 
 fn provider(server: &MockServer) -> OpenAiCompat {
     OpenAiCompat::new(
