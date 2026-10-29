@@ -13,12 +13,7 @@ pub struct LocalConfig {
     pub transport: Transport,
 }
 
-#[derive(Serialize, Deserialize, Type, Clone, Copy, Debug, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub enum Transport {
-    Https,
-    LocalHttp,
-}
+pub use crate::gateway::url::Transport;
 
 #[derive(Serialize, Deserialize, Type, Clone, Debug, PartialEq)]
 #[serde(tag = "kind", rename_all = "camelCase")]
@@ -36,41 +31,8 @@ struct RawConfig {
 }
 
 pub fn check_base_url(url: &str) -> Result<Transport, ConfigError> {
-    let parsed = reqwest::Url::parse(url)
-        .map_err(|_| ConfigError::InsecureUrl { url: url.to_string() })?;
-
-    match parsed.scheme() {
-        "https" => Ok(Transport::Https),
-        "http" => {
-            let is_local = if let Some(host) = parsed.host_str() {
-                if host == "localhost" {
-                    true
-                } else if let Ok(ip) = host
-                    .trim_start_matches('[')
-                    .trim_end_matches(']')
-                    .parse::<std::net::IpAddr>()
-                {
-                    match ip {
-                        std::net::IpAddr::V4(ipv4) => ipv4.is_loopback() || ipv4.is_private(),
-                        std::net::IpAddr::V6(ipv6) => {
-                            ipv6.is_loopback() || (ipv6.segments()[0] & 0xfe00) == 0xfc00
-                        }
-                    }
-                } else {
-                    false
-                }
-            } else {
-                false
-            };
-
-            if is_local {
-                Ok(Transport::LocalHttp)
-            } else {
-                Err(ConfigError::InsecureUrl { url: url.to_string() })
-            }
-        }
-        _ => Err(ConfigError::InsecureUrl { url: url.to_string() }),
-    }
+    crate::gateway::url::check_base_url(url)
+        .ok_or_else(|| ConfigError::InsecureUrl { url: url.to_string() })
 }
 
 pub fn load(dir: &Path) -> Result<LocalConfig, ConfigError> {

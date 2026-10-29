@@ -32,10 +32,13 @@ The M1 key file (`config.local.json`, `src-tauri/src/config.rs` and the "Configu
 
 ## In progress
 
-None. To claim: task / tool + model / date started / next step.
+Task: M2 Task 2: Anthropic adapter and provider factory
+Tool + model: Antigravity (Gemini 3.8 Flash)
+Date: 2026-10-29
+Next step: Move shared test helpers to tests/common/mod.rs, write failing tests in tests/anthropic.rs
 
 ## Next 3 tasks
 
-1. The M2 plan is approved (2026-10-29, `remark-gfm` kept). Start with Task 1 and claim it in "In progress" first. After Task 5 stop for a review: Tasks 1 to 5 are the security core (keychain, connections service).
-2. Execute M2 Tasks 1 to 5 (Rust: gateway helpers and `list_models`, Anthropic adapter, SQLite store, keychain wrapper, connections service), one commit per task, gate before each commit.
-3. Execute Tasks 6 to 8 (commands, frontend data layer, UI) as one working tree and one commit, then Task 9 (docs) and Task 10 (the human's live check, review, close). Do not tick any M2 box before the human confirms the live check.
+1. Execute Task 2: Anthropic adapter and provider factory with wiremock tests.
+2. Execute Task 3: SQLite store for connections and models.
+3. Execute Task 4: Keychain wrapper (SecretStore, Keychain, MemoryStore).

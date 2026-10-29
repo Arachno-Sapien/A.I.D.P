@@ -81,7 +81,7 @@ pub async fn send_message(
             message: e.to_string(),
         })?;
     let cfg = config::load(&config_dir)?;
-    let provider = OpenAiCompat::new(cfg.base_url, cfg.api_key);
+    let provider = OpenAiCompat::new(reqwest::Client::new(), cfg.base_url, cfg.api_key);
     let req = ChatRequest {
         model: cfg.model,
         messages,

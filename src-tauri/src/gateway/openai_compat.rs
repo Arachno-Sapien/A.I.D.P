@@ -1,8 +1,8 @@
-use crate::gateway::{
-    sse::SseLines, ChatEvent, ChatRequest, ModelProvider, ProviderError, Usage,
+use crate::gateway::http::{
+    list_error, map_http_error, map_reqwest_error, read_sse, Step, LIST_TIMEOUT,
 };
+use crate::gateway::{ChatEvent, ChatRequest, ModelInfo, ModelProvider, ProviderError, Usage};
 use async_trait::async_trait;
-use futures_util::StreamExt;
 use reqwest::header::HeaderValue;
 use secrecy::{ExposeSecret, SecretString};
 use serde::Deserialize;
@@ -17,9 +17,9 @@ pub struct OpenAiCompat {
 }
 
 impl OpenAiCompat {
-    pub fn new(base_url: String, api_key: SecretString) -> Self {
+    pub fn new(client: reqwest::Client, base_url: String, api_key: SecretString) -> Self {
         Self {
-            client: reqwest::Client::new(),
+            client,
             base_url: base_url.trim_end_matches('/').to_string(),
             api_key,
         }
@@ -43,75 +43,92 @@ struct ChunkUsage {
 }
 
 #[derive(Deserialize)]
-struct StreamChunk {
-    #[serde(default)]
-    choices: Vec<ChunkChoice>,
-    usage: Option<ChunkUsage>,
-    // Some providers (OpenRouter) report failures inside a 200 stream.
-    error: Option<ErrorMessage>,
-}
-
-#[derive(Deserialize)]
-struct ErrorEnvelope {
-    error: Option<ErrorMessage>,
-}
-
-#[derive(Deserialize)]
 struct ErrorMessage {
     message: Option<String>,
 }
 
-fn first_200_chars(msg: String) -> String {
-    if msg.chars().count() > 200 {
-        msg.chars().take(200).collect()
-    } else {
-        msg
-    }
-}
-
-fn parse_error_detail(body: &str) -> String {
-    first_200_chars(
-        serde_json::from_str::<ErrorEnvelope>(body)
-            .ok()
-            .and_then(|e| e.error)
-            .and_then(|e| e.message)
-            .unwrap_or_else(|| body.to_string()),
-    )
-}
-
-fn map_http_error(status: u16, retry_after: Option<&str>, body: &str) -> ProviderError {
-    match status {
-        401 | 403 => ProviderError::InvalidKey,
-        429 => ProviderError::RateLimited {
-            retry_after_secs: retry_after.and_then(|h| h.trim().parse::<u32>().ok()),
-        },
-        404 => ProviderError::ModelNotFound,
-        400 if body.contains("context_length_exceeded")
-            || body.contains("maximum context length") =>
-        {
-            ProviderError::ContextTooLong
-        }
-        _ => {
-            let detail = parse_error_detail(body);
-            ProviderError::Provider {
-                message: format!("HTTP {status}: {detail}"),
-            }
-        }
-    }
-}
-
-fn map_reqwest_error(e: reqwest::Error) -> ProviderError {
-    if e.is_connect() || e.is_timeout() {
-        ProviderError::Offline
-    } else {
-        ProviderError::Provider {
-            message: e.to_string(),
-        }
-    }
+#[derive(Deserialize)]
+struct StreamChunk {
+    #[serde(default)]
+    choices: Vec<ChunkChoice>,
+    usage: Option<ChunkUsage>,
+    error: Option<ErrorMessage>,
 }
 
 #[async_trait]
 impl ModelProvider for OpenAiCompat {
+    async fn list_models(&self) -> Result<Vec<ModelInfo>, ProviderError> {
+        let url = format!("{}/models", self.base_url);
+        let mut auth_header =
+            match HeaderValue::from_str(&format!("Bearer {}", self.api_key.expose_secret())) {
+                Ok(val) => val,
+                Err(_) => return Err(ProviderError::InvalidKey),
+            };
+        auth_header.set_sensitive(true);
+
+        let request = self
+            .client
+            .get(&url)
+            .header(reqwest::header::AUTHORIZATION, auth_header)
+            .timeout(LIST_TIMEOUT);
+
+        let resp = match request.send().await {
+            Ok(r) => r,
+            Err(err) => return Err(map_reqwest_error(err)),
+        };
+
+        if !resp.status().is_success() {
+            let status = resp.status().as_u16();
+            let retry_after = resp
+                .headers()
+                .get(reqwest::header::RETRY_AFTER)
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.to_string());
+            let body_text = resp.text().await.unwrap_or_default();
+            let err = map_http_error(status, retry_after.as_deref(), &body_text);
+            return Err(list_error(err));
+        }
+
+        #[derive(Deserialize)]
+        struct ModelItem {
+            id: Option<String>,
+            name: Option<String>,
+            context_length: Option<u32>,
+        }
+
+        #[derive(Deserialize)]
+        struct ModelsResponse {
+            #[serde(default)]
+            data: Vec<ModelItem>,
+        }
+
+        let body = match resp.json::<ModelsResponse>().await {
+            Ok(b) => b,
+            Err(_) => {
+                return Err(ProviderError::Provider {
+                    message: "the provider sent data the app could not read".to_string(),
+                });
+            }
+        };
+
+        let mut models: Vec<ModelInfo> = body
+            .data
+            .into_iter()
+            .filter_map(|m| {
+                let id = m.id?;
+                let display_name = m.name.unwrap_or_else(|| id.clone());
+                Some(ModelInfo {
+                    id,
+                    display_name,
+                    context_window: m.context_length,
+                })
+            })
+            .collect();
+
+        models.sort_by(|a, b| a.id.cmp(&b.id));
+        Ok(models)
+    }
+
     async fn stream_chat(
         &self,
         req: ChatRequest,
@@ -164,80 +181,60 @@ impl ModelProvider for OpenAiCompat {
             return Err(map_http_error(status, retry_after.as_deref(), &body_text));
         }
 
-        let mut stream = resp.bytes_stream();
-        let mut sse_lines = SseLines::default();
         let mut final_usage = Usage::default();
-        let mut done_received = false;
 
-        while !done_received {
-            let next_chunk = match cancel.run_until_cancelled(stream.next()).await {
-                Some(Some(Ok(bytes))) => bytes,
-                Some(Some(Err(_))) => {
+        let on_data = |line: &str| -> Result<Step, ProviderError> {
+            if line == "[DONE]" {
+                return Ok(Step::Done);
+            }
+
+            let chunk: StreamChunk = match serde_json::from_str(line) {
+                Ok(c) => c,
+                Err(_) => {
                     return Err(ProviderError::Provider {
-                        message: "the connection closed before the reply finished".to_string(),
+                        message: "the provider sent data the app could not read".to_string(),
                     });
                 }
-                Some(None) => break,
-                None => return Err(ProviderError::Cancelled),
             };
 
-            let lines = sse_lines.push(&next_chunk);
-            for line in lines {
-                if line == "[DONE]" {
-                    done_received = true;
-                    break;
+            if let Some(err) = chunk.error {
+                let msg = err.message.unwrap_or_else(|| {
+                    "the provider reported an error during the reply".to_string()
+                });
+                return Err(ProviderError::Provider {
+                    message: if msg.chars().count() > 200 {
+                        msg.chars().take(200).collect()
+                    } else {
+                        msg
+                    },
+                });
+            }
+
+            if let Some(usage) = chunk.usage {
+                if usage.prompt_tokens.is_some() {
+                    final_usage.tokens_in = usage.prompt_tokens;
                 }
-
-                let chunk: StreamChunk = match serde_json::from_str(&line) {
-                    Ok(c) => c,
-                    Err(_) => {
-                        return Err(ProviderError::Provider {
-                            message: "the provider sent data the app could not read".to_string(),
-                        });
-                    }
-                };
-
-                if let Some(err) = chunk.error {
-                    return Err(ProviderError::Provider {
-                        message: first_200_chars(err.message.unwrap_or_else(|| {
-                            "the provider reported an error during the reply".to_string()
-                        })),
-                    });
-                }
-
-                if let Some(usage) = chunk.usage {
-                    if usage.prompt_tokens.is_some() {
-                        final_usage.tokens_in = usage.prompt_tokens;
-                    }
-                    if usage.completion_tokens.is_some() {
-                        final_usage.tokens_out = usage.completion_tokens;
-                    }
-                }
-
-                if let Some(content) = chunk
-                    .choices
-                    .first()
-                    .and_then(|c| c.delta.as_ref())
-                    .and_then(|d| d.content.as_deref())
-                    && !content.is_empty()
-                    && out.send(ChatEvent::Delta(content.to_string())).is_err()
-                {
-                    return Err(ProviderError::Cancelled);
+                if usage.completion_tokens.is_some() {
+                    final_usage.tokens_out = usage.completion_tokens;
                 }
             }
-        }
 
-        if !done_received && sse_lines.finish().as_deref() == Some("[DONE]") {
-            done_received = true;
-        }
+            if let Some(content) = chunk
+                .choices
+                .first()
+                .and_then(|c| c.delta.as_ref())
+                .and_then(|d| d.content.as_deref())
+                && !content.is_empty()
+                && out.send(ChatEvent::Delta(content.to_string())).is_err()
+            {
+                return Err(ProviderError::Cancelled);
+            }
 
-        if !done_received {
-            return Err(ProviderError::Provider {
-                message: "the connection closed before the reply finished".to_string(),
-            });
-        }
+            Ok(Step::Continue)
+        };
+
+        read_sse(resp, &cancel, on_data).await?;
 
         Ok(final_usage)
     }
 }
-

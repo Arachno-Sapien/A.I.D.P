@@ -4,8 +4,18 @@ use specta::Type;
 use tauri::ipc::Channel;
 use tokio_util::sync::CancellationToken;
 
+pub mod http;
 pub mod openai_compat;
 pub mod sse;
+pub mod url;
+
+#[derive(Serialize, Deserialize, Type, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelInfo {
+    pub id: String,
+    pub display_name: String,
+    pub context_window: Option<u32>,
+}
 
 #[derive(Serialize, Deserialize, Type, Clone, Debug, PartialEq)]
 #[serde(rename_all = "lowercase")]
@@ -61,6 +71,12 @@ pub enum ChatEvent {
 
 #[async_trait]
 pub trait ModelProvider: Send + Sync {
+    async fn list_models(&self) -> Result<Vec<ModelInfo>, ProviderError>;
+
+    async fn test_connection(&self) -> Result<(), ProviderError> {
+        self.list_models().await.map(|_| ())
+    }
+
     async fn stream_chat(
         &self,
         req: ChatRequest,

@@ -59,6 +59,7 @@ fn sse(payloads: &[&str]) -> String {
 
 fn provider(server: &MockServer) -> OpenAiCompat {
     OpenAiCompat::new(
+        reqwest::Client::new(),
         format!("{}/v1", server.uri()),
         SecretString::from("sk-test".to_string()),
     )
@@ -224,6 +225,7 @@ async fn offline_when_nothing_listens() {
     drop(listener);
 
     let p = OpenAiCompat::new(
+        reqwest::Client::new(),
         format!("http://127.0.0.1:{port}/v1"),
         SecretString::from("sk-test".to_string()),
     );
@@ -296,5 +298,111 @@ async fn provider_error_inside_stream_is_reported() {
         Err(ProviderError::Provider {
             message: "Provider disconnected".to_string()
         })
+    );
+}
+
+#[tokio::test]
+async fn list_models_parses_ids_names_and_context() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/v1/models"))
+        .and(header("authorization", "Bearer sk-test"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "data": [
+                {"id": "b/model-b", "name": "Model B", "context_length": 128000},
+                {"id": "a-model"}
+            ]
+        })))
+        .mount(&server)
+        .await;
+
+    let p = provider(&server);
+    let models = p.list_models().await.unwrap();
+    assert_eq!(
+        models,
+        vec![
+            aidp_lib::gateway::ModelInfo {
+                id: "a-model".to_string(),
+                display_name: "a-model".to_string(),
+                context_window: None,
+            },
+            aidp_lib::gateway::ModelInfo {
+                id: "b/model-b".to_string(),
+                display_name: "Model B".to_string(),
+                context_window: Some(128000),
+            },
+        ]
+    );
+}
+
+#[tokio::test]
+async fn list_models_401_is_invalid_key() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/v1/models"))
+        .respond_with(ResponseTemplate::new(401))
+        .mount(&server)
+        .await;
+
+    let p = provider(&server);
+    let err = p.list_models().await.unwrap_err();
+    assert_eq!(err, ProviderError::InvalidKey);
+}
+
+#[tokio::test]
+async fn list_models_404_points_at_base_url() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/v1/models"))
+        .respond_with(ResponseTemplate::new(404))
+        .mount(&server)
+        .await;
+
+    let p = provider(&server);
+    let err = p.list_models().await.unwrap_err();
+    match err {
+        ProviderError::Provider { message } => {
+            assert!(message.contains("base URL"), "message was: {message}");
+        }
+        _ => panic!("unexpected error: {err:?}"),
+    }
+}
+
+#[tokio::test]
+async fn list_models_empty_is_ok() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/v1/models"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"data": []})))
+        .mount(&server)
+        .await;
+
+    let p = provider(&server);
+    let models = p.list_models().await.unwrap();
+    assert!(models.is_empty());
+}
+
+#[tokio::test]
+async fn test_connection_follows_list_models() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/v1/models"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"data": []})))
+        .up_to_n_times(1)
+        .mount(&server)
+        .await;
+
+    let p = provider(&server);
+    assert!(p.test_connection().await.is_ok());
+
+    Mock::given(method("GET"))
+        .and(path("/v1/models"))
+        .respond_with(ResponseTemplate::new(401))
+        .mount(&server)
+        .await;
+
+    assert_eq!(
+        p.test_connection().await.unwrap_err(),
+        ProviderError::InvalidKey
     );
 }
