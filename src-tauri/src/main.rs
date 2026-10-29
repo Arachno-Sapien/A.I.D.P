@@ -3,7 +3,7 @@
 
 fn main() {
     if let Err(e) = aidp_lib::run() {
-        eprintln!("aidp failed to start: {e}");
+        eprintln!("A.I.D.P failed to start: {e}");
         std::process::exit(1);
     }
 }

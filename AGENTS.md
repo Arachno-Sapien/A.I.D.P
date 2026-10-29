@@ -350,7 +350,7 @@ Test machines: dev laptop (RTX 3050 Ti 4 GB VRAM, 24 GB RAM) and one 8 GB RAM ma
 
 ## 14. Open questions (ask the human; don't decide silently)
 
-- App name and repository name (working folder: `A.I.D.P`)
+- Repository name (app name decided in `docs/decisions/0003-app-name.md`; the acronym expansion stays open)
 - v0.1 for Windows only, or all three OSes?
 - Link to the Ollama installer, or download and run it from inside the app?
 - Chat export format: Markdown, JSON, or both?

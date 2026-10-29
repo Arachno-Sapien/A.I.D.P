@@ -1,6 +1,6 @@
 # Setup Guide
 
-This guide walks through taking a fresh Windows machine to a fully running instance of **aidp**.
+This guide walks through taking a fresh Windows machine to a fully running instance of **A.I.D.P**.
 
 ---
 

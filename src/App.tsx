@@ -17,7 +17,7 @@ function App() {
           <div className="w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 font-semibold text-lg">
             AI
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-white">aidp</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-white">A.I.D.P</h1>
           <p className="text-xs text-slate-400">Desktop AI Model App</p>
         </div>
 

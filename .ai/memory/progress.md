@@ -26,7 +26,7 @@ Updated: 2026-10-29 by Antigravity (Gemini 3.8 Flash)
 - AGENTS.md (shared rules), CLAUDE.md and GEMINI.md (pointers), .ai/memory/
 - 8 agent skills in `.agents/skills/` + `.claude/skills/`, recorded in `skills-lock.json` (AGENTS.md section 12)
 - Repo hygiene: `.gitattributes` (LF), `.gitignore` (ignoring `.serena/`), M0 plan reviewed and approved
-- Scaffolded Tauri 2 + React 19 + TypeScript + Vite (`aidp`, `com.aidp.desktop`)
+- Scaffolded Tauri 2 + React 19 + TypeScript + Vite (display name A.I.D.P; internal `aidp` / `com.aidp.desktop`)
 - Typed IPC with `tauri-specta` exporting `src/lib/bindings.ts` via unit test
 - Hardened security: strict production CSP, opener plugin removed, clippy denying unwrap/expect
 - Added Windows Common-Controls v6 linker directive in `src-tauri/build.rs` to fix `STATUS_ENTRYPOINT_NOT_FOUND`

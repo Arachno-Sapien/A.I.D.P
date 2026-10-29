@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Project documentation suite: Setup Guide (`docs/setup.md`), Phase Plan (`docs/phases/M0.md`), and Architecture Decision Records (`0001-use-tauri.md`, `0002-bindings-exported-by-test.md`).
 - Moved master design document to `docs/design.md`.
 
+### Changed
+- App display name is now **A.I.D.P** (window title, page title, heading). Internal names stay `aidp`.
+
 ### Security
 - Strict Content Security Policy (`default-src 'self' ipc: http://ipc.localhost`) in production with development-only CSP for Vite HMR.
 - Removed unused Tauri plugins (opener plugin disabled).
