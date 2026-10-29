@@ -4,6 +4,7 @@ use specta::Type;
 use tauri::ipc::Channel;
 use tokio_util::sync::CancellationToken;
 
+pub mod openai_compat;
 pub mod sse;
 
 #[derive(Serialize, Deserialize, Type, Clone, Debug, PartialEq)]

@@ -28,17 +28,18 @@ For M1 only, the key comes from a git-ignored local config file (`config.local.j
 
 - M0 Setup, closed 2026-10-29: app shell, typed IPC, gate, CI, docs, license, README, and the re-plan around the coding workspace. Details in `docs/phases/M0.md`; decisions 0001 to 0005 in `docs/decisions/`.
 - M1 Task 1: Gateway types (`ModelProvider`, `ChatEvent`, `ProviderError`, `Role`, `ChatMessage`, `ChatRequest`, `Usage`) and `SseLines` parser with tests.
+- M1 Task 2: `OpenAiCompat` streaming adapter with 8 wiremock tests, decision record 0006 (`native-tls`), and docs.
 
 ## In progress
 
 Plan: `docs/superpowers/plans/2026-10-29-m1-chat.md`
-Current task: Task 2: OpenAI-compatible adapter
+Current task: Task 3: Local config file loader
 Agent: Antigravity (Gemini 3.8 Flash)
 Date: 2026-10-29
-Next step: Add reqwest, futures-util, secrecy dependencies and wiremock dev-dep, create decision 0006
+Next step: Create src-tauri/src/config.rs with failing tests for LocalConfig, check_base_url, and secret redaction
 
 ## Next 3 tasks
 
-1. Execute Task 2: `OpenAiCompat` adapter with wiremock tests and decision record 0006.
-2. Execute Task 3: Local config file loader for M1 key with security rules.
-3. Execute Task 4: Chat commands, Stop, and navigation guard.
+1. Execute Task 3: Local config file loader for M1 key with security rules.
+2. Execute Task 4: Chat commands, Stop, and navigation guard.
+3. Execute Task 5: Chat store and error messages.

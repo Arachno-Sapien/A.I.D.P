@@ -68,7 +68,7 @@ Chosen for low memory use and tools agents know well. **No new dependency withou
 | Styling | Tailwind CSS (no component library) |
 | UI state | Zustand |
 | Typed IPC | tauri-specta (generates `src/lib/bindings.ts`) |
-| HTTP + async | reqwest + tokio (cancellation: `tokio_util::sync::CancellationToken`) |
+| HTTP + async | reqwest (native-tls, decision 0006) + tokio (cancellation: `tokio_util::sync::CancellationToken`) |
 | Key storage | `keyring` crate (Windows Credential Manager / macOS Keychain / Linux Secret Service) |
 | Secret handling | `secrecy` crate (`Secret` prints as `[REDACTED]`) |
 | Database | SQLite via `rusqlite`, accessed only from Rust |

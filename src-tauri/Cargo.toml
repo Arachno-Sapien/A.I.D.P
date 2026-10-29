@@ -26,6 +26,13 @@ specta = "=2.0.0-rc.26"
 specta-typescript = "=0.0.13"
 async-trait = "0.1"
 tokio-util = "0.7"
+futures-util = "0.3"
+secrecy = "0.10"
+reqwest = { version = "0.13", default-features = false, features = ["native-tls", "charset", "http2", "system-proxy", "json", "stream"] }
+
+[dev-dependencies]
+wiremock = "0.6"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 
 [lints.clippy]
 unwrap_used = "deny"
