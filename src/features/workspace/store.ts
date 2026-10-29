@@ -1,10 +1,12 @@
 import { create } from "zustand";
+import type { ApplyTarget } from "../chat/store";
 import {
   commands,
   type DirEntry,
   type LineEnding,
   type WorkspaceInfo,
 } from "../../lib/bindings";
+import { applyProposal } from "./applyProposal";
 import { buffers } from "./buffers";
 import { createState } from "./cm";
 import { workspaceErrorText } from "./workspaceErrorText";
@@ -24,6 +26,12 @@ export interface Conflict {
   kind: "changedOnDisk" | "deleted";
 }
 
+export interface Proposal {
+  path: string;
+  original: string;
+  proposed: string;
+}
+
 export interface WorkspaceStore {
   info: WorkspaceInfo | null;
   recent: string[];
@@ -34,6 +42,9 @@ export interface WorkspaceStore {
   tabs: Tab[];
   active: string | null;
   conflict: Conflict | null;
+  proposal: Proposal | null;
+  gitWarned: boolean;
+  needsGitConfirm: boolean;
 
   loadRecent(): Promise<void>;
   openFolder(): Promise<void>;
@@ -49,6 +60,11 @@ export interface WorkspaceStore {
   save(path: string, options?: { overwrite?: boolean }): Promise<void>;
   reload(path: string): Promise<void>;
   closeTab(path: string): void;
+
+  propose(target: ApplyTarget, code: string): Promise<void>;
+  acceptProposal(): Promise<void>;
+  confirmGit(): Promise<void>;
+  rejectProposal(): void;
 }
 
 export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
@@ -61,6 +77,9 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   tabs: [],
   active: null,
   conflict: null,
+  proposal: null,
+  gitWarned: false,
+  needsGitConfirm: false,
 
   loadRecent: async () => {
     const res = await commands.recentFolders();
@@ -75,7 +94,15 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       if (res.data === null) {
         return;
       }
-      set({ info: res.data, children: {}, expanded: {}, error: null });
+      set({
+        info: res.data,
+        children: {},
+        expanded: {},
+        error: null,
+        proposal: null,
+        gitWarned: false,
+        needsGitConfirm: false,
+      });
       const listRes = await commands.listDir("");
       if (listRes.status === "ok") {
         set({ children: { "": listRes.data } });
@@ -89,7 +116,15 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   openRecent: async (path: string) => {
     const res = await commands.openRecent(path);
     if (res.status === "ok") {
-      set({ info: res.data, children: {}, expanded: {}, error: null });
+      set({
+        info: res.data,
+        children: {},
+        expanded: {},
+        error: null,
+        proposal: null,
+        gitWarned: false,
+        needsGitConfirm: false,
+      });
       const listRes = await commands.listDir("");
       if (listRes.status === "ok") {
         set({ children: { "": listRes.data } });
@@ -112,6 +147,9 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       tabs: [],
       active: null,
       conflict: null,
+      proposal: null,
+      gitWarned: false,
+      needsGitConfirm: false,
     });
     void get().loadRecent();
   },
@@ -297,5 +335,106 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       active: nextActive,
       conflict: s.conflict?.path === path ? null : s.conflict,
     }));
+  },
+
+  propose: async (target: ApplyTarget, code: string) => {
+    let tab = get().tabs.find((t) => t.path === target.path);
+    if (!tab) {
+      await get().openFile(target.path);
+      tab = get().tabs.find((t) => t.path === target.path);
+    }
+    if (!tab) {
+      return;
+    }
+    if (tab.dirty) {
+      set({
+        error: `Cannot apply changes to ${tab.name} because it has unsaved edits. Save or discard them first.`,
+        proposal: null,
+      });
+      return;
+    }
+    const doc = buffers.text(tab.path) ?? "";
+    const res = applyProposal(doc, target.selection, code);
+    if (!res.ok) {
+      const msg =
+        res.reason === "selectionChanged"
+          ? `The selected code in ${tab.name} has changed.`
+          : `The selected code in ${tab.name} is ambiguous.`;
+      set({ error: msg, proposal: null });
+      return;
+    }
+    set({
+      proposal: {
+        path: tab.path,
+        original: doc,
+        proposed: res.text,
+      },
+      error: null,
+    });
+  },
+
+  acceptProposal: async () => {
+    const { proposal, info, gitWarned, tabs } = get();
+    if (!proposal) return;
+
+    if (info && !info.isGit && !gitWarned) {
+      set({ needsGitConfirm: true });
+      return;
+    }
+
+    const tab = tabs.find((t) => t.path === proposal.path);
+    if (!tab) return;
+
+    const res = await commands.writeFile({
+      path: proposal.path,
+      text: proposal.proposed,
+      lineEnding: tab.lineEnding,
+      hasBom: tab.hasBom,
+      expectedVersion: tab.version,
+    });
+
+    if (res.status === "error") {
+      if (res.error.kind === "changedOnDisk") {
+        set({ conflict: { path: proposal.path, kind: "changedOnDisk" } });
+      } else if (res.error.kind === "notFound") {
+        set({ conflict: { path: proposal.path, kind: "deleted" } });
+      } else {
+        set({ error: workspaceErrorText(res.error) });
+      }
+      return;
+    }
+
+    const newVersion = res.data;
+    const newState = createState(proposal.proposed, tab.name, {
+      onChange: () => {
+        get().setDirty(tab.path, buffers.isDirty(tab.path));
+      },
+      onSave: () => {
+        void get().save(tab.path);
+      },
+    });
+    buffers.set(tab.path, newState);
+    buffers.markSaved(tab.path);
+
+    set((state) => ({
+      tabs: state.tabs.map((t) =>
+        t.path === proposal.path
+          ? { ...t, version: newVersion, dirty: false }
+          : t,
+      ),
+      proposal: null,
+      needsGitConfirm: false,
+      conflict: null,
+      error: null,
+    }));
+  },
+
+  confirmGit: async () => {
+    set({ gitWarned: true, needsGitConfirm: false });
+    await get().acceptProposal();
+  },
+
+  rejectProposal: () => {
+    set({ proposal: null, needsGitConfirm: false });
   },
 }));

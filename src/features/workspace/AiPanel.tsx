@@ -20,7 +20,7 @@ export interface AiPanelProps {
 }
 
 export function AiPanel({ onApply }: AiPanelProps) {
-  const { tabs, active } = useWorkspaceStore();
+  const { tabs, active, propose } = useWorkspaceStore();
   const { messages, streaming, send, stop } = useWorkspaceChatStore();
   const { selected } = useModelsStore();
 
@@ -119,6 +119,14 @@ export function AiPanel({ onApply }: AiPanelProps) {
     await send(question, selected, extra);
   };
 
+  const handleApply = (code: string, language: string, message: UiMessage) => {
+    if (onApply) {
+      onApply(code, language, message);
+    } else if (message.target) {
+      void propose(message.target, code);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full bg-neutral-900/30 border-l border-neutral-800 text-neutral-100">
       <ModelPicker />
@@ -195,7 +203,7 @@ export function AiPanel({ onApply }: AiPanelProps) {
       )}
 
       {/* Message list */}
-      <MessageList messages={messages} onApply={onApply} />
+      <MessageList messages={messages} onApply={handleApply} />
 
       {/* Composer */}
       <Composer

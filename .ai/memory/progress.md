@@ -34,10 +34,10 @@ Plan (approved 2026-10-30, defaults for D1 to D3): `docs/superpowers/plans/2026-
 
 ## In progress
 
-Task: M3 Task 9: apply, diff, Accept
+Task: M3 Task 10: never lose unsaved work on close
 Tool + model: Antigravity (Gemini 3.8 Flash)
 Date: 2026-10-30
-Next step: Step 1 of Task 9: install `@codemirror/merge@^6`, create `applyProposal.ts`, `cm.ts: mountDiff`, and proposal store state.
+Next step: Step 1 of Task 10: implement close_guard.rs, set_unsaved, watch_close, quit_app, App.tsx prompt.
 
 ## Next 3 tasks
 

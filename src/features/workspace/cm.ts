@@ -4,6 +4,7 @@ import { EditorView, keymap } from "@codemirror/view";
 import { oneDark } from "@codemirror/theme-one-dark";
 import { languages } from "@codemirror/language-data";
 import { LanguageDescription } from "@codemirror/language";
+import { unifiedMergeView } from "@codemirror/merge";
 
 export interface CreateStateOptions {
   onChange?: (text: string) => void;
@@ -59,6 +60,28 @@ export function createState(
 }
 
 export function mountView(parent: HTMLElement, state: EditorState): EditorView {
+  return new EditorView({
+    state,
+    parent,
+  });
+}
+
+export function mountDiff(
+  parent: HTMLElement,
+  original: string,
+  proposed: string,
+): EditorView {
+  const state = EditorState.create({
+    doc: proposed,
+    extensions: [
+      basicSetup,
+      oneDark,
+      EditorState.readOnly.of(true),
+      EditorView.editable.of(false),
+      unifiedMergeView({ original, mergeControls: false }),
+    ],
+  });
+
   return new EditorView({
     state,
     parent,

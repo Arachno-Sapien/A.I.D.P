@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { AiPanel } from "./AiPanel";
+import { DiffView } from "./DiffView";
 import { EditorPane } from "./EditorPane";
 import { FileTree } from "./FileTree";
 import { useWorkspaceStore } from "./store";
@@ -11,6 +12,7 @@ export function WorkspaceScreen() {
     children,
     expanded,
     error,
+    proposal,
     loadRecent,
     openFolder,
     openRecent,
@@ -138,9 +140,9 @@ export function WorkspaceScreen() {
           />
         </div>
 
-        {/* Center: Editor */}
+        {/* Center: Editor or DiffView */}
         <div className="flex-1 overflow-hidden bg-neutral-950 flex flex-col">
-          <EditorPane />
+          {proposal ? <DiffView /> : <EditorPane />}
         </div>
 
         {/* Right: AI Panel */}

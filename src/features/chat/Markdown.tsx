@@ -7,10 +7,12 @@ function CodeBlock({
   code,
   language,
   onApply,
+  applyDisabled,
 }: {
   code: string;
   language: string;
   onApply?: (code: string, language: string) => void;
+  applyDisabled?: boolean;
 }) {
   const [copied, setCopied] = useState(false);
 
@@ -28,8 +30,9 @@ function CodeBlock({
           {onApply && (
             <button
               type="button"
+              disabled={applyDisabled}
               onClick={() => onApply(code, language)}
-              className="cursor-pointer rounded px-2 py-0.5 hover:bg-neutral-800"
+              className="cursor-pointer rounded px-2 py-0.5 hover:bg-neutral-800 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Apply
             </button>
@@ -64,9 +67,11 @@ function CodeBlock({
 export function Markdown({
   text,
   onApply,
+  applyDisabled,
 }: {
   text: string;
   onApply?: (code: string, language: string) => void;
+  applyDisabled?: boolean;
 }) {
   return (
     <div className="reply-md">
@@ -89,7 +94,12 @@ export function Markdown({
               const language = match ? match[1] : "";
               const code = raw.replace(/\n$/, "");
               return (
-                <CodeBlock code={code} language={language} onApply={onApply} />
+                <CodeBlock
+                  code={code}
+                  language={language}
+                  onApply={onApply}
+                  applyDisabled={applyDisabled}
+                />
               );
             }
 

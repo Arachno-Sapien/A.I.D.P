@@ -60,6 +60,7 @@ export function MessageList({ messages, onApply }: MessageListProps) {
               <>
                 <Markdown
                   text={msg.text}
+                  applyDisabled={msg.status === "streaming"}
                   onApply={
                     onApply
                       ? (code, language) => onApply(code, language, msg)

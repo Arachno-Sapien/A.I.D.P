@@ -13,6 +13,7 @@ vi.mock("../../lib/bindings", () => ({
 }));
 
 import { commands } from "../../lib/bindings";
+import { buffers } from "./buffers";
 import { useWorkspaceStore } from "./store";
 
 describe("useWorkspaceStore", () => {
@@ -27,6 +28,9 @@ describe("useWorkspaceStore", () => {
       tabs: [],
       active: null,
       conflict: null,
+      proposal: null,
+      gitWarned: false,
+      needsGitConfirm: false,
     });
   });
 
@@ -281,6 +285,156 @@ describe("useWorkspaceStore", () => {
     expect(useWorkspaceStore.getState().tabs[0]?.dirty).toBe(false);
     expect(useWorkspaceStore.getState().tabs[0]?.version).toBe("v2");
     expect(useWorkspaceStore.getState().conflict).toBeNull();
+  });
+
+  it("reject never writes", () => {
+    useWorkspaceStore.setState({
+      proposal: { path: "a.ts", original: "orig", proposed: "prop" },
+    });
+
+    useWorkspaceStore.getState().rejectProposal();
+
+    expect(useWorkspaceStore.getState().proposal).toBeNull();
+    expect(commands.writeFile).not.toHaveBeenCalled();
+  });
+
+  it("accept writes exactly the proposed text", async () => {
+    vi.mocked(commands.writeFile).mockResolvedValueOnce({
+      status: "ok",
+      data: "v2",
+    });
+
+    useWorkspaceStore.setState({
+      info: { name: "repo", path: "/repo", isGit: true },
+      tabs: [
+        {
+          path: "a.ts",
+          name: "a.ts",
+          version: "v1",
+          lineEnding: "lf",
+          hasBom: false,
+          isSecret: false,
+          dirty: false,
+        },
+      ],
+      proposal: { path: "a.ts", original: "hello", proposed: "hello world" },
+    });
+
+    await useWorkspaceStore.getState().acceptProposal();
+
+    expect(commands.writeFile).toHaveBeenCalledWith({
+      path: "a.ts",
+      text: "hello world",
+      lineEnding: "lf",
+      hasBom: false,
+      expectedVersion: "v1",
+    });
+
+    expect(buffers.text("a.ts")).toBe("hello world");
+    const tab = useWorkspaceStore.getState().tabs[0];
+    expect(tab?.version).toBe("v2");
+    expect(tab?.dirty).toBe(false);
+    expect(useWorkspaceStore.getState().proposal).toBeNull();
+  });
+
+  it("asks once in a folder without git", async () => {
+    vi.mocked(commands.writeFile).mockResolvedValue({
+      status: "ok",
+      data: "v2",
+    });
+
+    useWorkspaceStore.setState({
+      info: { name: "no-git", path: "/no-git", isGit: false },
+      gitWarned: false,
+      tabs: [
+        {
+          path: "a.ts",
+          name: "a.ts",
+          version: "v1",
+          lineEnding: "lf",
+          hasBom: false,
+          isSecret: false,
+          dirty: false,
+        },
+      ],
+      proposal: { path: "a.ts", original: "hello", proposed: "hello world" },
+    });
+
+    await useWorkspaceStore.getState().acceptProposal();
+
+    expect(commands.writeFile).not.toHaveBeenCalled();
+    expect(useWorkspaceStore.getState().needsGitConfirm).toBe(true);
+
+    await useWorkspaceStore.getState().confirmGit();
+
+    expect(commands.writeFile).toHaveBeenCalledTimes(1);
+    expect(useWorkspaceStore.getState().gitWarned).toBe(true);
+    expect(useWorkspaceStore.getState().needsGitConfirm).toBe(false);
+
+    useWorkspaceStore.setState({
+      proposal: { path: "a.ts", original: "hello world", proposed: "done" },
+    });
+
+    await useWorkspaceStore.getState().acceptProposal();
+    expect(commands.writeFile).toHaveBeenCalledTimes(2);
+  });
+
+  it("refuses to apply to a file with unsaved edits", async () => {
+    useWorkspaceStore.setState({
+      tabs: [
+        {
+          path: "a.ts",
+          name: "a.ts",
+          version: "v1",
+          lineEnding: "lf",
+          hasBom: false,
+          isSecret: false,
+          dirty: true,
+        },
+      ],
+    });
+
+    await useWorkspaceStore
+      .getState()
+      .propose({ path: "a.ts", selection: null }, "new code");
+
+    expect(useWorkspaceStore.getState().proposal).toBeNull();
+    expect(useWorkspaceStore.getState().error).toContain("a.ts");
+  });
+
+  it("a conflict at accept keeps the proposal", async () => {
+    vi.mocked(commands.writeFile).mockResolvedValueOnce({
+      status: "error",
+      error: { kind: "changedOnDisk" },
+    });
+
+    useWorkspaceStore.setState({
+      info: { name: "repo", path: "/repo", isGit: true },
+      tabs: [
+        {
+          path: "a.ts",
+          name: "a.ts",
+          version: "v1",
+          lineEnding: "lf",
+          hasBom: false,
+          isSecret: false,
+          dirty: false,
+        },
+      ],
+      proposal: { path: "a.ts", original: "hello", proposed: "hello world" },
+    });
+
+    await useWorkspaceStore.getState().acceptProposal();
+
+    expect(useWorkspaceStore.getState().proposal).toEqual({
+      path: "a.ts",
+      original: "hello",
+      proposed: "hello world",
+    });
+    expect(useWorkspaceStore.getState().conflict).toEqual({
+      path: "a.ts",
+      kind: "changedOnDisk",
+    });
   });
 });
 
