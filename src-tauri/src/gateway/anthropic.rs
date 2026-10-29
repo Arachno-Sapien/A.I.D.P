@@ -5,6 +5,7 @@ use crate::gateway::{
     ChatEvent, ChatRequest, ModelInfo, ModelProvider, ProviderError, Role, Usage,
 };
 use async_trait::async_trait;
+use reqwest::header::HeaderValue;
 use secrecy::{ExposeSecret, SecretString};
 use serde::Deserialize;
 use serde_json::json;
@@ -34,9 +35,16 @@ impl Anthropic {
     pub fn new(client: reqwest::Client, base_url: String, api_key: SecretString) -> Self {
         Self {
             client,
-            base_url,
+            base_url: base_url.trim_end_matches('/').to_string(),
             api_key,
         }
+    }
+
+    fn key_header(&self) -> Result<HeaderValue, ProviderError> {
+        let mut value = HeaderValue::from_str(self.api_key.expose_secret())
+            .map_err(|_| ProviderError::InvalidKey)?;
+        value.set_sensitive(true);
+        Ok(value)
     }
 }
 
@@ -119,7 +127,7 @@ impl ModelProvider for Anthropic {
         let resp = self
             .client
             .get(&url)
-            .header("x-api-key", self.api_key.expose_secret())
+            .header("x-api-key", self.key_header()?)
             .header("anthropic-version", "2026-10-21")
             .timeout(LIST_TIMEOUT)
             .send()
@@ -197,7 +205,7 @@ impl ModelProvider for Anthropic {
         let request = self
             .client
             .post(&url)
-            .header("x-api-key", self.api_key.expose_secret())
+            .header("x-api-key", self.key_header()?)
             .header("anthropic-version", "2026-10-21")
             .header("content-type", "application/json")
             .json(&body_json);
@@ -215,7 +223,10 @@ impl ModelProvider for Anthropic {
             .map(|s| s.to_string());
 
         if !status.is_success() {
-            let body = resp.text().await.unwrap_or_default();
+            let body = match cancel.run_until_cancelled(resp.text()).await {
+                Some(text) => text.unwrap_or_default(),
+                None => return Err(ProviderError::Cancelled),
+            };
             return Err(map_http_error(
                 status.as_u16(),
                 retry_after.as_deref(),
@@ -228,7 +239,15 @@ impl ModelProvider for Anthropic {
         read_sse(resp, &cancel, |payload| {
             let event = match serde_json::from_str::<StreamEvent>(payload) {
                 Ok(ev) => ev,
-                Err(_) => return Ok(Step::Continue),
+                // Valid JSON in a shape we don't know is a newer event: skip it.
+                Err(_) if serde_json::from_str::<serde::de::IgnoredAny>(payload).is_ok() => {
+                    return Ok(Step::Continue);
+                }
+                Err(_) => {
+                    return Err(ProviderError::Provider {
+                        message: "the provider sent data the app could not read".to_string(),
+                    });
+                }
             };
 
             match event {
@@ -244,8 +263,9 @@ impl ModelProvider for Anthropic {
                     if let Some(d) = delta
                         && d.delta_type.as_deref() == Some("text_delta")
                         && let Some(text) = d.text
+                        && out.send(ChatEvent::Delta(text)).is_err()
                     {
-                        let _ = out.send(ChatEvent::Delta(text));
+                        return Err(ProviderError::Cancelled);
                     }
                     Ok(Step::Continue)
                 }

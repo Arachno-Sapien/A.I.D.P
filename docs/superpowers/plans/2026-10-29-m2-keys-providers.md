@@ -1,6 +1,6 @@
 # M2 Keys and Providers Implementation Plan
 
-> **Status: approved by the human on 2026-10-29** (decision D1: `remark-gfm` stays in). Execute from Task 1. After Task 5, stop for a review before starting Task 6.
+> **Status: approved by the human on 2026-10-29** (decision D1: `remark-gfm` stays in). Tasks 1 to 5 are done and reviewed (2026-10-30; review fixes listed in `docs/phases/M2.md`). Continue from Task 6; Tasks 6, 7 and 8 go in one commit.
 
 > **For agentic workers:** execute task by task, in order, inline in one session (the tasks share files). In Claude Code, `superpowers:executing-plans` fits; in other tools, follow the steps directly. Steps use checkbox (`- [ ]`) syntax. **Get the human's OK on this plan before Task 1. Do not tick any milestone box, in any file, until the human confirms the live check in Task 10. Do not push; the human decides.**
 

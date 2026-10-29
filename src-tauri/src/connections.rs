@@ -149,7 +149,7 @@ impl Services {
             return Err(AppError::InsecureUrl { url: base_url });
         }
 
-        let secret_key = SecretString::from(input.api_key);
+        let secret_key = SecretString::from(key.to_string());
         let prov = provider(
             input.kind,
             self.http.clone(),
@@ -253,7 +253,8 @@ impl Services {
     }
 
     pub async fn replace_key(&self, id: u32, api_key: String) -> Result<ConnectionView, AppError> {
-        if api_key.trim().is_empty() {
+        let api_key = api_key.trim();
+        if api_key.is_empty() {
             return Err(AppError::InvalidInput {
                 message: "key cannot be empty".to_string(),
             });
@@ -266,7 +267,7 @@ impl Services {
             get_connection(&db, id)?.ok_or(AppError::NotFound)?
         };
 
-        let new_secret_key = SecretString::from(api_key);
+        let new_secret_key = SecretString::from(api_key.to_string());
         let prov = provider(
             row.kind,
             self.http.clone(),

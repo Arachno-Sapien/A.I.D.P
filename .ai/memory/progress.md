@@ -1,6 +1,6 @@
 # Progress
 
-Updated: 2026-10-29 by Claude Code (Sonnet 5.5)
+Updated: 2026-10-30 by Claude Code (Opus 5.5)
 
 ## Current milestone: M2 Keys and providers
 
@@ -10,6 +10,8 @@ M1 is closed and pushed (summary in `docs/phases/M1.md`). The M2 plan is written
 - [ ] Keys saved in Windows Credential Manager, never in SQLite
 - [ ] Anthropic adapter streams replies
 - [ ] Every error kind shows a clear message in the UI
+
+Tasks 1 to 5 (gateway helpers, Anthropic adapter, SQLite store, keychain wrapper, connections service) are done and reviewed, 2026-10-30. No box is ticked: each needs the UI (Tasks 6 to 8) and the human's live check (Task 10).
 
 The M1 key file (`config.local.json`, `src-tauri/src/config.rs` and the "Configuration Required" panel) is deleted in M2. First launch asks for the provider details itself ("Add a model"), as the human asked on 2026-10-29. Carry-overs from M1 are in `docs/phases/M1.md` under "What's left".
 
@@ -32,13 +34,13 @@ The M1 key file (`config.local.json`, `src-tauri/src/config.rs` and the "Configu
 
 ## In progress
 
-Task: M2 Tasks 1 to 5 completed. Paused at user boundary.
-Tool + model: Antigravity (Gemini 3.8 Flash)
-Date: 2026-10-30
-Next step: Task 6 (Commands, app state, chat rewrite; delete the config path) after user review.
+Nothing in progress. Review fixes for Tasks 1 to 5 are committed (Claude Code, Opus 5.5, 2026-10-30).
+Next step: plan Task 6 (`src-tauri/src/commands/connections.rs`, app state in `lib.rs`, chat rewrite, delete `config.rs`).
 
 ## Next 3 tasks
 
+Tasks 6, 7 and 8 go in **one commit**: Task 6 alone breaks the frontend typecheck, and a red tree must not be committed.
+
 1. Task 6: Commands, app state, chat rewrite; delete the config path.
-2. Task 7: Models screen and connections UI.
-3. Task 8: Settings and default model.
+2. Task 7: Frontend data layer and error copy.
+3. Task 8: UI: first-run flow, Models page, model picker (step 6 adds `remark-gfm`).

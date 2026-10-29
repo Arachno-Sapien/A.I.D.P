@@ -202,7 +202,12 @@ async fn key_is_not_in_the_database_file() {
         .mount(&server)
         .await;
 
-    let temp_dir = std::env::temp_dir().join(format!("aidp-test-{}", std::time::SystemTime::now().elapsed().unwrap().as_nanos()));
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let temp_dir =
+        std::env::temp_dir().join(format!("aidp-test-{}-{nanos}", std::process::id()));
     std::fs::create_dir_all(&temp_dir).unwrap();
     let db_path = temp_dir.join("test.db");
 
@@ -306,6 +311,52 @@ async fn replace_key_swaps_after_a_good_test() {
         .await
         .unwrap();
 
+    assert_eq!(updated.key_hint, "cdef");
+    assert_eq!(
+        store.get(id).unwrap().expose_secret(),
+        "sk-new-0123456789abcdef"
+    );
+}
+
+#[tokio::test]
+async fn keys_are_trimmed_before_saving() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/v1/models"))
+        .and(header("authorization", "Bearer sk-pad-0123456789abcdef"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"data": []})))
+        .mount(&server)
+        .await;
+
+    let store = Arc::new(MemoryStore::default());
+    let services = create_services(store.clone());
+
+    let input = NewConnection {
+        kind: ConnectionKind::OpenaiCompat,
+        label: "Pasted".to_string(),
+        base_url: format!("{}/v1", server.uri()),
+        api_key: "  sk-pad-0123456789abcdef\n".to_string(),
+    };
+    let added = services.add_connection(input).await.unwrap();
+    let id = added.connection.id;
+    assert_eq!(added.connection.key_hint, "cdef");
+    assert_eq!(
+        store.get(id).unwrap().expose_secret(),
+        "sk-pad-0123456789abcdef"
+    );
+
+    server.reset().await;
+    Mock::given(method("GET"))
+        .and(path("/v1/models"))
+        .and(header("authorization", "Bearer sk-new-0123456789abcdef"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"data": []})))
+        .mount(&server)
+        .await;
+
+    let updated = services
+        .replace_key(id, "\tsk-new-0123456789abcdef \r\n".to_string())
+        .await
+        .unwrap();
     assert_eq!(updated.key_hint, "cdef");
     assert_eq!(
         store.get(id).unwrap().expose_secret(),

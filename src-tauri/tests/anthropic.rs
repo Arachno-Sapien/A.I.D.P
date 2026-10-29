@@ -3,13 +3,14 @@
 mod common;
 
 use aidp_lib::gateway::{
-    anthropic::Anthropic, provider, ChatMessage, ChatRequest, ConnectionKind,
+    anthropic::Anthropic, provider, ChatEvent, ChatMessage, ChatRequest, ConnectionKind,
     ModelInfo, ModelProvider, ProviderError, Role, Usage,
 };
 use common::{capture, deltas, events, req};
 use secrecy::SecretString;
 use serde_json::json;
 use std::time::{Duration, Instant};
+use tauri::ipc::Channel;
 use tokio_util::sync::CancellationToken;
 use wiremock::matchers::{body_partial_json, header, method, path};
 use wiremock::{Match, Mock, MockServer, Request, ResponseTemplate};
@@ -233,6 +234,74 @@ async fn refusal_is_an_error() {
             message: "The model declined to answer this request.".to_string()
         }
     );
+}
+
+#[tokio::test]
+async fn malformed_event_is_an_error() {
+    let server = MockServer::start().await;
+    let body = events(&[
+        (
+            "content_block_delta",
+            r#"{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"x"}}"#,
+        ),
+        ("content_block_delta", "{not json"),
+        ("message_stop", r#"{"type":"message_stop"}"#),
+    ]);
+
+    Mock::given(method("POST"))
+        .and(path("/v1/messages"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .insert_header("content-type", "text/event-stream")
+                .set_body_string(body),
+        )
+        .mount(&server)
+        .await;
+
+    let p = test_provider(&server);
+    let (channel, captured) = capture();
+    let err = p
+        .stream_chat(req(), channel, CancellationToken::new())
+        .await
+        .unwrap_err();
+    assert_eq!(deltas(&captured), vec!["x"]);
+    assert_eq!(
+        err,
+        ProviderError::Provider {
+            message: "the provider sent data the app could not read".to_string()
+        }
+    );
+}
+
+#[tokio::test]
+async fn closed_channel_stops_the_stream() {
+    let server = MockServer::start().await;
+    let body = events(&[
+        (
+            "content_block_delta",
+            r#"{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"x"}}"#,
+        ),
+        ("message_stop", r#"{"type":"message_stop"}"#),
+    ]);
+
+    Mock::given(method("POST"))
+        .and(path("/v1/messages"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .insert_header("content-type", "text/event-stream")
+                .set_body_string(body),
+        )
+        .mount(&server)
+        .await;
+
+    let p = test_provider(&server);
+    let closed: Channel<ChatEvent> =
+        Channel::new(|_| Err(std::io::Error::other("window closed").into()));
+    let err = p
+        .stream_chat(req(), closed, CancellationToken::new())
+        .await
+        .unwrap_err();
+    assert_eq!(err, ProviderError::Cancelled);
 }
 
 #[tokio::test]
