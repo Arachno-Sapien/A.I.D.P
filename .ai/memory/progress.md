@@ -1,10 +1,10 @@
 # Progress
 
-Updated: 2026-10-29 by Antigravity (Gemini 3.8 Flash)
+Updated: 2026-10-29 by Claude Code (Opus 5.5)
 
 ## Current milestone: M0 Setup
 
-- [ ] `npm run tauri dev` opens an empty window on Windows. *Release binary builds; window not yet confirmed by the human (dev or release)*
+- [x] `npm run tauri dev` opens an empty window on Windows. *Human confirmed 2026-10-29: dev and release windows render, Greet works, no CSP errors*
 - [ ] CI runs clippy, tests, and typecheck on every push (workflow defined in `.github/workflows/ci.yml`; awaiting remote repo confirmation from human)
 - [x] AGENTS.md holds the stack, folder, security, documentation, and memory rules; docs/ and .ai/memory/ exist with templates.
 - [ ] Rust book chapters 1 to 9 read (human)
@@ -35,13 +35,12 @@ Updated: 2026-10-29 by Antigravity (Gemini 3.8 Flash)
 - Verified release build (`src-tauri/target/release/aidp.exe`)
 - Documentation: `docs/design.md` (moved), `docs/setup.md`, `docs/phases/M0.md`, `docs/decisions/0001-use-tauri.md`, `docs/decisions/0002-bindings-exported-by-test.md`, `CHANGELOG.md`
 - GitHub Actions CI workflow (`.github/workflows/ci.yml`) running the 4-part gate and checking for `bindings.ts` drift
+- Review fixes: MSVC-only manifest flag in `build.rs`, CI actions v5, M0 doc deviations recorded, template leftovers (029eb8c)
+- Display name A.I.D.P, internal names unchanged (`docs/decisions/0003-app-name.md`, 0184f01)
 
 ## In progress
 
-Task: M0 review fixes (MSVC-only manifest flag, CI action v5, docs, template leftovers), then human window check
-Agent: Claude Code (Opus 5.5)
-Date: 2026-10-29
-Next step: fixes committed; human confirms dev window (`npm run tauri dev`) and release `src-tauri/target/release/aidp.exe`, then tick the M0 window box
+None. To claim: task / tool + model / date started / next step.
 
 ## Next 3 tasks
 
