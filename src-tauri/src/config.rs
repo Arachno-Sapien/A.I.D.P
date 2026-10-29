@@ -45,7 +45,11 @@ pub fn check_base_url(url: &str) -> Result<Transport, ConfigError> {
             let is_local = if let Some(host) = parsed.host_str() {
                 if host == "localhost" {
                     true
-                } else if let Ok(ip) = host.parse::<std::net::IpAddr>() {
+                } else if let Ok(ip) = host
+                    .trim_start_matches('[')
+                    .trim_end_matches(']')
+                    .parse::<std::net::IpAddr>()
+                {
                     match ip {
                         std::net::IpAddr::V4(ipv4) => ipv4.is_loopback() || ipv4.is_private(),
                         std::net::IpAddr::V6(ipv6) => {
@@ -197,6 +201,22 @@ mod tests {
         ));
         assert!(matches!(
             check_base_url("ftp://example.com"),
+            Err(ConfigError::InsecureUrl { .. })
+        ));
+    }
+
+    #[test]
+    fn ipv6_local_hosts_are_local_http() {
+        assert_eq!(
+            check_base_url("http://[::1]:11434/v1"),
+            Ok(Transport::LocalHttp)
+        );
+        assert_eq!(
+            check_base_url("http://[fd00::5]:8080"),
+            Ok(Transport::LocalHttp)
+        );
+        assert!(matches!(
+            check_base_url("http://[2001:db8::1]/v1"),
             Err(ConfigError::InsecureUrl { .. })
         ));
     }

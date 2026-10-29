@@ -72,6 +72,8 @@ pub async fn send_message(
     messages: Vec<ChatMessage>,
     on_event: Channel<ChatEvent>,
 ) -> Result<(), ConfigError> {
+    // Register first, so a Stop pressed while the config loads isn't lost.
+    let cancel = state.begin();
     let config_dir = app
         .path()
         .app_config_dir()
@@ -80,7 +82,6 @@ pub async fn send_message(
         })?;
     let cfg = config::load(&config_dir)?;
     let provider = OpenAiCompat::new(cfg.base_url, cfg.api_key);
-    let cancel = state.begin();
     let req = ChatRequest {
         model: cfg.model,
         messages,

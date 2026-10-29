@@ -39,10 +39,10 @@ For M1 only, the key comes from a git-ignored local config file (`config.local.j
 ## In progress
 
 Plan: `docs/superpowers/plans/2026-10-29-m1-chat.md`
-Current task: Human live verification & Milestone M1 close
-Agent: Antigravity (Gemini 3.8 Flash)
+Current task: fix the M1 review findings (empty stopped replies in history, in-stream provider errors, Stop before begin, IPv6 local hosts, M1.md boxes)
+Agent: Claude Code (Opus 5.5)
 Date: 2026-10-29
-Next step: Human tests live streaming with config.local.json; tick design.md M1 boxes; archive M1 logs; proceed to M2
+Next step: failing tests in store.test.ts, tests/openai_compat.rs, config.rs; then the fixes
 
 ## Next 3 tasks
 

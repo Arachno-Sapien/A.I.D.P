@@ -131,5 +131,25 @@ describe("useChatStore", () => {
       expect.anything(),
     );
   });
+
+  it("leaves empty replies out of the history", async () => {
+    useChatStore.setState({
+      messages: [
+        { id: "m1", role: "user", text: "a", status: "complete" },
+        { id: "m2", role: "assistant", text: "", status: "stopped" },
+      ],
+      streaming: false,
+    });
+
+    await useChatStore.getState().send("b");
+
+    expect(commands.sendMessage).toHaveBeenCalledWith(
+      [
+        { role: "user", content: "a" },
+        { role: "user", content: "b" },
+      ],
+      expect.anything(),
+    );
+  });
 });
 

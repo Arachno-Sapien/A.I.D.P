@@ -56,7 +56,11 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     };
 
     const history: ChatMessage[] = get()
-      .messages.filter((m) => m.status === "complete" || m.status === "stopped")
+      .messages.filter(
+        (m) =>
+          (m.status === "complete" || m.status === "stopped") &&
+          m.text.trim() !== "",
+      )
       .map((m) => ({ role: m.role, content: m.text }));
 
     history.push({ role: "user", content: trimmed });

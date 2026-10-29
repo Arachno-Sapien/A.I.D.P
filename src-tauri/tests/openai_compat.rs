@@ -265,3 +265,36 @@ async fn stop_cancels_a_waiting_request() {
     );
 }
 
+
+#[tokio::test]
+async fn provider_error_inside_stream_is_reported() {
+    let server = MockServer::start().await;
+    let body = sse(&[
+        r#"{"choices":[{"delta":{"content":"Hel"}}]}"#,
+        r#"{"error":{"code":"server_error","message":"Provider disconnected"},"choices":[{"index":0,"delta":{"content":""},"finish_reason":"error"}]}"#,
+        "[DONE]",
+    ]);
+
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .insert_header("content-type", "text/event-stream")
+                .set_body_string(body),
+        )
+        .mount(&server)
+        .await;
+
+    let (channel, events) = capture();
+    let result = provider(&server)
+        .stream_chat(req(), channel, CancellationToken::new())
+        .await;
+
+    assert_eq!(deltas(&events), vec!["Hel"]);
+    assert_eq!(
+        result,
+        Err(ProviderError::Provider {
+            message: "Provider disconnected".to_string()
+        })
+    );
+}

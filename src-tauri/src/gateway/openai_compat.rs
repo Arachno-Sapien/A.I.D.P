@@ -47,6 +47,8 @@ struct StreamChunk {
     #[serde(default)]
     choices: Vec<ChunkChoice>,
     usage: Option<ChunkUsage>,
+    // Some providers (OpenRouter) report failures inside a 200 stream.
+    error: Option<ErrorMessage>,
 }
 
 #[derive(Deserialize)]
@@ -59,19 +61,22 @@ struct ErrorMessage {
     message: Option<String>,
 }
 
-fn parse_error_detail(body: &str) -> String {
-    let msg = serde_json::from_str::<ErrorEnvelope>(body)
-        .ok()
-        .and_then(|e| e.error)
-        .and_then(|e| e.message)
-        .unwrap_or_else(|| body.to_string());
-
-    let char_count = msg.chars().count();
-    if char_count > 200 {
+fn first_200_chars(msg: String) -> String {
+    if msg.chars().count() > 200 {
         msg.chars().take(200).collect()
     } else {
         msg
     }
+}
+
+fn parse_error_detail(body: &str) -> String {
+    first_200_chars(
+        serde_json::from_str::<ErrorEnvelope>(body)
+            .ok()
+            .and_then(|e| e.error)
+            .and_then(|e| e.message)
+            .unwrap_or_else(|| body.to_string()),
+    )
 }
 
 fn map_http_error(status: u16, retry_after: Option<&str>, body: &str) -> ProviderError {
@@ -191,6 +196,14 @@ impl ModelProvider for OpenAiCompat {
                         });
                     }
                 };
+
+                if let Some(err) = chunk.error {
+                    return Err(ProviderError::Provider {
+                        message: first_200_chars(err.message.unwrap_or_else(|| {
+                            "the provider reported an error during the reply".to_string()
+                        })),
+                    });
+                }
 
                 if let Some(usage) = chunk.usage {
                     if usage.prompt_tokens.is_some() {
