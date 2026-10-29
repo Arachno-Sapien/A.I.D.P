@@ -188,7 +188,7 @@ Other local servers (LM Studio, llama.cpp) connect through the OpenAI-compatible
 
 ## Data model
 
-Five SQLite tables in one local file, read and written only by Rust. No table ever holds a full API key.
+Five SQLite tables in one local file, read and written only by Rust. No table ever holds a full API key. All record IDs, foreign keys, and epoch timestamps are `u32` across the IPC boundary to ensure safe serialization without JavaScript `BigInt` precision loss. Note that in M2, the `models` table has only the columns M2 uses (`id`, `connection_id`, `model_id`, `display_name`, `context_window`, `is_default`); model capability columns (`supports_tools`, `supports_vision`) arrive in a later migration (M4).
 
 | Table | Holds | Key columns |
 | --- | --- | --- |
@@ -273,14 +273,19 @@ app/
       commands/            thin Tauri commands, one file per area
       gateway/
         mod.rs             ModelProvider trait, ChatEvent, ProviderError
+        http.rs            shared HTTP helpers and SSE line reader
+        url.rs             base URL check and transport classification
         openai_compat.rs
         anthropic.rs
         ollama_chat.rs
       ollama/              detect, start, pull, ps, delete, unload
       workspace/           open folder, path checks, file read/write, secret filter
       tools/               tool definitions, tool-call loop, approvals, commands, PTY
+      connections.rs       connection and model orchestration service
       secrets.rs           keychain wrapper, the only file that touches keys
-      db/                  schema, migrations, queries
+      db/
+        mod.rs             schema, numbered migrations, SQLite connection
+        connections.rs     queries for connections and models tables
     tests/                 adapter tests against wiremock fake servers
   docs/
     design.md              this document, exported

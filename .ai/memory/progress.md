@@ -34,18 +34,21 @@ The M1 key file (`config.local.json`, `src-tauri/src/config.rs` and the "Configu
 
 ## In progress
 
-Task: M2 Task 9: Docs
+Task: M2 Task 10: Human check, review, close
 Tool + model: Antigravity (Gemini 3.8 Flash)
 Date: 2026-10-30
-Completed in Task 8 step 6:
-- Installed `remark-gfm@4`
-- Added table and strikethrough support in `src/features/chat/Markdown.tsx`
-- Added table styling in `src/App.css`
-- Verified table rendering test in `src/features/chat/Markdown.test.tsx`
-Next step: Task 9: Docs (docs/security.md, docs/decisions/0007-connections-storage.md, docs/setup.md, AGENTS.md, docs/design.md, .ai/memory/known-issues.md, CHANGELOG.md, docs/phases/M2.md).
+Completed in Task 9 (Docs):
+- Created `docs/security.md` and linked from `README.md`
+- Created `docs/decisions/0007-connections-storage.md`
+- Updated `docs/setup.md` with in-app model setup instructions
+- Updated `AGENTS.md` and `docs/design.md` trees, commands, and data model notes
+- Updated `.ai/memory/known-issues.md` with M2 findings (JSDOM cleanup, scrollIntoView, rusqlite bundled, keyring v4)
+- Updated `CHANGELOG.md` with M2 additions and removal of `config.local.json`
+- Updated `docs/phases/M2.md`
+Next step: Step 1 of Task 10: Human live check and smoke test on dev/release build.
 
 ## Next 3 tasks
 
-1. Task 9: Docs (`docs/security.md`, `docs/decisions/0007-connections-storage.md`, `docs/setup.md`, `AGENTS.md`, `docs/design.md`, `.ai/memory/known-issues.md`, `CHANGELOG.md`, `docs/phases/M2.md`).
-2. Task 10: Human check, review, close.
-3. M3 Planning & kickoff.
+1. Task 10: Human check, review, close (live smoke check with OpenRouter / Anthropic).
+2. M3 Planning & kickoff (coding workspace: folder tree, tabs, AI panel).
+3. M3 Task execution.

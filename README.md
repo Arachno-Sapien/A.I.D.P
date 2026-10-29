@@ -26,7 +26,7 @@ Keys are the one thing this app can't get wrong, so the rules are strict. A key 
 
 The UI hands a key over once, when you add a connection, and never gets it back. Only the Rust core reads it, and only to call that key's own provider. Keys are never logged, cloud calls have to use HTTPS, and model replies render as Markdown with raw HTML switched off, so a reply can't run scripts inside the app.
 
-If your Linux system has no Secret Service, the app says so. It won't fall back to keeping keys in a plain file.
+If your Linux system has no Secret Service, the app says so. It won't fall back to keeping keys in a plain file. See [docs/security.md](docs/security.md) for the full security architecture and threat model.
 
 ## What the AI is allowed to touch
 

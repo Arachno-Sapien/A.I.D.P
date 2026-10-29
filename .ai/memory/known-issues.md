@@ -4,6 +4,10 @@ Bugs, gotchas, and approaches that failed. Newest first. If you hit one of the "
 
 ## Seen in this repo
 
+- **2026-10-30 · Vitest without global test environment does not auto-cleanup JSDOM.** In `vite.config.ts`, `globals` is false, so `@testing-library/react` does not automatically register an afterEach cleanup hook. Each component test file (`*.test.tsx`) must import `cleanup` and register `afterEach(() => { cleanup(); })`, otherwise DOM nodes from earlier tests remain in `document.body` and cause `TestingLibraryElementError: Found multiple elements` in later tests.
+- **2026-10-30 · JSDOM lacks `element.scrollIntoView`.** `window` and DOM elements in JSDOM do not provide `scrollIntoView`. Call defensively using optional chaining: `ref.current?.scrollIntoView?.({ behavior: "smooth" })`.
+- **2026-10-30 · rusqlite bundled feature on Windows.** Enabled `features = ["bundled"]` in `Cargo.toml` so Windows MSVC builds compile embedded SQLite C source directly and do not require external SQLite DLLs or system libraries.
+- **2026-10-30 · keyring 4.2 in unit tests.** `keyring::Entry` operates directly against the host OS store. To keep tests deterministic and prevent pollution of the developer's Windows Credential Manager (or failure on headless CI runners), keychain calls are abstracted behind a `SecretStore` trait with `MemoryStore` for tests and `Keychain` for production.
 - **2026-10-30 · reqwest `.header(name, &str)` does not mark a key header as sensitive.** Build a `HeaderValue`, call `set_sensitive(true)`, and map a `from_str` failure to `InvalidKey` (see `key_header` in `gateway/anthropic.rs`). The review caught the Anthropic adapter passing the raw string.
 - **2026-10-30 · Pasted keys carry whitespace.** A key copied with a trailing newline makes `HeaderValue::from_str` fail, which shows up as `InvalidKey`. `connections.rs` trims the key before testing and saving it; keep that for any new way in.
 - **2026-10-29 · tauri-specta rejects 64-bit integers.** `u64` and `i64` (BigInt) in exported types fail the TypeScript export, because JavaScript numbers lose precision. Use `u32` (as `ProviderError::RateLimited.retry_after_secs` does) or a string.
@@ -18,8 +22,6 @@ Bugs, gotchas, and approaches that failed. Newest first. If you hit one of the "
 
 ## From docs, not yet seen here (check when you get there)
 
-- **keyring 4.x picks the OS store itself** (checked in keyring 4.2.0 on 2026-10-29). Its default `v1` feature enables Windows Credential Manager, macOS Keychain and the Linux Secret Service per target, so `keyring = "4"` needs no platform features. The 3.x trap (no default features, so a silent in-memory store that loses keys on restart) no longer applies, but still confirm that a saved key shows up in Windows Credential Manager.
-- **rusqlite:** enable the `bundled` feature so Windows builds don't need a system SQLite.
 - **Streaming parsers:** network chunks don't line up with lines. Buffer bytes and split on newlines before parsing. OpenAI-compatible APIs send SSE `data:` lines ending with `data: [DONE]`; Anthropic sends SSE with named `event:` lines; Ollama `/api/chat` streams NDJSON (one JSON object per line). The OpenAI-compatible and Anthropic adapters share `gateway/sse.rs` and `read_sse` in `gateway/http.rs` (tested with split UTF-8 and `event:` lines); Ollama (M5) still needs an NDJSON reader.
 - **tauri-specta and specta** versions must match. If they're still pre-release on crates.io, pin exact versions (`=x.y.z-rc.n`) for both.
 - **Ollama on Windows** usually runs as a tray app that starts the server itself. Spawn `ollama serve` only when `/api/version` fails and the binary exists.

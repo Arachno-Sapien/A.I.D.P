@@ -75,27 +75,22 @@ Before every commit, all four checks must pass cleanly without warnings:
 
 ---
 
-## 4. Chat with a Cloud Model (M1)
+## 4. Add a Model in the App
 
-For M1, the app loads connection configuration from a local file outside the repository:
+Starting in Milestone 2, API keys and connections are configured directly inside the app:
 
-**File path (Windows):**
-```text
-%APPDATA%\com.aidp.desktop\config.local.json
-```
-*(Full path typically: `C:\Users\<username>\AppData\Roaming\com.aidp.desktop\config.local.json`)*
-
-**File template:**
-```json
-{
-  "base_url": "https://api.openai.com/v1",
-  "model": "gpt-4o-mini",
-  "api_key": "sk-...XXXX"
-}
-```
+1. Launch the app (`npm run tauri dev`).
+2. On first launch, the Chat view displays **"Add a model to start chatting"** with an **"Add a model"** button (or navigate directly to the **Models** tab).
+3. In the **"Add a model"** dialog:
+   - Select a provider preset (OpenAI, OpenRouter, Groq, DeepSeek, Gemini, Anthropic) or **Custom endpoint**.
+   - Review or edit the connection name.
+   - Enter your API key in the secure password field.
+   - Click **"Test and add"**. The app tests your key against the provider's models endpoint over HTTPS, stores the key securely in your OS keychain (Windows Credential Manager), and saves the connection details in the local SQLite database.
+4. In the **"Choose models"** step, tick the models you want available in Chat and click **Save**.
+5. Switch to the **Chat** tab, pick your active model from the dropdown, and start chatting.
 
 > [!NOTE]
-> This config file is used exclusively during Milestone M1 to test cloud streaming. Milestone M2 replaces this configuration file with the OS Credential Manager (Keychain) and deletes this path.
+> If you used the M1 temporary configuration file (`%APPDATA%\com.aidp.desktop\config.local.json`), it is now ignored and can be safely deleted. Keys are stored only in the OS keychain.
 
 ---
 

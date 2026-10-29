@@ -71,7 +71,7 @@ Chosen for low memory use and tools agents know well. **No new dependency withou
 | HTTP + async | reqwest (native-tls, decision 0006) + tokio (cancellation: `tokio_util::sync::CancellationToken`) |
 | Key storage | `keyring` crate (Windows Credential Manager / macOS Keychain / Linux Secret Service) |
 | Secret handling | `secrecy` crate (`Secret` prints as `[REDACTED]`) |
-| Database | SQLite via `rusqlite`, accessed only from Rust |
+| Database | SQLite via `rusqlite` (bundled), accessed only from Rust |
 | Markdown | react-markdown + Prism, **raw HTML off** |
 | Long lists | @tanstack/react-virtual (messages, file tree) |
 | Code editor (M3) | CodeMirror 6, with @codemirror/merge for diffs (not Monaco: too heavy for the RAM target) |
@@ -95,7 +95,7 @@ React UI ──commands──▶ Rust core ──▶ OS keychain
 ```
 
 - **The UI talks only to the Rust core.** The core holds the keys, makes every network call, manages Ollama, saves chats, and does every file read, file write, and command run in the workspace. The UI never calls `fetch`/XHR and never calls `invoke()` by hand; it uses only the generated `commands` from `src/lib/bindings.ts`.
-- **Tauri commands are thin:** parse args, call into `gateway/`, `ollama/`, `workspace/`, `tools/`, `db/` or `secrets.rs`, map the error. No business logic in `commands/`.
+- **Tauri commands are thin:** parse args, call into `gateway/`, `ollama/`, `workspace/`, `tools/`, `connections.rs`, `db/` or `secrets.rs`, map the error. No business logic in `commands/`.
 - **All chat goes through one trait.** The UI never knows which provider it is talking to:
 
 ```rust
@@ -158,14 +158,19 @@ src-tauri/
     commands/              thin Tauri commands, one file per area
     gateway/
       mod.rs               ModelProvider trait, ChatEvent, ProviderError
+      http.rs              shared HTTP helpers and SSE line reader
+      url.rs               base URL check and transport classification
       openai_compat.rs
       anthropic.rs
       ollama_chat.rs
     ollama/                detect, start, pull, ps, delete, unload
     workspace/             open folder, path checks, file read/write, secret filter (M3)
     tools/                 tool definitions, tool-call loop, approvals, commands, PTY (M4)
+    connections.rs         connection and model orchestration service
     secrets.rs             keychain wrapper, the ONLY file that touches keys
-    db/                    schema, migrations, queries
+    db/
+      mod.rs               schema, numbered migrations, SQLite connection
+      connections.rs       queries for connections and models tables
   tests/                   adapter tests against wiremock fake servers
 docs/
   design.md                the design doc (moved here in M0)
@@ -190,8 +195,6 @@ docs/
 7. **Clean delete.** Removing a connection also deletes its keychain entry.
 
 On Linux, the keyring needs a Secret Service (GNOME Keyring or KWallet). If none is found, show a clear error instead of falling back to plain-text storage.
-
-**M1 exception only:** the key comes from a git-ignored local config file. M2 replaces it with the keychain and deletes that path.
 
 ### Workspace and tool security (word for word from the design doc; do not weaken)
 
