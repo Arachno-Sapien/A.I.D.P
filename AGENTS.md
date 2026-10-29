@@ -38,19 +38,22 @@ Several agents and tools share this repo, and any of them can run out of tokens 
 
 ## 2. What we are building
 
-A **Tauri 2 desktop app** where one person connects cloud models (with their own API keys) and local Ollama models, then chats with any of them from one place. Everything runs on the user's computer: no server, no accounts, no monthly bill.
+A **Tauri 2 desktop app** where one person connects cloud models (with their own API keys) and local Ollama models, then chats with them and works on code with them from one place. Everything runs on the user's computer: no server, no accounts, no monthly bill.
+
+**The coding workspace is the main goal** (decision 0005). It is built on the model layer, so M1 (streaming chat) and M2 (keys and providers) come first.
 
 **v1 goals**
 
+- A coding workspace: open a folder, edit files with an AI that can see the code, and let it change files or run commands only with the user's approval.
 - One model picker that lists cloud and local models together, with clear status for each.
 - API keys stored only in the OS keychain and sent only to their own provider.
 - Full Ollama control from inside the app: detect, start, list, download, delete, unload models.
-- Light: **under 150 MB RAM at idle** with no model loaded.
+- Light: **under 150 MB RAM at idle** with no model loaded and no folder open. The workspace gets its own budget, measured in M3 and M4.
 - Windows first (the dev machine), then macOS and Linux.
 
-**Not in v1. Don't build these, don't scaffold "for later":** practice area, coding workspace, browser automation, MCP tools, user accounts or sync, a built-in inference engine, mobile apps.
+**Not in v1. Don't build these, don't scaffold "for later":** practice area, browser automation, an MCP client (built-in agent tools are in v1, M4), user accounts or sync, a built-in inference engine, mobile apps.
 
-**Three screens:** Chat, Models, Settings. Details: design doc, "Screens and user flows".
+**Four screens:** Chat, Workspace, Models, Settings. Details: design doc, "Coding workspace" and "Screens and user flows".
 
 ---
 
@@ -70,7 +73,10 @@ Chosen for low memory use and tools agents know well. **No new dependency withou
 | Secret handling | `secrecy` crate (`Secret` prints as `[REDACTED]`) |
 | Database | SQLite via `rusqlite`, accessed only from Rust |
 | Markdown | react-markdown + Prism, **raw HTML off** |
-| Long lists | @tanstack/react-virtual |
+| Long lists | @tanstack/react-virtual (messages, file tree) |
+| Code editor (M3) | CodeMirror 6, with @codemirror/merge for diffs (not Monaco: too heavy for the RAM target) |
+| File walking and search (M3) | `ignore` crate (respects .gitignore) |
+| Terminal (M4) | xterm.js + `portable-pty` |
 | Tests | `cargo test` + wiremock (fake provider servers), Vitest |
 | Builds | GitHub Actions + tauri-action |
 
@@ -85,10 +91,11 @@ React UI ──commands──▶ Rust core ──▶ OS keychain
          ◀──Channel───            ──▶ SQLite file
           (token stream)          ──▶ cloud providers (HTTPS)
                                   ──▶ Ollama at 127.0.0.1:11434
+                                  ──▶ opened workspace folder (files, commands, terminal)
 ```
 
-- **The UI talks only to the Rust core.** The core holds the keys, makes every network call, manages Ollama, and saves chats. The UI never calls `fetch`/XHR and never calls `invoke()` by hand; it uses only the generated `commands` from `src/lib/bindings.ts`.
-- **Tauri commands are thin:** parse args, call into `gateway/`, `ollama/`, `db/` or `secrets.rs`, map the error. No business logic in `commands/`.
+- **The UI talks only to the Rust core.** The core holds the keys, makes every network call, manages Ollama, saves chats, and does every file read, file write, and command run in the workspace. The UI never calls `fetch`/XHR and never calls `invoke()` by hand; it uses only the generated `commands` from `src/lib/bindings.ts`.
+- **Tauri commands are thin:** parse args, call into `gateway/`, `ollama/`, `workspace/`, `tools/`, `db/` or `secrets.rs`, map the error. No business logic in `commands/`.
 - **All chat goes through one trait.** The UI never knows which provider it is talking to:
 
 ```rust
@@ -115,11 +122,12 @@ pub trait ModelProvider: Send + Sync {
 - **Stop:** cancels the token. The adapter drops the HTTP stream and saves the partial reply with status `stopped`.
 - **Normalized errors:** every adapter maps provider responses into exactly these: `InvalidKey` (401, 403), `RateLimited` (429, with retry time if sent), `ModelNotFound`, `ContextTooLong`, `Offline` (no internet / Ollama not running), `ProviderError` (5xx and anything unexpected), `Cancelled`. The UI shows one message per kind, the same everywhere.
 - **Capabilities per model:** streaming, tool calling, vision, context window stored as yes / no / unknown. Fill from the provider where it reports them (Ollama `/api/show`), otherwise user-set.
-- **Leave room for later, cheaply:** message content is a list of parts (text now; images and tool calls later), and `ChatEvent` stays open for a future `ToolCall` variant. This is the *only* future-proofing allowed. No MCP or tool code in v1.
+- **Leave room for later, cheaply:** message content is a list of parts (text now; tool calls from M4; images later), and `ChatEvent` stays open for the `ToolCall` variant M4 adds. This is the *only* future-proofing allowed. No tool code before M4, and no MCP code in v1.
+- **Workspace and tools** (M3, M4) live in `src-tauri/src/workspace/` (folder, path checks, files, secret filter) and `src-tauri/src/tools/` (tool definitions, tool-call loop, approvals, commands, PTY). Every rule in section 6's workspace list applies to them.
 - **Each message stores its own `model_ref`,** so switching models mid-chat keeps a correct record.
 - **Schema changes go through numbered migrations** from day one.
 
-Ollama endpoints, data model (5 tables), and UI flows: see the design doc sections "Local models (Ollama)", "Data model", "Screens and user flows".
+Workspace scope, Ollama endpoints, data model (5 tables), and UI flows: see the design doc sections "Coding workspace", "Workspace and tool security", "Local models (Ollama)", "Data model", "Screens and user flows".
 
 ---
 
@@ -139,6 +147,7 @@ skills-lock.json           sources + hashes of installed agent skills (section 1
 .ai/memory/                progress, known issues, session logs (section 11)
 src/                       React frontend
   features/chat/
+  features/workspace/      file tree, editor, AI panel, diffs, approvals, terminal (M3, M4)
   features/models/
   features/settings/
   lib/bindings.ts          generated by tauri-specta, NEVER edited by hand
@@ -153,6 +162,8 @@ src-tauri/
       anthropic.rs
       ollama_chat.rs
     ollama/                detect, start, pull, ps, delete, unload
+    workspace/             open folder, path checks, file read/write, secret filter (M3)
+    tools/                 tool definitions, tool-call loop, approvals, commands, PTY (M4)
     secrets.rs             keychain wrapper, the ONLY file that touches keys
     db/                    schema, migrations, queries
   tests/                   adapter tests against wiremock fake servers
@@ -161,7 +172,7 @@ docs/
   setup.md                 fresh Windows machine → running app
   security.md
   user-guide.md
-  phases/                  M0.md … M5.md
+  phases/                  M0.md … M6.md
   decisions/               one page per decision (0001-use-tauri.md, …)
   dev/                     how-tos for repeat tasks (add an adapter, add a command, release)
 ```
@@ -182,6 +193,16 @@ On Linux, the keyring needs a Secret Service (GNOME Keyring or KWallet). If none
 
 **M1 exception only:** the key comes from a git-ignored local config file. M2 replaces it with the keychain and deletes that path.
 
+### Workspace and tool security (word for word from the design doc; do not weaken)
+
+1. **One folder.** The workspace is the folder the user opened. Rust resolves every path, following symlinks, and refuses anything that lands outside it, including `..` and absolute paths.
+2. **Files and processes go through Rust.** The UI uses workspace commands only. The Tauri fs and shell plugins stay off.
+3. **Edits are proposals.** AI changes appear as a diff and reach the disk only when the user accepts them.
+4. **Every model command is approved.** The user sees the exact command and working directory before it runs. There is no auto-approve in v1. Commands run inside the folder, with a timeout and a Stop button.
+5. **Tool output is data.** File contents and command output returned to the model are untrusted. Instructions inside them never skip an approval.
+6. **Secrets stay out of prompts.** Files that look like secrets (`.env*`, `*.pem`, `*.key`, `id_rsa*`, `id_ed25519*`) are skipped by `list_files`, `read_file`, and `search`, and are never sent as context unless the user adds them by hand.
+7. **Warn without git.** If the folder isn't a git repository, warn before the first AI edit, because there is no easy undo.
+
 ---
 
 ## 7. Never
@@ -194,6 +215,8 @@ On Linux, the keyring needs a Secret Service (GNOME Keyring or KWallet). If none
 - No new Tauri plugin or capability permission without saying why in the commit.
 - No plain-text fallback for key storage, ever.
 - No raw HTML rendering of model output.
+- No file or process access from the UI, and none outside the opened folder.
+- No AI edit written before the user accepts its diff, and no model-requested command run without approval.
 - No work on "Not in v1" features, and no starting the next milestone before the current one is done.
 - No deciding an open question (design doc, "Open questions") on your own. Ask the human, then record a decision.
 - No editing old session logs. Correct them in a new one.
@@ -235,6 +258,7 @@ When something breaks, use `systematic-debugging`: find the root cause before ch
 - [ ] Was a new Tauri permission or plugin added? Why?
 - [ ] Any new dependency? Is it widely used and maintained?
 - [ ] Any `unwrap()` or `expect()` in non-test code?
+- [ ] Can any path or command reach outside the opened folder, or run without the user's approval?
 - [ ] Were tests, docs, and the memory log updated?
 - [ ] Does the app still start and stream a reply?
 
@@ -334,16 +358,17 @@ If your tool doesn't load skills automatically (or looks in a different folder),
 
 ## 13. Milestones
 
-v0.1 ships on Windows after ~10 weeks at 10–20 h/week. Every milestone ends with an app that runs. **A milestone is done only when every box in its checklist (design doc, "Milestones") is ticked, its phase doc is written, and its logs are summarised. Don't start the next one early.**
+Decision 0005 moved the coding workspace into v1. v0.1 ships on Windows after roughly 16 weeks at 10–20 h/week (estimate, revisited in each phase doc). Every milestone ends with an app that runs. **A milestone is done only when every box in its checklist (design doc, "Milestones") is ticked, its phase doc is written, and its logs are summarised. Don't start the next one early.**
 
 | | Milestone | Done means |
 | --- | --- | --- |
 | M0 | Setup | `npm run tauri dev` opens an empty window; CI runs the gate; docs/ and memory exist |
 | M1 | Chat with one cloud model | Streamed reply from one OpenAI-compatible provider; Stop works; code blocks with copy; adapter tests (success, 401, 429, dropped stream) |
-| M2 | Model Hub | Add/test/delete connections; keys in Credential Manager only; Anthropic adapter; every error kind shown clearly |
-| M3 | Ollama | Detect + start; local models in picker; download with progress + cancel; delete with confirm; Free memory |
-| M4 | History and settings | Chats survive restart; per-message `model_ref`; default model, theme, keep_alive settings |
-| M5 | v0.1 release | Idle RAM < 150 MB measured; CI-built Windows installer on GitHub Releases; auto-update tested; tested on 8 GB RAM machine |
+| M2 | Keys and providers | Add/test/delete cloud connections; keys in Credential Manager only; Anthropic adapter; every error kind shown clearly |
+| M3 | Coding workspace | Open folder; file tree respects .gitignore; CodeMirror 6 tabs with save; AI panel with file + selection context and Stop; Apply → diff → Accept; path-escape tests; no-git warning; workspace RAM budget recorded |
+| M4 | Agent tools and terminal | `ChatEvent::ToolCall` in OpenAI-compatible + Anthropic adapters; list/read/search/edit/create/run tools inside the folder; diffs for edits, approval for every model command; secret files skipped; terminal panel; refusal tests |
+| M5 | Ollama, history, settings | Detect + start Ollama; local models in picker, Chat and workspace; download/delete/Free memory; chats survive restart; default model, theme, keep_alive settings |
+| M6 | v0.1 release | Idle RAM < 150 MB (no folder open), workspace within its budget; CI-built Windows installer on GitHub Releases; auto-update tested; tested on 8 GB RAM machine with a real project open |
 
 Test machines: dev laptop (RTX 3050 Ti 4 GB VRAM, 24 GB RAM) and one 8 GB RAM machine or VM.
 

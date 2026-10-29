@@ -2,7 +2,7 @@
 
 A.I.D.P is a desktop app for talking to AI models from one place. You connect cloud providers with your own API keys, add local models through Ollama, and pick whichever one you want for each conversation. Everything runs on your own computer. There's no server and no account, and nothing to pay for beyond what your providers charge.
 
-The name stands for AI Independent Development Platform, at least for now. Chat comes first. A coding workspace and a practice area for programming problems are planned once the chat app is solid, and the name may change as they arrive.
+The name stands for AI Independent Development Platform, at least for now. The main goal is the coding workspace: open a project folder, work on it with an AI that can see your code, and let it change files or run commands only when you say so. It runs on top of the chat layer, so chat comes first. A practice area for programming problems is planned after v0.1.
 
 ## Status
 
@@ -12,6 +12,8 @@ Windows is the first platform. macOS and Linux follow after v0.1.
 
 ## What v0.1 will do
 
+- A coding workspace. Open a folder, browse it in a file tree, and edit files in tabs. An AI panel beside the editor sees the file you have open and whatever you've selected.
+- AI edits you approve. Suggested changes show up as a diff, and nothing touches the disk until you accept it. Models that support tool calling can also read and search your project and ask to run commands, such as your tests, one approval at a time.
 - One model picker that lists cloud and local models together, with a status for each (key invalid, Ollama stopped, model not downloaded).
 - Support for OpenAI-compatible APIs (OpenAI, OpenRouter, Groq, DeepSeek, Gemini's compatible endpoint, LM Studio or any custom endpoint), Anthropic, and Ollama.
 - Ollama control from inside the app: detect it, start it, download models with a progress bar, delete them, and free the memory a loaded model is holding.
@@ -26,11 +28,17 @@ The UI hands a key over once, when you add a connection, and never gets it back.
 
 If your Linux system has no Secret Service, the app says so. It won't fall back to keeping keys in a plain file.
 
+## What the AI is allowed to touch
+
+Letting a model edit code and run commands is a bigger risk than storing a key, so the workspace has its own rules. The AI only sees the folder you opened. Anything outside it is refused, including paths that try to climb out with `..` or a symlink. Every change it suggests appears as a diff and is written only when you accept it. Every command it wants to run shows you the exact command first and waits for you; there is no auto-approve. Files that look like secrets, such as `.env` files and private keys, are kept out of what the model can read unless you add them yourself.
+
+If the folder isn't a git repository, the app warns you before the first AI edit, because there's no easy way back. Commands you type into the terminal yourself are yours and run as normal.
+
 ## How it's built
 
 A.I.D.P is a Tauri 2 app. The frontend is React, TypeScript and Vite, styled with Tailwind, and the core is Rust. Tauri uses the WebView that already ships with the operating system instead of bundling a browser, which is why the release binary is about 4 MB.
 
-The window never touches the network or the disk itself. Every request goes through the Rust core, which holds the keys, calls the providers, manages Ollama and saves chats to a local SQLite file. The TypeScript functions the UI calls are generated from the Rust code by tauri-specta, and CI fails if the two ever drift apart.
+The window never touches the network or the disk itself. Every request goes through the Rust core, which holds the keys, calls the providers, manages Ollama, saves chats to a local SQLite file, and does all the reading, writing and running inside your project folder. The editor is CodeMirror 6, picked over Monaco because it's much lighter. The TypeScript functions the UI calls are generated from the Rust code by tauri-specta, and CI fails if the two ever drift apart.
 
 ## Getting started
 
@@ -98,16 +106,17 @@ The repo also ships a few agent skills (Tauri, Rust, React, Vitest, plus some pl
 
 ## Roadmap
 
-v0.1 is split into six milestones, and each one ends with an app that runs.
+v0.1 is split into seven milestones, and each one ends with an app that runs. The first two build the model layer the workspace needs.
 
 1. M0, setup: app shell, checks, CI and docs. Nearly done.
 2. M1: streamed chat with one OpenAI-compatible provider, including Stop.
-3. M2: the Models page. Add, test and delete connections, keys in the keychain, Anthropic support.
-4. M3: Ollama. Detect and start it, download, delete and unload models.
-5. M4: chat history and settings.
-6. M5: the v0.1 release. A Windows installer built by CI, auto-update, and a test run on an 8 GB RAM machine.
+3. M2: keys in the keychain, adding and testing providers, and Anthropic support.
+4. M3: the coding workspace. File tree, editor, the AI panel, and edits as diffs.
+5. M4: agent tools and a terminal. The model can read, search and edit files and run commands, each with your approval.
+6. M5: Ollama, chat history and settings.
+7. M6: the v0.1 release. A Windows installer built by CI, auto-update, and a test run on an 8 GB RAM machine.
 
-After v0.1 come tool calling through MCP, browser checks with Playwright, the practice area and the coding workspace.
+After v0.1 come an MCP client for outside tools, browser checks with Playwright, and the practice area.
 
 ## Contributing
 

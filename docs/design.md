@@ -1,22 +1,25 @@
-# Desktop AI Model App: Design Doc
+# A.I.D.P: Design Doc
 
-Oct 29, 2026 · @Syed Junaid
+Oct 29, 2026 · @Syed Junaid · revised the same day by decision 0005 (coding workspace moves into v1)
 
 ## Overview
 
-Version 1 is a Tauri desktop app where one person connects cloud models with their own API keys and local Ollama models, then chats with any of them from one place. Everything runs on the user's computer: no server, no accounts, no monthly bill.
+Version 1 is a Tauri desktop app where one person connects cloud models with their own API keys and local Ollama models, then chats with them and works on code with them from one place. Everything runs on the user's computer: no server, no accounts, no monthly bill.
+
+The coding workspace is the main goal. It sits on top of the model layer, so the chat and provider work comes first (see Milestones).
 
 **Goals for v1**
 
+- A coding workspace: open a folder, edit files with an AI that can see the code, and let it change files or run commands only with the user's approval.
 - One model picker that lists cloud and local models together, with clear status for each.
 - API keys stored only in the operating system's keychain and sent only to their own provider.
 - Full Ollama control from inside the app: detect, start, list, download, delete, and unload models.
-- A light app that leaves memory for local models. Target: under 150 MB of RAM at idle with no model loaded.
+- A light app that leaves memory for local models. Target: under 150 MB of RAM at idle with no model loaded and no folder open.
 - Windows first (the development machine), then macOS and Linux.
 
 **Not in v1**
 
-- Practice area, coding workspace, browser automation, or MCP tools (see the last section).
+- Practice area, browser automation, or an MCP client (see the last section). Built-in agent tools are in v1 (M4); MCP is not.
 - User accounts or sync between devices.
 - A built-in inference engine. Ollama runs the models.
 - Mobile apps.
@@ -37,13 +40,17 @@ Tauri 2 with a React frontend and a Rust core. Every choice below favours low me
 | Secret handling | secrecy crate | Wraps keys so they print as \[REDACTED\] in logs |
 | Database | SQLite via rusqlite | One local file, accessed only from Rust |
 | Markdown | react-markdown + a light highlighter (Prism) | Renders model replies safely, no raw HTML |
-| Long lists | @tanstack/react-virtual | Renders only the messages on screen |
+| Long lists | @tanstack/react-virtual | Renders only the messages and file-tree rows on screen |
+| Code editor (M3) | CodeMirror 6 | Modular, small bundle, low memory. Monaco (VS Code's editor) is several MB and runs web workers, which works against the RAM target |
+| Diff view (M3) | @codemirror/merge | Same editor; shows AI edits with Accept and Reject |
+| File walking and search (M3) | `ignore` crate | The walker ripgrep uses; respects .gitignore |
+| Terminal (M4) | xterm.js + `portable-pty` | xterm.js draws the terminal; portable-pty runs the shell through Windows ConPTY (Unix PTYs later) |
 | Tests | cargo test + wiremock, Vitest | Fake provider servers for adapter tests |
 | Builds | GitHub Actions + tauri-action | Windows, macOS, Linux installers from one push |
 
 ## Architecture
 
-The React window talks only to the Rust core. The core holds the keys, makes every network call, manages Ollama, and saves chats.
+The React window talks only to the Rust core. The core holds the keys, makes every network call, manages Ollama, saves chats, and does every file read, file write, and command run in the workspace.
 
 &#91;embedded content: architecture · UI, Rust core, and what the core talks to\]
 
@@ -90,9 +97,9 @@ pub trait ModelProvider: Send + Sync {
 - `ProviderError` (5xx and anything unexpected)
 - `Cancelled`
 
-**Capabilities per model.** Each model record stores streaming, tool calling, vision, and context window as yes / no / unknown. Fill them from the provider where it reports them (Ollama's /api/show does for local models); otherwise the user can set them. Later features, like browser checks, only appear for models that support them.
+**Capabilities per model.** Each model record stores streaming, tool calling, vision, and context window as yes / no / unknown. Fill them from the provider where it reports them (Ollama's /api/show does for local models); otherwise the user can set them. Agent tools (M4) only appear for models that support tool calling; the rest get the M3 workspace.
 
-**Leave room for later.** Store message content as a list of parts (text now, images and tool calls later), and keep `ChatEvent` open for a future `ToolCall` event. This makes MCP support an addition, not a rewrite.
+**Leave room for later.** Store message content as a list of parts (text now, tool calls from M4, images later), and keep `ChatEvent` open for the `ToolCall` event M4 adds. This makes MCP support after v1 an addition, not a rewrite.
 
 ## API key security
 
@@ -107,6 +114,50 @@ A key enters the app once, goes straight into the OS keychain, and is only ever 
 7. **Clean delete.** Removing a connection also deletes its keychain entry.
 
 On Linux, the keyring needs a Secret Service (GNOME Keyring or KWallet). If none is found, show a clear error instead of falling back to plain-text storage.
+
+## Coding workspace
+
+The coding workspace is the main goal of A.I.D.P (decision 0005). It uses the model layer above, so it comes after M1 and M2, in two milestones.
+
+**M3: editor with an AI panel**
+
+- Open a folder. The file tree respects `.gitignore` and stays responsive on a large repo: rows are virtualized and folders load when expanded.
+- Edit files in tabs with CodeMirror 6: syntax highlighting, unsaved-change markers, save. Before saving, Rust checks the file's modified time and warns if something else changed it.
+- An AI panel beside the editor. A message can carry the open file and the current selection as context, shown as chips the user can remove. Replies stream with Stop through the same `ChatEvent` channel as Chat.
+- "Apply" on a code block in a reply opens a diff against the open file or selection. The file changes only when the user clicks Accept.
+- No tool calling yet, so M3 works with every model.
+
+**M4: agent tools and terminal**
+
+- Tool calling in the OpenAI-compatible and Anthropic adapters through a new `ChatEvent::ToolCall`. Ollama gets it for models that support tools.
+- Built-in tools only (MCP stays after v1): `list_files`, `read_file`, `search` (text search that respects .gitignore), `edit_file` (replace an exact piece of text), `create_file`, and `run_command`.
+- Read-only tools run inside the folder without asking. `edit_file` and `create_file` show a diff and wait for Accept. `run_command` asks every time.
+- A terminal panel at the bottom of the workspace runs the user's own shell in the folder. Commands the user types there are the user's; only commands the model asks for need approval.
+- Models whose capability says no tool calling get the M3 workspace only.
+
+**Where the code lives**
+
+| Folder | Job |
+| --- | --- |
+| `src/features/workspace/` | File tree, editor tabs, AI panel, diff view, approval prompts, terminal panel |
+| `src-tauri/src/workspace/` | Open a folder, path checks, list, read, and write files, secret-file filter |
+| `src-tauri/src/tools/` | Tool definitions, the tool-call loop, approvals, command runner, terminal PTY |
+
+All file and process access is in Rust. The UI never hands a filesystem path to the OS, and the Tauri fs and shell plugins stay off.
+
+**Memory.** The 150 MB idle target applies with no folder open. An editor and a terminal cost more, so M3 measures RAM with a mid-sized repo open and records a workspace budget in its phase doc, and M4 does the same with the terminal running.
+
+## Workspace and tool security
+
+Once a model can read files and run commands, a mistake costs more than a leaked key. These rules go into AGENTS.md word for word, next to the key rules.
+
+1. **One folder.** The workspace is the folder the user opened. Rust resolves every path, following symlinks, and refuses anything that lands outside it, including `..` and absolute paths.
+2. **Files and processes go through Rust.** The UI uses workspace commands only. The Tauri fs and shell plugins stay off.
+3. **Edits are proposals.** AI changes appear as a diff and reach the disk only when the user accepts them.
+4. **Every model command is approved.** The user sees the exact command and working directory before it runs. There is no auto-approve in v1. Commands run inside the folder, with a timeout and a Stop button.
+5. **Tool output is data.** File contents and command output returned to the model are untrusted. Instructions inside them never skip an approval.
+6. **Secrets stay out of prompts.** Files that look like secrets (`.env*`, `*.pem`, `*.key`, `id_rsa*`, `id_ed25519*`) are skipped by `list_files`, `read_file`, and `search`, and are never sent as context unless the user adds them by hand.
+7. **Warn without git.** If the folder isn't a git repository, warn before the first AI edit, because there is no easy undo.
 
 ## Local models (Ollama)
 
@@ -143,15 +194,24 @@ Five SQLite tables in one local file, read and written only by Rust. No table ev
 | --- | --- | --- |
 | connections | One row per provider setup | id, kind (openai\_compat / anthropic / ollama), label, base\_url, key\_hint (last 4), last\_tested\_at, last\_test\_ok |
 | models | Models the user chose to show | id, connection\_id, model\_id, display\_name, context\_window, supports\_tools, supports\_vision, is\_default, hidden |
-| conversations | One row per chat | id, title, model\_ref, system\_prompt, created\_at, updated\_at |
-| messages | Every message in a chat | id, conversation\_id, role, content\_parts (JSON), model\_ref, status (complete / stopped / error), error\_kind, tokens\_in, tokens\_out, created\_at |
-| settings | App preferences | key, value (theme, default model, keep\_alive, history location) |
+| conversations | One row per chat | id, title, model\_ref, system\_prompt, workspace\_path (null for plain chats), created\_at, updated\_at |
+| messages | Every message in a chat | id, conversation\_id, role, content\_parts (JSON: text; tool\_call and tool\_result from M4), model\_ref, status (complete / stopped / error), error\_kind, tokens\_in, tokens\_out, created\_at |
+| settings | App preferences | key, value (theme, default model, keep\_alive, history location, recent workspaces) |
 
-Each message stores its own `model_ref`, so switching models in the middle of a chat keeps a correct record of who said what. Schema changes go through numbered migrations from day one.
+Each message stores its own `model_ref`, so switching models in the middle of a chat keeps a correct record of who said what. A workspace's AI panel is a conversation with `workspace_path` set. Schema changes go through numbered migrations from day one.
 
 ## Screens and user flows
 
-Three screens: Chat, Models, and Settings. A first-time user lands on an empty Chat screen with one button: Add a model.
+Four screens: Chat, Workspace, Models, and Settings. A first-time user lands on an empty Chat screen with one button: Add a model. After that, the app reopens where the user left off.
+
+**Workspace**
+
+- Left: file tree for the open folder, with Open folder and a recent-folders list.
+- Centre: editor tabs.
+- Right: AI panel with the model picker, context chips (open file, selection), and the same message list and composer as Chat.
+- Bottom (M4): terminal panel.
+- Every AI edit opens a diff over the editor with Accept and Reject.
+- Every command the model wants to run opens an approval prompt showing the command and folder, with Run and Deny.
 
 **Chat**
 
@@ -182,6 +242,14 @@ Three screens: Chat, Models, and Settings. A first-time user lands on an empty C
 3. Running → downloaded models appear in the picker automatically.
 4. No models yet → suggest a small coding model with its download size, then show progress.
 
+**Flow: work on code with AI**
+
+1. Workspace → Open folder. The tree loads. If the folder isn't a git repository, a banner says AI edits can't be undone easily.
+2. Open a file, select some code, and ask in the AI panel.
+3. The reply streams in. Apply on a code block opens the diff.
+4. Accept writes the file; Reject leaves it untouched.
+5. From M4, the model can also list, read, and search files on its own, propose edits as diffs, and ask to run commands such as the tests, each with an approval prompt.
+
 ## Project structure
 
 One repository, frontend in `src/`, Rust core in `src-tauri/`. Each Rust folder has one job, so an agent working on Ollama never needs to touch key storage.
@@ -194,6 +262,7 @@ app/
   .ai/memory/              progress, known issues, session logs
   src/                     React frontend
     features/chat/
+    features/workspace/    file tree, editor, AI panel, diffs, approvals, terminal
     features/models/
     features/settings/
     lib/bindings.ts        generated by tauri-specta, never edited by hand
@@ -208,6 +277,8 @@ app/
         anthropic.rs
         ollama_chat.rs
       ollama/              detect, start, pull, ps, delete, unload
+      workspace/           open folder, path checks, file read/write, secret filter
+      tools/               tool definitions, tool-call loop, approvals, commands, PTY
       secrets.rs           keychain wrapper, the only file that touches keys
       db/                  schema, migrations, queries
     tests/                 adapter tests against wiremock fake servers
@@ -216,7 +287,7 @@ app/
     setup.md
     security.md
     user-guide.md
-    phases/                M0.md to M5.md
+    phases/                M0.md to M6.md
     decisions/             one page per decision
     dev/                   how-to guides for repeat tasks
 ```
@@ -238,7 +309,7 @@ Agents can write all of this code, but you still need to judge what they wrote. 
 **What goes in AGENTS.md**
 
 - The stack and folder rules from this doc.
-- The seven key security rules, word for word.
+- The seven key security rules and the seven workspace and tool security rules, word for word.
 - The commands to build, test, and run the app, plus the documentation and memory rules from the next section.
 - A "never" list: no `unwrap()` outside tests, no new dependency without a stated reason, no editing `bindings.ts` by hand, no command that returns a key.
 
@@ -248,6 +319,7 @@ Agents can write all of this code, but you still need to judge what they wrote. 
 - [ ] Was a new Tauri permission or plugin added? Why?
 - [ ] Any new dependency? Is it widely used and maintained?
 - [ ] Any `unwrap()` or `expect()` in non-test code?
+- [ ] Can any path or command reach outside the opened folder, or run without the user's approval?
 - [ ] Did the agent update tests, docs, and its memory log?
 - [ ] Does the app still start and stream a reply?
 
@@ -261,12 +333,12 @@ Agents write the docs as they build, and every agent session leaves a short log 
 | --- | --- | --- |
 | Design doc | docs/design.md | Exported from this doc in M0; updated whenever a design decision changes |
 | Setup guide | docs/setup.md | M0, then whenever a tool, version, or setup step changes. It must take a fresh Windows machine to a running app |
-| Phase docs | docs/phases/M0.md to M5.md | Start of each milestone (the plan) and end of it (what was built, what changed from the plan, what's left) |
+| Phase docs | docs/phases/M0.md to M6.md | Start of each milestone (the plan) and end of it (what was built, what changed from the plan, what's left) |
 | Decision records | docs/decisions/0001-use-tauri.md, and so on | Whenever a choice is made between real alternatives. One page: context, options, choice, why |
 | Developer guide | docs/dev/ | When a task repeats: adding an adapter, adding a Tauri command, running tests, making a release |
-| Security notes | docs/security.md | M2, then with any change to key handling, permissions, or network calls |
+| Security notes | docs/security.md | M2, then with any change to key handling, permissions, network calls, file access, or command running |
 | Changelog | CHANGELOG.md | Every user-visible change, grouped by version |
-| User guide | docs/user-guide.md | M5: install, add a model, connect Ollama, troubleshooting |
+| User guide | docs/user-guide.md | M6: install, add a model, open a folder, connect Ollama, troubleshooting |
 
 **Documentation rules**
 
@@ -314,9 +386,9 @@ Next: Stop button cancels the stream
 
 ## Milestones
 
-v0.1 ships on Windows after about 10 weeks at 10 to 20 hours a week, with 2 buffer weeks for exams. Every milestone ends with an app that runs.
+Decision 0005 moved the coding workspace into v1, which adds two milestones. Rough estimate: v0.1 ships on Windows after about 16 weeks at 10 to 20 hours a week, plus 2 buffer weeks for exams. Revisit the estimate in each phase doc. Every milestone ends with an app that runs.
 
-&#91;embedded content: roadmap · 6 milestones at 10 to 20 hours a week\]
+&#91;embedded content: roadmap · original 6-milestone plan; the list below replaces it\]
 
 Each milestone is done only when every box below is ticked, its phase doc is written, and its session logs are summarised. Don't start the next one early.
 
@@ -336,32 +408,47 @@ Each milestone is done only when every box below is ticked, its phase doc is wri
 
 For M1 only, the key comes from a git-ignored local config file. M2 replaces it with the keychain.
 
-**M2 Model Hub**
+**M2 Keys and providers**
 
-- [ ] Add, test, and delete connections from the Models page
+- [ ] Add, test, and delete cloud connections from the Models page
 - [ ] Keys saved in Windows Credential Manager, never in SQLite
 - [ ] Anthropic adapter streams replies
 - [ ] Every error kind shows a clear message in the UI
 
-**M3 Ollama**
+**M3 Coding workspace**
+
+- [ ] Open a folder; the file tree respects .gitignore and stays responsive on a 10,000-file folder
+- [ ] Open, edit, and save files in CodeMirror 6 tabs, with unsaved changes marked
+- [ ] The AI panel sends the open file and selection as context, streams replies, and Stop works
+- [ ] Apply shows a diff; the file changes only after Accept
+- [ ] Tests prove that `..`, absolute paths, and symlinks pointing outside the folder are refused
+- [ ] A warning appears before the first AI edit in a folder without git
+- [ ] RAM with a mid-sized repo open is measured and the workspace budget recorded in the phase doc
+
+**M4 Agent tools and terminal**
+
+- [ ] `ChatEvent::ToolCall` and tool calling in the OpenAI-compatible and Anthropic adapters
+- [ ] `list_files`, `read_file`, `search`, `edit_file`, `create_file`, and `run_command` work inside the folder
+- [ ] Every edit shows a diff first; every model command asks first; no auto-approve
+- [ ] Secret-looking files are never read or sent unless the user adds them by hand
+- [ ] The terminal panel runs the user's shell in the folder; model commands have a timeout and Stop
+- [ ] Fake-provider tests: a model asking for a path outside the folder is refused, and a denied command never runs
+- [ ] Models without tool calling still get the M3 workspace
+
+**M5 Ollama, history, and settings**
 
 - [ ] App detects Ollama and starts it if stopped
-- [ ] Downloaded models appear in the picker and chat works
-- [ ] Download with progress and cancel; delete with confirmation
-- [ ] Free memory unloads the model
-
-**M4 History and settings**
-
-- [ ] Chats survive an app restart
-- [ ] Switching models mid-chat records the model on each message
+- [ ] Downloaded models appear in the picker and work in Chat and the workspace
+- [ ] Download with progress and cancel; delete with confirmation; Free memory unloads the model
+- [ ] Chats survive an app restart, and each message records its model
 - [ ] Settings for default model, theme, and keep\_alive work
 
-**M5 v0.1 release**
+**M6 v0.1 release**
 
-- [ ] Idle RAM measured and under the 150 MB target
+- [ ] Idle RAM (no folder open) under 150 MB; workspace RAM within the budget set in M3 and M4
 - [ ] Windows installer built by CI and published as a GitHub release
 - [ ] Auto-update tested from one version to the next
-- [ ] Tested on an 8 GB RAM machine
+- [ ] Tested on an 8 GB RAM machine with a real project folder open
 
 ## Risks and open questions
 
@@ -376,21 +463,25 @@ The biggest risk is an agent-built Rust core you can't debug; the plan answers i
 | WebView differences across OSes | UI looks or behaves differently | Windows first; test macOS and Linux before their release |
 | Unsigned installer | Windows shows an "unknown publisher" warning | Document how to proceed; sign once the app has users |
 | Provider API changes | An adapter breaks | Fake-server tests catch it; adapters are isolated files |
-| Small local models handle tools poorly | Later features don't work with them | Capability flags hide those features per model |
+| Small local models handle tools poorly | Agent tools don't work with them | Capability flags limit those models to the M3 workspace |
+| An AI edit damages files | User loses work | Every edit is a diff the user accepts; warning in folders without git |
+| The model runs a harmful command | Files deleted or data sent somewhere | Every model command needs approval; no auto-approve; runs inside the folder with a timeout |
+| A file or command output tells the model to do something (prompt injection) | The model tries to read secrets or run commands | Tool output is treated as data; approvals still apply; secret-looking files are skipped |
+| Editor and terminal push RAM up | The app competes with local models for memory | CodeMirror 6 over Monaco; lazy file tree; budgets measured in M3 and M4 |
 
 **Open questions**
 
-- [ ] App name and repository name
+- [x] App name: A.I.D.P (decision 0003). Repository name still open.
 - [ ] v0.1 for Windows only, or all three OSes?
 - [ ] Link to the Ollama installer, or download and run it from inside the app?
 - [ ] Chat export format: Markdown, JSON, or both?
-- [ ] Open source from day one? If yes, which license (MIT or Apache-2.0)?
+- [x] Open source from day one: yes, MIT OR Apache-2.0 (decision 0004)
+- [ ] After v0.1: allow "approve this command for the session" for repeat commands like the test runner?
 
 ## Later
 
 These wait until v1 ships. The model layer is designed so each one is an addition, not a rewrite.
 
-- **MCP client and tool calling.** Adds a `ToolCall` event to the model layer. Opens the door to many tools at once.
+- **MCP client.** Lets the model use external tool servers on top of the built-in tools from M4.
 - **Browser checks with Playwright.** Connect Microsoft's Playwright MCP server as a sidecar. Offered only for models with tool calling (and ideally vision). The browser starts on demand and closes after, to save memory.
 - **Practice area.** LeetCode-style problems with hidden test cases and an AI tutor that uses the user's chosen model. Code runs either in local language runtimes or through a sandbox service like Judge0.
-- **Coding workspace.** File explorer, editor, and terminal. The largest of these, so it comes last.
