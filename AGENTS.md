@@ -354,6 +354,5 @@ Test machines: dev laptop (RTX 3050 Ti 4 GB VRAM, 24 GB RAM) and one 8 GB RAM ma
 - v0.1 for Windows only, or all three OSes?
 - Link to the Ollama installer, or download and run it from inside the app?
 - Chat export format: Markdown, JSON, or both?
-- Open source from day one? If yes, MIT or Apache-2.0?
 
 When one is answered, write a decision record and remove it from this list.

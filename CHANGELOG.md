@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Common-Controls v6 linker directive in `src-tauri/build.rs` for Windows compatibility.
 - Project documentation suite: Setup Guide (`docs/setup.md`), Phase Plan (`docs/phases/M0.md`), and Architecture Decision Records (`0001-use-tauri.md`, `0002-bindings-exported-by-test.md`).
 - Moved master design document to `docs/design.md`.
+- Dual license: MIT OR Apache-2.0 (`LICENSE-MIT`, `LICENSE-APACHE`, decision 0004).
 
 ### Changed
 - App display name is now **A.I.D.P** (window title, page title, heading). Internal names stay `aidp`.

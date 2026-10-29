@@ -37,6 +37,7 @@ Updated: 2026-10-29 by Claude Code (Opus 5.5)
 - GitHub Actions CI workflow (`.github/workflows/ci.yml`) running the 4-part gate and checking for `bindings.ts` drift
 - Review fixes: MSVC-only manifest flag in `build.rs`, CI actions v5, M0 doc deviations recorded, template leftovers (029eb8c)
 - Display name A.I.D.P, internal names unchanged (`docs/decisions/0003-app-name.md`, 0184f01)
+- License: MIT OR Apache-2.0 (`docs/decisions/0004-license.md`)
 
 ## In progress
 
@@ -44,6 +45,6 @@ None. To claim: task / tool + model / date started / next step.
 
 ## Next 3 tasks
 
-1. Human input: confirm GitHub repository name and visibility (public/private) to add remote and push CI workflow.
+1. Human: create an empty **public** GitHub repo (no README/license) and send the URL. Before the first push, decide whether to switch commit emails to the GitHub noreply address (rewrites the unpushed commits).
 2. Human: complete reading Rust book chapters 1 to 9 to close Milestone M0.
 3. Milestone M1: Start cloud model chat plan with OpenAI-compatible adapter.
