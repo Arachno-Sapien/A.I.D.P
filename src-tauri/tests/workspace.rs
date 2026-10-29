@@ -1,9 +1,8 @@
 mod common;
 
 use aidp_lib::workspace::files::{list_dir, read_file, write_file, LineEnding, WriteFile};
-use aidp_lib::workspace::is_git;
 use aidp_lib::workspace::paths::resolve;
-use aidp_lib::workspace::WorkspaceError;
+use aidp_lib::workspace::{is_git, open, WorkspaceError};
 use common::{link_dir, TempDir};
 use std::fs::{self, canonicalize};
 
@@ -331,5 +330,29 @@ fn is_git_detection() {
     let fresh = TempDir::new();
     assert!(!is_git(fresh.path()));
 }
+
+#[test]
+fn open_reports_git_and_display_path() {
+    let temp = TempDir::new();
+    let root = temp.path();
+    fs::create_dir(root.join(".git")).unwrap();
+
+    let (canonical, info) = open(root).unwrap();
+    assert!(info.is_git);
+    assert!(!info.path.starts_with(r"\\?\"));
+    let expected_name = canonical.file_name().unwrap().to_str().unwrap();
+    assert_eq!(info.name, expected_name);
+}
+
+#[test]
+fn open_refuses_a_file() {
+    let temp = TempDir::new();
+    let root = temp.path();
+    let a_txt = root.join("a.txt");
+    fs::write(&a_txt, "hello").unwrap();
+
+    assert_eq!(open(&a_txt), Err(WorkspaceError::NotFound));
+}
+
 
 

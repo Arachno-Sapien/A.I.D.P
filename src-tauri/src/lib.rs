@@ -42,12 +42,20 @@ fn specta_builder() -> Builder<tauri::Wry> {
         commands::connections::set_default_model,
         commands::chat::send_message,
         commands::chat::stop_reply,
+        commands::workspace::open_folder,
+        commands::workspace::recent_folders,
+        commands::workspace::open_recent,
+        commands::workspace::close_folder,
+        commands::workspace::list_dir,
+        commands::workspace::read_file,
+        commands::workspace::write_file,
     ])
 }
 
 pub fn run() -> tauri::Result<()> {
     let builder = specta_builder();
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .plugin(
             tauri::plugin::Builder::<tauri::Wry>::new("nav-guard")
                 .on_navigation(|_window, url| is_app_url(url))
@@ -69,6 +77,7 @@ pub fn run() -> tauri::Result<()> {
             Ok(())
         })
         .manage(commands::chat::ChatState::default())
+        .manage(workspace::WorkspaceState::default())
         .invoke_handler(builder.invoke_handler())
         .run(tauri::generate_context!())
 }

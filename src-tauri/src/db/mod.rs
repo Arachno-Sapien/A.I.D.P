@@ -1,9 +1,11 @@
 pub mod connections;
+pub mod settings;
 
 use rusqlite::Connection;
 use std::path::Path;
 
-const MIGRATIONS: &[&str] = &[r#"
+const MIGRATIONS: &[&str] = &[
+    r#"
 CREATE TABLE connections (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   kind TEXT NOT NULL,
@@ -22,7 +24,11 @@ CREATE TABLE models (
   is_default INTEGER NOT NULL DEFAULT 0,
   UNIQUE (connection_id, model_id)
 );
-"#];
+"#,
+    r#"
+CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+"#,
+];
 
 pub fn open(path: &Path) -> rusqlite::Result<Connection> {
     let mut conn = Connection::open(path)?;
@@ -64,13 +70,13 @@ mod tests {
         let version: i32 = conn
             .query_row("PRAGMA user_version;", [], |row| row.get(0))
             .unwrap();
-        assert_eq!(version, 1);
+        assert_eq!(version, 2);
 
         migrate(&mut conn).unwrap();
         let version_after: i32 = conn
             .query_row("PRAGMA user_version;", [], |row| row.get(0))
             .unwrap();
-        assert_eq!(version_after, 1);
+        assert_eq!(version_after, 2);
     }
 
     #[test]

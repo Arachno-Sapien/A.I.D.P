@@ -53,4 +53,55 @@ describe("generated IPC bindings", () => {
       apiKey: "sk-new",
     });
   });
+
+  it("openFolder calls open_folder", async () => {
+    await commands.openFolder();
+    expect(invoke).toHaveBeenCalledWith("open_folder");
+  });
+
+  it("recentFolders calls recent_folders", async () => {
+    await commands.recentFolders();
+    expect(invoke).toHaveBeenCalledWith("recent_folders");
+  });
+
+  it("openRecent sends path to open_recent", async () => {
+    await commands.openRecent("/path/to/folder");
+    expect(invoke).toHaveBeenCalledWith("open_recent", {
+      path: "/path/to/folder",
+    });
+  });
+
+  it("closeFolder calls close_folder", async () => {
+    await commands.closeFolder();
+    expect(invoke).toHaveBeenCalledWith("close_folder");
+  });
+
+  it("listDir sends path to list_dir", async () => {
+    await commands.listDir("src");
+    expect(invoke).toHaveBeenCalledWith("list_dir", { path: "src" });
+  });
+
+  it("readFile sends path to read_file", async () => {
+    await commands.readFile("src/a.ts");
+    expect(invoke).toHaveBeenCalledWith("read_file", { path: "src/a.ts" });
+  });
+
+  it("writeFile sends req to write_file", async () => {
+    await commands.writeFile({
+      path: "src/a.ts",
+      text: "hello",
+      lineEnding: "lf",
+      hasBom: false,
+      expectedVersion: "1-5",
+    });
+    expect(invoke).toHaveBeenCalledWith("write_file", {
+      req: {
+        path: "src/a.ts",
+        text: "hello",
+        lineEnding: "lf",
+        hasBom: false,
+        expectedVersion: "1-5",
+      },
+    });
+  });
 });

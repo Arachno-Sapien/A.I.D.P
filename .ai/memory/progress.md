@@ -34,13 +34,13 @@ Plan (approved 2026-10-30, defaults for D1 to D3): `docs/superpowers/plans/2026-
 
 ## In progress
 
-Task: M3 Task 4: workspace commands, recent folders, app state
+Task: Review of Tasks 1 to 4 (Milestone M3)
 Tool + model: Antigravity (Gemini 3.8 Flash)
 Date: 2026-10-30
-Next step: Step 1 of Task 4: add `tauri-plugin-dialog@2` dependency, write migration 2 in `db/mod.rs` and `db/settings.rs`.
+Next step: Human review of Tasks 1 to 4; upon approval proceed to Task 5 (chat surfaces and reusable chat parts).
 
 ## Next 3 tasks
 
-1. Task 1: M2 follow-ups (Choose models keeps current picks; show swallowed errors).
-2. Task 2: workspace path checks and the secret-file filter (`src-tauri/src/workspace/`).
-3. Task 3: read, write and list workspace files.
+1. Task 5: chat surfaces and reusable chat parts (`commands/chat.rs`, `features/chat/store.ts`, reusable chat components).
+2. Task 6: workspace screen, virtualized file tree, navigation (`@tanstack/react-virtual`, `FileTree.tsx`, `WorkspaceScreen.tsx`).
+3. Task 7: editor tabs (CodeMirror 6, tab bar, dirty tracking, conflict bar).

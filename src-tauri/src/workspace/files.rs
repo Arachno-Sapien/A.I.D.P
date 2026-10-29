@@ -36,7 +36,7 @@ pub struct FileContent {
     pub is_secret: bool,
 }
 
-#[derive(Deserialize, Type, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Type, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct WriteFile {
     pub path: String,

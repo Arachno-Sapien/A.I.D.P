@@ -15,6 +15,13 @@ export const commands = {
 	setDefaultModel: (connectionId: number, modelId: string) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("set_default_model", { connectionId, modelId })),
 	sendMessage: (connectionId: number, modelId: string, messages: ChatMessage[], onEvent: Channel<ChatEvent_Deserialize>) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("send_message", { connectionId, modelId, messages, onEvent })),
 	stopReply: () => __TAURI_INVOKE<void>("stop_reply"),
+	openFolder: () => typedError<WorkspaceInfo | null, WorkspaceError>(__TAURI_INVOKE("open_folder")),
+	recentFolders: () => typedError<string[], WorkspaceError>(__TAURI_INVOKE("recent_folders")),
+	openRecent: (path: string) => typedError<WorkspaceInfo, WorkspaceError>(__TAURI_INVOKE("open_recent", { path })),
+	closeFolder: () => typedError<null, WorkspaceError>(__TAURI_INVOKE("close_folder")),
+	listDir: (path: string) => typedError<DirEntry[], WorkspaceError>(__TAURI_INVOKE("list_dir", { path })),
+	readFile: (path: string) => typedError<FileContent, WorkspaceError>(__TAURI_INVOKE("read_file", { path })),
+	writeFile: (req: WriteFile_Deserialize) => typedError<string, WorkspaceError>(__TAURI_INVOKE("write_file", { req })),
 };
 
 /* Types */
@@ -79,6 +86,23 @@ export type ConnectionView_Serialize = {
 	lastTestOk: boolean | null,
 };
 
+export type DirEntry = {
+	name: string,
+	path: string,
+	isDir: boolean,
+};
+
+export type FileContent = {
+	path: string,
+	text: string,
+	version: string,
+	lineEnding: LineEnding,
+	hasBom: boolean,
+	isSecret: boolean,
+};
+
+export type LineEnding = "lf" | "crlf";
+
 export type ModelInfo = ModelInfo_Serialize | ModelInfo_Deserialize;
 
 export type ModelInfo_Deserialize = {
@@ -118,6 +142,32 @@ export type Usage_Deserialize = {
 export type Usage_Serialize = {
 	tokensIn: number | null,
 	tokensOut: number | null,
+};
+
+export type WorkspaceError = { kind: "noFolder" } | { kind: "outsideFolder" } | { kind: "notFound" } | { kind: "notText" } | { kind: "tooLarge"; bytes: number } | { kind: "changedOnDisk" } | { kind: "io"; message: string } | { kind: "storage"; message: string };
+
+export type WorkspaceInfo = {
+	name: string,
+	path: string,
+	isGit: boolean,
+};
+
+export type WriteFile = WriteFile_Serialize | WriteFile_Deserialize;
+
+export type WriteFile_Deserialize = {
+	path: string,
+	text: string,
+	lineEnding: LineEnding,
+	hasBom: boolean,
+	expectedVersion?: string | null,
+};
+
+export type WriteFile_Serialize = {
+	path: string,
+	text: string,
+	lineEnding: LineEnding,
+	hasBom: boolean,
+	expectedVersion: string | null,
 };
 
 /* Tauri Specta runtime */

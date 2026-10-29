@@ -375,6 +375,20 @@ impl Services {
         Ok(())
     }
 
+    pub fn setting(&self, key: &str) -> Result<Option<String>, AppError> {
+        let conn = self.db.lock().map_err(|e| AppError::Storage {
+            message: e.to_string(),
+        })?;
+        crate::db::settings::get(&conn, key).map_err(AppError::from)
+    }
+
+    pub fn set_setting(&self, key: &str, value: &str) -> Result<(), AppError> {
+        let conn = self.db.lock().map_err(|e| AppError::Storage {
+            message: e.to_string(),
+        })?;
+        crate::db::settings::set(&conn, key, value).map_err(AppError::from)
+    }
+
     pub async fn stream(
         &self,
         connection_id: u32,

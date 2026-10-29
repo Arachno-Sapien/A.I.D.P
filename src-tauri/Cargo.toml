@@ -32,6 +32,7 @@ keyring = "4"
 rusqlite = { version = "0.41", features = ["bundled"] }
 ignore = "0.4"
 reqwest = { version = "0.13", default-features = false, features = ["native-tls", "charset", "http2", "system-proxy", "json", "stream"] }
+tauri-plugin-dialog = "2"
 
 [dev-dependencies]
 wiremock = "0.6"
