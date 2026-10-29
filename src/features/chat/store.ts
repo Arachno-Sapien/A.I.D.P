@@ -121,3 +121,4 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     set({ messages: [], streaming: false, configError: null });
   },
 }));
+

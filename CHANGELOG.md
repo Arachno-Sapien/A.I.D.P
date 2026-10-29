@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Streaming chat with one OpenAI-compatible provider, with Stop, Markdown, and code blocks you can copy.
 - Initial project scaffolding with Tauri 2, React 19, TypeScript, and Vite.
 - Typed IPC integration with `tauri-specta`, exporting TypeScript bindings via `cargo test`.
 - Frontend unit testing setup using Vitest scoped to `src/**/*.test.{ts,tsx}`.

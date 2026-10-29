@@ -33,17 +33,18 @@ For M1 only, the key comes from a git-ignored local config file (`config.local.j
 - M1 Task 4: Chat commands (`chat_config`, `send_message`, `stop_reply`), `ChatState`, navigation guard plugin, and bindings.
 - M1 Task 5: Zustand chat store (`useChatStore`), normalized `errorText`, and unit tests.
 - M1 Task 6: Markdown renderer with raw HTML off, Prism syntax highlighting, Copy button, and tests.
+- M1 Task 7: Chat screen (`ChatScreen.tsx`), App.tsx wiring, removal of greet, setup guide and changelog docs.
 
 ## In progress
 
 Plan: `docs/superpowers/plans/2026-10-29-m1-chat.md`
-Current task: Task 7: Chat screen, wiring, and manual verification
+Current task: Task 8: Review and close M1
 Agent: Antigravity (Gemini 3.8 Flash)
 Date: 2026-10-29
-Next step: Create ChatScreen.tsx, update App.tsx, remove greet command, run gate, verify app
+Next step: Review M1 diff, conduct human verification, close M1 phase docs and summarize memory logs
 
 ## Next 3 tasks
 
-1. Execute Task 7: Chat screen, wiring, and manual verification.
-2. Execute Task 8: Review and close M1.
-3. Prepare for M2: Keys and providers.
+1. Execute Task 8: Review and close M1.
+2. Prepare for M2: Keys and providers.
+3. Milestone M2 planning.

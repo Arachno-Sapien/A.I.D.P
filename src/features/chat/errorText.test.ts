@@ -48,3 +48,4 @@ describe("errorText", () => {
     expect(errorText({ kind: "cancelled" })).toBe("Stopped.");
   });
 });
+

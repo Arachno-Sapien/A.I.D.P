@@ -4,12 +4,6 @@ pub mod gateway;
 
 use tauri_specta::{collect_commands, Builder};
 
-#[tauri::command]
-#[specta::specta]
-fn greet(name: &str) -> String {
-    format!("Hello, {name}! You've been greeted from Rust!")
-}
-
 pub fn is_app_url(url: &tauri::Url) -> bool {
     if url.scheme() == "tauri" {
         return true;
@@ -31,7 +25,6 @@ pub fn is_app_url(url: &tauri::Url) -> bool {
 
 fn specta_builder() -> Builder<tauri::Wry> {
     Builder::<tauri::Wry>::new().commands(collect_commands![
-        greet,
         commands::chat::chat_config,
         commands::chat::send_message,
         commands::chat::stop_reply,

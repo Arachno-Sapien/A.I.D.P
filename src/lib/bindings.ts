@@ -4,7 +4,6 @@ import { invoke as __TAURI_INVOKE, Channel } from "@tauri-apps/api/core";
 
 /** Commands */
 export const commands = {
-	greet: (name: string) => __TAURI_INVOKE<string>("greet", { name }),
 	chatConfig: () => typedError<ChatConfigView, ConfigError>(__TAURI_INVOKE("chat_config")),
 	sendMessage: (messages: ChatMessage[], onEvent: Channel<ChatEvent_Deserialize>) => typedError<null, ConfigError>(__TAURI_INVOKE("send_message", { messages, onEvent })),
 	stopReply: () => __TAURI_INVOKE<void>("stop_reply"),

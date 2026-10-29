@@ -75,7 +75,31 @@ Before every commit, all four checks must pass cleanly without warnings:
 
 ---
 
-## 4. Production Release Build
+## 4. Chat with a Cloud Model (M1)
+
+For M1, the app loads connection configuration from a local file outside the repository:
+
+**File path (Windows):**
+```text
+%APPDATA%\com.aidp.desktop\config.local.json
+```
+*(Full path typically: `C:\Users\<username>\AppData\Roaming\com.aidp.desktop\config.local.json`)*
+
+**File template:**
+```json
+{
+  "base_url": "https://api.openai.com/v1",
+  "model": "gpt-4o-mini",
+  "api_key": "sk-...XXXX"
+}
+```
+
+> [!NOTE]
+> This config file is used exclusively during Milestone M1 to test cloud streaming. Milestone M2 replaces this configuration file with the OS Credential Manager (Keychain) and deletes this path.
+
+---
+
+## 5. Production Release Build
 
 To build the standalone release executable without generating installer bundles:
 ```bash
