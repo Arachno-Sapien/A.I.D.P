@@ -31,17 +31,18 @@ For M1 only, the key comes from a git-ignored local config file (`config.local.j
 - M1 Task 2: `OpenAiCompat` streaming adapter with 8 wiremock tests, decision record 0006 (`native-tls`), and docs.
 - M1 Task 3: Local config file loader (`config.rs`) for M1 key with transport validation and secret redaction.
 - M1 Task 4: Chat commands (`chat_config`, `send_message`, `stop_reply`), `ChatState`, navigation guard plugin, and bindings.
+- M1 Task 5: Zustand chat store (`useChatStore`), normalized `errorText`, and unit tests.
 
 ## In progress
 
 Plan: `docs/superpowers/plans/2026-10-29-m1-chat.md`
-Current task: Task 5: Chat store and error messages
+Current task: Task 6: Markdown replies with copyable code blocks
 Agent: Antigravity (Gemini 3.8 Flash)
 Date: 2026-10-29
-Next step: Install zustand@5, implement store.ts and errorText.ts with tests
+Next step: Install react-markdown, prism-react-renderer, testing-library/react, jsdom; create Markdown.tsx
 
 ## Next 3 tasks
 
-1. Execute Task 5: Chat store and error messages.
-2. Execute Task 6: Markdown replies with copyable code blocks.
-3. Execute Task 7: Chat screen, wiring, and manual verification.
+1. Execute Task 6: Markdown replies with copyable code blocks.
+2. Execute Task 7: Chat screen, wiring, and manual verification.
+3. Execute Task 8: Review and close M1.
