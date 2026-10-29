@@ -34,3 +34,4 @@ We chose **`native-tls`** for `reqwest` by setting `default-features = false` an
 1. **Clean Windows builds:** Developers need only the Visual Studio Build Tools and MSVC toolchain, without needing CMake or NASM.
 2. **Native certificate trust:** Enterprise proxies and custom root certificates installed in Windows Certificate Manager are respected out of the box.
 3. **Small footprint:** Leverages Windows SChannel (`schannel.dll`), keeping app size within our low-overhead target.
+

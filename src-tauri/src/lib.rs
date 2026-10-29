@@ -1,3 +1,4 @@
+pub mod config;
 pub mod gateway;
 
 use tauri_specta::{collect_commands, Builder};
