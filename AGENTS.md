@@ -74,7 +74,8 @@ Chosen for low memory use and tools agents know well. **No new dependency withou
 | Database | SQLite via `rusqlite` (bundled), accessed only from Rust |
 | Markdown | react-markdown + Prism, **raw HTML off** |
 | Long lists | @tanstack/react-virtual (messages, file tree) |
-| Code editor (M3) | CodeMirror 6, with @codemirror/merge for diffs (not Monaco: too heavy for the RAM target) |
+| Folder picker (M3) | tauri-plugin-dialog, called from Rust only |
+| Code editor (M3) | CodeMirror 6, with @codemirror/merge for diffs, @codemirror/language-data (not Monaco: too heavy for the RAM target) |
 | File walking and search (M3) | `ignore` crate (respects .gitignore) |
 | Terminal (M4) | xterm.js + `portable-pty` |
 | Tests | `cargo test` + wiremock (fake provider servers), Vitest |

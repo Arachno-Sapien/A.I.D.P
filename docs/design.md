@@ -188,7 +188,7 @@ Other local servers (LM Studio, llama.cpp) connect through the OpenAI-compatible
 
 ## Data model
 
-Five SQLite tables in one local file, read and written only by Rust. No table ever holds a full API key. All record IDs, foreign keys, and epoch timestamps are `u32` across the IPC boundary to ensure safe serialization without JavaScript `BigInt` precision loss. Note that in M2, the `models` table has only the columns M2 uses (`id`, `connection_id`, `model_id`, `display_name`, `context_window`, `is_default`); model capability columns (`supports_tools`, `supports_vision`) arrive in a later migration (M4).
+Five SQLite tables in one local file, read and written only by Rust. No table ever holds a full API key. All record IDs, foreign keys, and epoch timestamps are `u32` across the IPC boundary to ensure safe serialization without JavaScript `BigInt` precision loss. Note that in M2, the `models` table has only the columns M2 uses (`id`, `connection_id`, `model_id`, `display_name`, `context_window`, `is_default`); model capability columns (`supports_tools`, `supports_vision`) arrive in a later migration (M4). The `settings` table arrives in M3 (`key, value` text columns, migration 2, storing recent workspaces).
 
 | Table | Holds | Key columns |
 | --- | --- | --- |

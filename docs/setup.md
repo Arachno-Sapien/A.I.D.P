@@ -35,8 +35,9 @@ Ensure the following tools are installed:
 
 2. **Install frontend dependencies:**
    ```bash
-   npm ci
+   npm install
    ```
+   All editor components (CodeMirror 6, `@codemirror/merge`), virtualization (`@tanstack/react-virtual`), and Rust dialog plugins are handled by npm and cargo dependencies. There is nothing additional to install beyond `npm install`.
 
 3. **Restore agent skills (if working with AI agents):**
    ```bash

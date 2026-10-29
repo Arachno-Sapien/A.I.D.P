@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Workspace screen: open folders, virtualized file tree respecting `.gitignore` via `ignore` and `@tanstack/react-virtual`, recent folders history stored in SQLite `settings` table.
+- CodeMirror 6 editor tabs: syntax highlighting via `@codemirror/language-data` with one-dark theme, dirty edit tracking, line ending and BOM preservation, conflict bar for files changed or deleted on disk.
+- Workspace AI panel: multi-turn chat on `"workspace"` surface with context chips for open files and line selections, secret file auto-exclusion, and custom system contract.
+- Interactive code diffs: `@codemirror/merge` unified diff review with Accept and Reject actions; non-git warning banner and confirmation dialog before first AI modification.
+- Unsaved changes close guard: native window close interception via `CloseGuard` and Tauri Channel, preventing accidental loss of unsaved edits on folder switch or window close.
 - First-run "Add a model" flow: configure provider presets (OpenAI, OpenRouter, Groq, DeepSeek, Gemini, Anthropic) or custom endpoints directly in the app.
 - Models management page: test connections, view masked keys, replace keys, pick active models, and delete connections.
 - Secure key storage in native operating system keychain (Windows Credential Manager, macOS Keychain, Linux Secret Service) via `keyring` v4 and `secrecy` with zero plain-text storage on disk.

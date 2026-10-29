@@ -74,7 +74,35 @@ The database file contains **no secret keys**. Even if the database file is extr
 
 ---
 
-## 7. Threat Model & Boundaries
+## 7. Workspace & File Security
+
+Milestone 3 introduces the coding workspace, allowing the desktop application to open local project directories, navigate files, and preview AI proposals. The security architecture enforces strict boundaries:
+
+### Path Confinement & `resolve`
+Every file read, file write, and directory listing operation is governed by `workspace::paths::resolve`:
+- **Relative paths only:** Absolute paths (e.g. `/etc/passwd`, `C:\Windows`) and drive-prefixed paths are rejected upfront with `WorkspaceError::PathEscapes`.
+- **Colon rejection:** Colons (`:`) in any path component are strictly forbidden to prevent Windows alternate data stream exploits or drive specifiers.
+- **Component-by-component construction:** Paths are broken into normalized components (`Normal`) and pushed onto the canonical root directory.
+- **Canonicalization & Boundary Check:** The resolved path is canonicalized following symlinks and junctions, then verified with `resolved.starts_with(&canonical_root)`. If a symlink or `..` sequence escapes the opened workspace folder, the request is immediately rejected with `WorkspaceError::PathEscapes`.
+- **Tested boundary conditions:** 21 automated integration tests in `tests/workspace.rs` prove that `..`, absolute paths, Windows drive letters, directory junctions pointing outside the workspace, and symlinks escaping the folder are rejected.
+
+### Secret File Shielding
+Files containing sensitive credentials (`.env*`, `*.pem`, `*.key`, `id_rsa*`, `id_ed25519*`) are automatically protected:
+- **Detection:** `workspace::secret_files::is_secret` identifies sensitive file names and extensions, including when reached through directory symlinks.
+- **Marked on read:** `read_file` returns `is_secret: true`.
+- **AI Context Exclusion:** Secret files are automatically excluded from AI context chips (`chipsFor` initializes with `enabled: false, reason: "secret"`). They cannot be sent to cloud models unless the user explicitly and intentionally clicks `+ Add {filename}` in the UI.
+
+### Native Dialog Security
+Folder selection uses `tauri-plugin-dialog` v2:
+- **Rust-only invocation:** The dialog plugin is registered in Rust with zero permissions granted in `src-tauri/capabilities/default.json`. The web frontend cannot invoke dialog APIs directly.
+- **Recent folder validation:** `open_recent` verifies that any requested path matches an entry in the SQLite `settings` table before opening, preventing arbitrary path opening via forged IPC calls.
+
+### Release CSP & Styling
+- In release builds, `aidp.exe` compiles with a locked-down Content Security Policy (`script-src 'self'`). CodeMirror 6 syntax highlighting and one-dark themes render cleanly without requiring external script evaluation.
+
+---
+
+## 8. Threat Model & Boundaries
 
 **What this protects against:**
 - **Disk theft & backup leakage:** Stolen project files, SQLite database backups, or source code repositories do not expose your API keys.

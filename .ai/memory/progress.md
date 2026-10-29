@@ -34,10 +34,10 @@ Plan (approved 2026-10-30, defaults for D1 to D3): `docs/superpowers/plans/2026-
 
 ## In progress
 
-Task: M3 Task 11: docs
+Task: M3 Task 12: live check, RAM, review, close
 Tool + model: Antigravity (Gemini 3.8 Flash)
 Date: 2026-10-30
-Next step: Step 1 of Task 11: docs/security.md, docs/decisions/0008-folder-picker.md, docs/dev/measure-ram.md, AGENTS.md, etc.
+Next step: Step 1 of Task 12: prepare aidp-big folder and perform live checks.
 
 ## Next 3 tasks
 
