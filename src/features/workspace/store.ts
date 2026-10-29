@@ -32,6 +32,12 @@ export interface Proposal {
   proposed: string;
 }
 
+export type DirtyPromptAction =
+  | "open"
+  | "close"
+  | { type: "recent"; path: string }
+  | null;
+
 export interface WorkspaceStore {
   info: WorkspaceInfo | null;
   recent: string[];
@@ -45,11 +51,15 @@ export interface WorkspaceStore {
   proposal: Proposal | null;
   gitWarned: boolean;
   needsGitConfirm: boolean;
+  dirtyPrompt: DirtyPromptAction;
 
   loadRecent(): Promise<void>;
   openFolder(): Promise<void>;
+  forceOpenFolder(): Promise<void>;
   openRecent(path: string): Promise<void>;
+  forceOpenRecent(path: string): Promise<void>;
   closeFolder(): Promise<void>;
+  forceCloseFolder(): Promise<void>;
   toggleDir(path: string): Promise<void>;
   refreshTree(): Promise<void>;
   clearError(): void;
@@ -65,6 +75,14 @@ export interface WorkspaceStore {
   acceptProposal(): Promise<void>;
   confirmGit(): Promise<void>;
   rejectProposal(): void;
+
+  saveAll(): Promise<void>;
+  discardAndProceed(): Promise<void>;
+  cancelPrompt(): void;
+}
+
+function syncUnsaved(tabs: Tab[]) {
+  void commands.setUnsaved(tabs.some((t) => t.dirty));
 }
 
 export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
@@ -80,6 +98,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   proposal: null,
   gitWarned: false,
   needsGitConfirm: false,
+  dirtyPrompt: null,
 
   loadRecent: async () => {
     const res = await commands.recentFolders();
@@ -89,6 +108,14 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   },
 
   openFolder: async () => {
+    if (get().tabs.some((t) => t.dirty)) {
+      set({ dirtyPrompt: "open" });
+      return;
+    }
+    await get().forceOpenFolder();
+  },
+
+  forceOpenFolder: async () => {
     const res = await commands.openFolder();
     if (res.status === "ok") {
       if (res.data === null) {
@@ -102,7 +129,12 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
         proposal: null,
         gitWarned: false,
         needsGitConfirm: false,
+        tabs: [],
+        active: null,
+        conflict: null,
+        dirtyPrompt: null,
       });
+      syncUnsaved([]);
       const listRes = await commands.listDir("");
       if (listRes.status === "ok") {
         set({ children: { "": listRes.data } });
@@ -114,6 +146,14 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   },
 
   openRecent: async (path: string) => {
+    if (get().tabs.some((t) => t.dirty)) {
+      set({ dirtyPrompt: { type: "recent", path } });
+      return;
+    }
+    await get().forceOpenRecent(path);
+  },
+
+  forceOpenRecent: async (path: string) => {
     const res = await commands.openRecent(path);
     if (res.status === "ok") {
       set({
@@ -124,7 +164,12 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
         proposal: null,
         gitWarned: false,
         needsGitConfirm: false,
+        tabs: [],
+        active: null,
+        conflict: null,
+        dirtyPrompt: null,
       });
+      syncUnsaved([]);
       const listRes = await commands.listDir("");
       if (listRes.status === "ok") {
         set({ children: { "": listRes.data } });
@@ -137,6 +182,14 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   },
 
   closeFolder: async () => {
+    if (get().tabs.some((t) => t.dirty)) {
+      set({ dirtyPrompt: "close" });
+      return;
+    }
+    await get().forceCloseFolder();
+  },
+
+  forceCloseFolder: async () => {
     await commands.closeFolder();
     buffers.clear();
     set({
@@ -150,7 +203,9 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       proposal: null,
       gitWarned: false,
       needsGitConfirm: false,
+      dirtyPrompt: null,
     });
+    syncUnsaved([]);
     void get().loadRecent();
   },
 
@@ -235,9 +290,13 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   },
 
   setDirty: (path: string, dirty: boolean) => {
-    set((s) => ({
-      tabs: s.tabs.map((t) => (t.path === path ? { ...t, dirty } : t)),
-    }));
+    set((s) => {
+      const nextTabs = s.tabs.map((t) =>
+        t.path === path ? { ...t, dirty } : t,
+      );
+      syncUnsaved(nextTabs);
+      return { tabs: nextTabs };
+    });
   },
 
   setActive: (path: string) => {
@@ -262,13 +321,15 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
     if (res.status === "ok") {
       const newVersion = res.data;
       buffers.markSaved(path);
+      const nextTabs = get().tabs.map((t) =>
+        t.path === path ? { ...t, version: newVersion, dirty: false } : t,
+      );
       set((s) => ({
-        tabs: s.tabs.map((t) =>
-          t.path === path ? { ...t, version: newVersion, dirty: false } : t,
-        ),
+        tabs: nextTabs,
         conflict: s.conflict?.path === path ? null : s.conflict,
         error: null,
       }));
+      syncUnsaved(nextTabs);
     } else {
       if (res.error.kind === "changedOnDisk") {
         set({ conflict: { path, kind: "changedOnDisk" } });
@@ -297,22 +358,24 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       buffers.set(path, state);
       buffers.markSaved(path);
 
+      const nextTabs = get().tabs.map((t) =>
+        t.path === path
+          ? {
+              ...t,
+              version: file.version,
+              lineEnding: file.lineEnding,
+              hasBom: file.hasBom,
+              isSecret: file.isSecret,
+              dirty: false,
+            }
+          : t,
+      );
       set((s) => ({
-        tabs: s.tabs.map((t) =>
-          t.path === path
-            ? {
-                ...t,
-                version: file.version,
-                lineEnding: file.lineEnding,
-                hasBom: file.hasBom,
-                isSecret: file.isSecret,
-                dirty: false,
-              }
-            : t,
-        ),
+        tabs: nextTabs,
         conflict: s.conflict?.path === path ? null : s.conflict,
         error: null,
       }));
+      syncUnsaved(nextTabs);
     } else {
       if (res.error.kind === "notFound") {
         set({ conflict: { path, kind: "deleted" } });
@@ -335,6 +398,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       active: nextActive,
       conflict: s.conflict?.path === path ? null : s.conflict,
     }));
+    syncUnsaved(remaining);
   },
 
   propose: async (target: ApplyTarget, code: string) => {
@@ -416,17 +480,19 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
     buffers.set(tab.path, newState);
     buffers.markSaved(tab.path);
 
-    set((state) => ({
-      tabs: state.tabs.map((t) =>
-        t.path === proposal.path
-          ? { ...t, version: newVersion, dirty: false }
-          : t,
-      ),
+    const nextTabs = get().tabs.map((t) =>
+      t.path === proposal.path
+        ? { ...t, version: newVersion, dirty: false }
+        : t,
+    );
+    set({
+      tabs: nextTabs,
       proposal: null,
       needsGitConfirm: false,
       conflict: null,
       error: null,
-    }));
+    });
+    syncUnsaved(nextTabs);
   },
 
   confirmGit: async () => {
@@ -436,5 +502,33 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
 
   rejectProposal: () => {
     set({ proposal: null, needsGitConfirm: false });
+  },
+
+  saveAll: async () => {
+    for (const tab of get().tabs) {
+      if (tab.dirty) {
+        await get().save(tab.path);
+      }
+    }
+  },
+
+  discardAndProceed: async () => {
+    const action = get().dirtyPrompt;
+    set({ dirtyPrompt: null });
+    if (action === "open") {
+      await get().forceOpenFolder();
+    } else if (action === "close") {
+      await get().forceCloseFolder();
+    } else if (
+      action &&
+      typeof action === "object" &&
+      action.type === "recent"
+    ) {
+      await get().forceOpenRecent(action.path);
+    }
+  },
+
+  cancelPrompt: () => {
+    set({ dirtyPrompt: null });
   },
 }));

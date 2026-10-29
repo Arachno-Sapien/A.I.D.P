@@ -2,6 +2,15 @@
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("../../lib/bindings", () => ({
+  commands: {
+    setUnsaved: vi.fn().mockResolvedValue(undefined),
+    readFile: vi.fn(),
+    writeFile: vi.fn(),
+  },
+}));
+
 import { buffers } from "./buffers";
 import { createState } from "./cm";
 import { EditorPane } from "./EditorPane";

@@ -9,6 +9,7 @@ vi.mock("../../lib/bindings", () => ({
     listDir: vi.fn().mockResolvedValue({ status: "ok", data: [] }),
     readFile: vi.fn(),
     writeFile: vi.fn(),
+    setUnsaved: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
@@ -31,6 +32,7 @@ describe("useWorkspaceStore", () => {
       proposal: null,
       gitWarned: false,
       needsGitConfirm: false,
+      dirtyPrompt: null,
     });
   });
 
@@ -435,6 +437,64 @@ describe("useWorkspaceStore", () => {
       path: "a.ts",
       kind: "changedOnDisk",
     });
+  });
+
+  it("reports unsaved state to Rust", async () => {
+    vi.mocked(commands.writeFile).mockResolvedValueOnce({
+      status: "ok",
+      data: "v2",
+    });
+
+    useWorkspaceStore.setState({
+      tabs: [
+        {
+          path: "a.ts",
+          name: "a.ts",
+          version: "v1",
+          lineEnding: "lf",
+          hasBom: false,
+          isSecret: false,
+          dirty: false,
+        },
+      ],
+    });
+
+    useWorkspaceStore.getState().setDirty("a.ts", true);
+    expect(commands.setUnsaved).toHaveBeenCalledWith(true);
+
+    vi.mocked(commands.setUnsaved).mockClear();
+
+    await useWorkspaceStore.getState().save("a.ts");
+    expect(commands.setUnsaved).toHaveBeenCalledWith(false);
+  });
+
+  it("switching folders with unsaved tabs asks first", async () => {
+    vi.mocked(commands.openFolder).mockResolvedValueOnce({
+      status: "ok",
+      data: null,
+    });
+
+    useWorkspaceStore.setState({
+      tabs: [
+        {
+          path: "a.ts",
+          name: "a.ts",
+          version: "v1",
+          lineEnding: "lf",
+          hasBom: false,
+          isSecret: false,
+          dirty: true,
+        },
+      ],
+    });
+
+    await useWorkspaceStore.getState().openFolder();
+    expect(commands.openFolder).not.toHaveBeenCalled();
+    expect(useWorkspaceStore.getState().dirtyPrompt).toBe("open");
+
+    await useWorkspaceStore.getState().discardAndProceed();
+    expect(commands.openFolder).toHaveBeenCalled();
+    expect(useWorkspaceStore.getState().dirtyPrompt).toBeNull();
   });
 });
 

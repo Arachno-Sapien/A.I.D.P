@@ -34,10 +34,10 @@ Plan (approved 2026-10-30, defaults for D1 to D3): `docs/superpowers/plans/2026-
 
 ## In progress
 
-Task: M3 Task 10: never lose unsaved work on close
+Task: M3 Task 11: docs
 Tool + model: Antigravity (Gemini 3.8 Flash)
 Date: 2026-10-30
-Next step: Step 1 of Task 10: implement close_guard.rs, set_unsaved, watch_close, quit_app, App.tsx prompt.
+Next step: Step 1 of Task 11: docs/security.md, docs/decisions/0008-folder-picker.md, docs/dev/measure-ram.md, AGENTS.md, etc.
 
 ## Next 3 tasks
 

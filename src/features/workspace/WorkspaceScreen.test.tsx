@@ -10,6 +10,7 @@ vi.mock("../../lib/bindings", () => ({
     openRecent: vi.fn(),
     closeFolder: vi.fn(),
     listDir: vi.fn(),
+    setUnsaved: vi.fn().mockResolvedValue(undefined),
   },
 }));
 

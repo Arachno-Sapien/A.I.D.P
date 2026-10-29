@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("./lib/bindings", () => ({
@@ -8,11 +8,22 @@ vi.mock("./lib/bindings", () => ({
     listConnections: vi.fn().mockResolvedValue({ status: "ok", data: [] }),
     chatModels: vi.fn().mockResolvedValue({ status: "ok", data: [] }),
     recentFolders: vi.fn().mockResolvedValue({ status: "ok", data: [] }),
+    watchClose: vi.fn().mockResolvedValue(undefined),
+    quitApp: vi.fn().mockResolvedValue(undefined),
+    setUnsaved: vi.fn().mockResolvedValue(undefined),
+  },
+}));
+
+vi.mock("@tauri-apps/api/core", () => ({
+  Channel: class {
+    onmessage = (_: unknown) => {};
   },
 }));
 
 import App from "./App";
+import { commands } from "./lib/bindings";
 import { useModelsStore } from "./features/models/store";
+import { useWorkspaceStore } from "./features/workspace/store";
 
 describe("App", () => {
   beforeEach(() => {
@@ -57,5 +68,87 @@ describe("App", () => {
     fireEvent.click(workspaceNav);
     expect(screen.getByTestId("workspace-container")).toBe(wsNode);
     expect(wsNode.classList.contains("hidden")).toBe(false);
+  });
+
+  it("quit prompt offers save, discard, cancel", async () => {
+    let closeCallback: ((val: boolean) => void) | undefined;
+    vi.mocked(commands.watchClose).mockImplementation((channel: any) => {
+      closeCallback = channel.onmessage;
+      return Promise.resolve();
+    });
+
+    const saveSpy = vi.fn().mockResolvedValue(undefined);
+    useWorkspaceStore.setState({
+      tabs: [
+        {
+          path: "a.ts",
+          name: "a.ts",
+          version: "v1",
+          lineEnding: "lf",
+          hasBom: false,
+          isSecret: false,
+          dirty: true,
+        },
+        {
+          path: "b.ts",
+          name: "b.ts",
+          version: "v1",
+          lineEnding: "lf",
+          hasBom: false,
+          isSecret: false,
+          dirty: true,
+        },
+      ],
+      save: saveSpy,
+    });
+
+    render(<App />);
+
+    // Trigger close notification from Rust
+    act(() => {
+      closeCallback?.(true);
+    });
+
+    // Prompt appears
+    expect(
+      screen.getByText(/You have unsaved changes in 2 files\./i),
+    ).toBeDefined();
+
+    // Cancel does neither quitApp nor save
+    const cancelBtn = screen.getByRole("button", { name: /^cancel$/i });
+    fireEvent.click(cancelBtn);
+    expect(
+      screen.queryByText(/You have unsaved changes in 2 files\./i),
+    ).toBeNull();
+    expect(commands.quitApp).not.toHaveBeenCalled();
+    expect(saveSpy).not.toHaveBeenCalled();
+
+    // Trigger close again
+    act(() => {
+      closeCallback?.(true);
+    });
+
+    // Discard calls quitApp
+    const discardBtn = screen.getByRole("button", {
+      name: /discard and quit/i,
+    });
+    fireEvent.click(discardBtn);
+    expect(commands.quitApp).toHaveBeenCalledTimes(1);
+
+    vi.mocked(commands.quitApp).mockClear();
+
+    // Trigger close again
+    act(() => {
+      closeCallback?.(true);
+    });
+
+    // Save all saves then quits
+    const saveAllBtn = screen.getByRole("button", { name: /save all/i });
+    fireEvent.click(saveAllBtn);
+    await vi.waitFor(() => {
+      expect(commands.quitApp).toHaveBeenCalledTimes(1);
+    });
+    expect(saveSpy).toHaveBeenCalledWith("a.ts");
+    expect(saveSpy).toHaveBeenCalledWith("b.ts");
   });
 });

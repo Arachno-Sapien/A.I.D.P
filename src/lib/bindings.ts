@@ -22,6 +22,9 @@ export const commands = {
 	listDir: (path: string) => typedError<DirEntry[], WorkspaceError>(__TAURI_INVOKE("list_dir", { path })),
 	readFile: (path: string) => typedError<FileContent, WorkspaceError>(__TAURI_INVOKE("read_file", { path })),
 	writeFile: (req: WriteFile_Deserialize) => typedError<string, WorkspaceError>(__TAURI_INVOKE("write_file", { req })),
+	setUnsaved: (unsaved: boolean) => __TAURI_INVOKE<void>("set_unsaved", { unsaved }),
+	watchClose: (onClose: Channel<boolean>) => __TAURI_INVOKE<void>("watch_close", { onClose }),
+	quitApp: () => __TAURI_INVOKE<void>("quit_app"),
 };
 
 /* Types */

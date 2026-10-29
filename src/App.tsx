@@ -1,17 +1,31 @@
 import { useEffect, useState } from "react";
+import { Channel } from "@tauri-apps/api/core";
+import { commands } from "./lib/bindings";
 import { ChatScreen } from "./features/chat/ChatScreen";
 import { ModelsScreen } from "./features/models/ModelsScreen";
 import { useModelsStore } from "./features/models/store";
 import { WorkspaceScreen } from "./features/workspace/WorkspaceScreen";
+import { useWorkspaceStore } from "./features/workspace/store";
 import "./App.css";
 
 function App() {
   const [screen, setScreen] = useState<"chat" | "workspace" | "models">("chat");
   const [hasVisitedWorkspace, setHasVisitedWorkspace] = useState(false);
   const [startAdding, setStartAdding] = useState(false);
+  const [quitPrompt, setQuitPrompt] = useState(false);
+
+  const { tabs, dirtyPrompt, saveAll, discardAndProceed, cancelPrompt } =
+    useWorkspaceStore();
 
   useEffect(() => {
     void useModelsStore.getState().refresh();
+    const channel = new Channel<boolean>();
+    channel.onmessage = (closeRequested) => {
+      if (closeRequested) {
+        setQuitPrompt(true);
+      }
+    };
+    void commands.watchClose(channel);
   }, []);
 
   const handleSelectScreen = (next: "chat" | "workspace" | "models") => {
@@ -94,6 +108,84 @@ function App() {
           />
         )}
       </main>
+
+      {/* Quit Prompt Modal */}
+      {quitPrompt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+          <div className="bg-neutral-900 border border-neutral-800 rounded-xl max-w-md w-full p-6 shadow-2xl text-neutral-100">
+            <h3 className="text-base font-semibold mb-2">Unsaved changes</h3>
+            <p className="text-sm text-neutral-400 mb-6">
+              You have unsaved changes in {tabs.filter((t) => t.dirty).length}{" "}
+              {tabs.filter((t) => t.dirty).length === 1 ? "file" : "files"}.
+            </p>
+            <div className="flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setQuitPrompt(false)}
+                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-300 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void commands.quitApp()}
+                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-red-950/80 hover:bg-red-900 text-red-200 border border-red-800/80 transition-colors cursor-pointer"
+              >
+                Discard and quit
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  await saveAll();
+                  await commands.quitApp();
+                }}
+                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-neutral-100 hover:bg-white text-neutral-900 transition-colors cursor-pointer"
+              >
+                Save all
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Folder Switch / Close Dirty Prompt Modal */}
+      {dirtyPrompt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+          <div className="bg-neutral-900 border border-neutral-800 rounded-xl max-w-md w-full p-6 shadow-2xl text-neutral-100">
+            <h3 className="text-base font-semibold mb-2">Unsaved changes</h3>
+            <p className="text-sm text-neutral-400 mb-6">
+              You have unsaved changes in {tabs.filter((t) => t.dirty).length}{" "}
+              {tabs.filter((t) => t.dirty).length === 1 ? "file" : "files"}.
+            </p>
+            <div className="flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={cancelPrompt}
+                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-300 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void discardAndProceed()}
+                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-red-950/80 hover:bg-red-900 text-red-200 border border-red-800/80 transition-colors cursor-pointer"
+              >
+                Discard
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  await saveAll();
+                  await discardAndProceed();
+                }}
+                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-neutral-100 hover:bg-white text-neutral-900 transition-colors cursor-pointer"
+              >
+                Save all
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

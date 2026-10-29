@@ -1,3 +1,4 @@
+pub mod close_guard;
 pub mod commands;
 pub mod connections;
 pub mod db;
@@ -49,6 +50,9 @@ fn specta_builder() -> Builder<tauri::Wry> {
         commands::workspace::list_dir,
         commands::workspace::read_file,
         commands::workspace::write_file,
+        close_guard::set_unsaved,
+        close_guard::watch_close,
+        close_guard::quit_app,
     ])
 }
 
@@ -78,6 +82,16 @@ pub fn run() -> tauri::Result<()> {
         })
         .manage(commands::chat::ChatState::default())
         .manage(workspace::WorkspaceState::default())
+        .manage(close_guard::CloseGuard::default())
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                let guard = window.state::<close_guard::CloseGuard>();
+                if guard.should_block() {
+                    api.prevent_close();
+                    guard.notify_close_requested();
+                }
+            }
+        })
         .invoke_handler(builder.invoke_handler())
         .run(tauri::generate_context!())
 }
