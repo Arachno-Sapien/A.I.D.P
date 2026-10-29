@@ -38,14 +38,10 @@ For M1 only, the key comes from a git-ignored local config file (`config.local.j
 
 ## In progress
 
-Plan: `docs/superpowers/plans/2026-10-29-m1-chat.md`
-Current task: fix the M1 review findings (empty stopped replies in history, in-stream provider errors, Stop before begin, IPv6 local hosts, M1.md boxes)
-Agent: Claude Code (Opus 5.5)
-Date: 2026-10-29
-Next step: failing tests in store.test.ts, tests/openai_compat.rs, config.rs; then the fixes
+None. To claim: task / tool + model / date started / next step.
 
 ## Next 3 tasks
 
-1. Human verification with live OpenAI-compatible provider credentials.
-2. Tick M1 boxes in `docs/design.md` and archive M1 logs to `archive/M1/`.
-3. Plan and start Milestone M2: Keys and providers.
+1. Human: live check (M1 plan Task 7 step 4). Create `%APPDATA%\com.aidp.desktop\config.local.json`, then in `npm run tauri dev` test streaming, Copy, Stop after text has started, a link, a wrong key, and offline. Repeat streaming in the release build.
+2. M1 plan Task 8: review the whole M1 diff, tick the M1 boxes only on that evidence, close M1 (phase doc, archive logs), push with the human's OK.
+3. Plan M2 (keys and providers).
