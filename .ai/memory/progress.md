@@ -30,11 +30,11 @@ Updated: 2026-10-29 by Antigravity (Gemini 3.8 Flash)
 ## In progress
 
 Plan: `docs/superpowers/plans/2026-10-29-m0-setup.md`
-Current task: Task 1 (Scaffold and harden)
+Current task: Task 3 (Tailwind CSS and window check)
 Provisional app name: `aidp`, identifier: `com.aidp.desktop`
 Agent: Antigravity (Gemini 3.8 Flash)
 Date: 2026-10-29
-Next step: Scaffold outside repo into $TEMP/aidp-scaffold, copy into root, harden CSP and clippy lints
+Next step: Task 3: Install Tailwind CSS v4 and @tailwindcss/vite, restyle App.tsx, test dev and release windows
 
 ## Next 3 tasks
 

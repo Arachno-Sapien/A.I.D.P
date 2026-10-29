@@ -1,0 +1,9 @@
+// Prevents additional console window on Windows in release, DO NOT REMOVE!!
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
+fn main() {
+    if let Err(e) = aidp_lib::run() {
+        eprintln!("aidp failed to start: {e}");
+        std::process::exit(1);
+    }
+}
