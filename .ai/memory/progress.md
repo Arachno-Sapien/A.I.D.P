@@ -38,6 +38,7 @@ Updated: 2026-10-29 by Claude Code (Opus 5.5)
 - Review fixes: MSVC-only manifest flag in `build.rs`, CI actions v5, M0 doc deviations recorded, template leftovers (029eb8c)
 - Display name A.I.D.P, internal names unchanged (`docs/decisions/0003-app-name.md`, 0184f01)
 - License: MIT OR Apache-2.0 (`docs/decisions/0004-license.md`)
+- README.md (project overview, setup, agent workflow, roadmap, license)
 
 ## In progress
 
@@ -45,6 +46,6 @@ None. To claim: task / tool + model / date started / next step.
 
 ## Next 3 tasks
 
-1. Human: create an empty **public** GitHub repo (no README/license) and send the URL. Before the first push, decide whether to switch commit emails to the GitHub noreply address (rewrites the unpushed commits).
+1. Human: create an empty **public** GitHub repo (no README/license/.gitignore) and send the URL; then add the remote, push, confirm CI is green, and replace `<repo-url>` in README.md and docs/setup.md. Commits keep the existing Gmail author (human decision 2026-10-29).
 2. Human: complete reading Rust book chapters 1 to 9 to close Milestone M0.
 3. Milestone M1: Start cloud model chat plan with OpenAI-compatible adapter.

@@ -128,6 +128,7 @@ Ollama endpoints, data model (5 tables), and UI flows: see the design doc sectio
 Frontend in `src/`, Rust core in `src-tauri/`. **Each folder has one job; touch only the folders your task needs.** An agent working on Ollama never edits key storage. If a plan touches a folder outside its area, say why in the plan.
 
 ```text
+README.md                  project overview for humans
 AGENTS.md                  this file
 CLAUDE.md                  one line: @AGENTS.md
 GEMINI.md                  pointer to this file (Gemini CLI / Antigravity)
