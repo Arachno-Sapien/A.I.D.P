@@ -32,13 +32,13 @@ The M1 key file (`config.local.json`, `src-tauri/src/config.rs` and the "Configu
 
 ## In progress
 
-Task: M2 Task 5: Connections service (add, test, replace key, delete, stream)
+Task: M2 Tasks 1 to 5 completed. Paused at user boundary.
 Tool + model: Antigravity (Gemini 3.8 Flash)
 Date: 2026-10-30
-Next step: Write failing integration tests in tests/connections.rs, implement connections.rs
+Next step: Task 6 (Commands, app state, chat rewrite; delete the config path) after user review.
 
 ## Next 3 tasks
 
-1. Execute Task 5: Connections service (add, test, replace key, delete, stream).
-2. Wait for human confirmation after Task 5.
-3. Once approved, proceed with Tasks 6 to 10.
+1. Task 6: Commands, app state, chat rewrite; delete the config path.
+2. Task 7: Models screen and connections UI.
+3. Task 8: Settings and default model.

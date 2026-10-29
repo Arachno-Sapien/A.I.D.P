@@ -1,5 +1,6 @@
 pub mod commands;
 pub mod config;
+pub mod connections;
 pub mod db;
 pub mod gateway;
 pub mod secrets;
