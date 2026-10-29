@@ -136,8 +136,12 @@ function App() {
               <button
                 type="button"
                 onClick={async () => {
-                  await saveAll();
-                  await commands.quitApp();
+                  // Quit only if every file was written; otherwise the conflict stays on screen.
+                  if (await saveAll()) {
+                    await commands.quitApp();
+                  } else {
+                    setQuitPrompt(false);
+                  }
                 }}
                 className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-neutral-100 hover:bg-white text-neutral-900 transition-colors cursor-pointer"
               >
@@ -175,8 +179,11 @@ function App() {
               <button
                 type="button"
                 onClick={async () => {
-                  await saveAll();
-                  await discardAndProceed();
+                  if (await saveAll()) {
+                    await discardAndProceed();
+                  } else {
+                    cancelPrompt();
+                  }
                 }}
                 className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-neutral-100 hover:bg-white text-neutral-900 transition-colors cursor-pointer"
               >

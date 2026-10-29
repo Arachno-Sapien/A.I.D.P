@@ -9,6 +9,7 @@ import { useWorkspaceChatStore } from "./chatStore";
 import {
   buildContent,
   chipsFor,
+  FILE_CHAR_LIMIT,
   WORKSPACE_SYSTEM,
   type FileContext,
   type SelectionContext,
@@ -20,7 +21,7 @@ export interface AiPanelProps {
 }
 
 export function AiPanel({ onApply }: AiPanelProps) {
-  const { tabs, active, propose } = useWorkspaceStore();
+  const { tabs, active, selection, propose } = useWorkspaceStore();
   const { messages, streaming, send, stop } = useWorkspaceChatStore();
   const { selected } = useModelsStore();
 
@@ -33,7 +34,6 @@ export function AiPanel({ onApply }: AiPanelProps) {
   const activeTab = tabs.find((t) => t.path === active);
 
   const chips = chipsFor(activeTab, buffers);
-  const text = activeTab ? (buffers.text(activeTab.path) ?? "") : "";
 
   const isSecret = chips.file?.reason === "secret";
   const isTooLarge = chips.file?.reason === "tooLarge";
@@ -51,9 +51,13 @@ export function AiPanel({ onApply }: AiPanelProps) {
       : !isManuallyRemoved && !isTooLarge
     : false;
 
-  const selInfo = activeTab ? buffers.selection(activeTab.path) : null;
-  const selectionEnabled =
-    activeTab && selInfo && fileEnabled && !isSelRemoved;
+  const selInfo =
+    activeTab && selection?.path === activeTab.path ? selection.info : null;
+  // A selection needs no file chip (that is how a too-large file is asked about),
+  // but a secret file's selection is sent only after the file is added by hand.
+  const selectionEnabled = Boolean(
+    activeTab && selInfo && !isSelRemoved && (!isSecret || isManuallyAdded),
+  );
 
   const canAddFile =
     activeTab &&
@@ -64,11 +68,18 @@ export function AiPanel({ onApply }: AiPanelProps) {
   const handleSend = async (question: string) => {
     if (!selected) return;
 
+    // Read the buffer now, not at the last render: the user may have typed since.
     let fileContext: FileContext | undefined;
-    if (fileEnabled && activeTab) {
+    const fresh = activeTab ? buffers.text(activeTab.path) : undefined;
+    if (
+      fileEnabled &&
+      activeTab &&
+      fresh !== undefined &&
+      fresh.length <= FILE_CHAR_LIMIT
+    ) {
       fileContext = {
         path: activeTab.path,
-        text,
+        text: fresh,
       };
     }
 

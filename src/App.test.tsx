@@ -77,7 +77,11 @@ describe("App", () => {
       return Promise.resolve();
     });
 
-    const saveSpy = vi.fn().mockResolvedValue(undefined);
+    const saveSpy = vi.fn(async (path: string) => {
+      useWorkspaceStore.setState((s) => ({
+        tabs: s.tabs.map((t) => (t.path === path ? { ...t, dirty: false } : t)),
+      }));
+    });
     useWorkspaceStore.setState({
       tabs: [
         {
@@ -150,5 +154,46 @@ describe("App", () => {
     });
     expect(saveSpy).toHaveBeenCalledWith("a.ts");
     expect(saveSpy).toHaveBeenCalledWith("b.ts");
+  });
+
+  it("Save all does not quit when a file could not be saved", async () => {
+    let closeCallback: ((val: boolean) => void) | undefined;
+    vi.mocked(commands.watchClose).mockImplementation((channel: any) => {
+      closeCallback = channel.onmessage;
+      return Promise.resolve();
+    });
+
+    // A save that fails (for example, the file changed on disk) leaves the tab dirty.
+    const failingSave = vi.fn().mockResolvedValue(undefined);
+    useWorkspaceStore.setState({
+      tabs: [
+        {
+          path: "a.ts",
+          name: "a.ts",
+          version: "v1",
+          lineEnding: "lf",
+          hasBom: false,
+          isSecret: false,
+          dirty: true,
+        },
+      ],
+      save: failingSave,
+    });
+
+    render(<App />);
+    act(() => {
+      closeCallback?.(true);
+    });
+    fireEvent.click(screen.getByRole("button", { name: /save all/i }));
+
+    await vi.waitFor(() => {
+      expect(failingSave).toHaveBeenCalledWith("a.ts");
+    });
+    await vi.waitFor(() => {
+      expect(
+        screen.queryByText(/You have unsaved changes in 1 file\./i),
+      ).toBeNull();
+    });
+    expect(commands.quitApp).not.toHaveBeenCalled();
   });
 });

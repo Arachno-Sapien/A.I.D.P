@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../lib/bindings", () => ({
@@ -11,6 +11,7 @@ vi.mock("../../lib/bindings", () => ({
   },
 }));
 
+import { commands } from "../../lib/bindings";
 import { buffers } from "./buffers";
 import { createState } from "./cm";
 import { EditorPane } from "./EditorPane";
@@ -67,6 +68,48 @@ describe("EditorPane", () => {
     fireEvent.click(discardBtn);
 
     expect(useWorkspaceStore.getState().tabs).toHaveLength(0);
+  });
+
+  const file = (path: string, text: string, version = "v1") => ({
+    status: "ok" as const,
+    data: {
+      path,
+      text,
+      version,
+      lineEnding: "lf" as const,
+      hasBom: false,
+      isSecret: false,
+    },
+  });
+
+  it("shows the new text after a reload", async () => {
+    vi.mocked(commands.readFile)
+      .mockResolvedValueOnce(file("a.ts", "old"))
+      .mockResolvedValueOnce(file("a.ts", "new", "v2"));
+    await useWorkspaceStore.getState().openFile("a.ts");
+
+    const { container } = render(<EditorPane />);
+    expect(container.querySelector(".cm-content")?.textContent).toBe("old");
+
+    await act(async () => {
+      await useWorkspaceStore.getState().reload("a.ts");
+    });
+    expect(container.querySelector(".cm-content")?.textContent).toBe("new");
+  });
+
+  it("shows a newly opened file after the last tab was closed", async () => {
+    vi.mocked(commands.readFile).mockImplementation(async (p) => file(p, p));
+    await useWorkspaceStore.getState().openFile("a.ts");
+    const { container } = render(<EditorPane />);
+
+    act(() => {
+      useWorkspaceStore.getState().closeTab("a.ts");
+    });
+    await act(async () => {
+      await useWorkspaceStore.getState().openFile("b.ts");
+    });
+
+    expect(container.querySelector(".cm-content")?.textContent).toBe("b.ts");
   });
 });
 

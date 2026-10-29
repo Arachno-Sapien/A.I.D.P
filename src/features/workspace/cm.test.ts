@@ -6,10 +6,10 @@ import { createState, mountDiff, mountView } from "./cm";
 describe("cm", () => {
   it("createState sets up one-dark and basic setup", () => {
     const onSave = vi.fn();
-    const onChange = vi.fn();
+    const onUpdate = vi.fn();
 
     const state = createState("const a = 1;", "test.ts", {
-      onChange,
+      onUpdate,
       onSave,
     });
 

@@ -18,8 +18,14 @@ impl CloseGuard {
         *guard = Some(channel);
     }
 
+    // Without a listening window nobody can answer the prompt, so never trap the user.
     pub fn should_block(&self) -> bool {
         self.unsaved.load(Ordering::SeqCst)
+            && self
+                .channel
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .is_some()
     }
 
     pub fn notify_close_requested(&self) {
@@ -56,10 +62,18 @@ mod tests {
     #[test]
     fn close_guard_blocks_only_when_unsaved() {
         let guard = CloseGuard::default();
+        guard.watch(Channel::new(|_| Ok(())));
         assert!(!guard.should_block());
         guard.set_unsaved(true);
         assert!(guard.should_block());
         guard.set_unsaved(false);
+        assert!(!guard.should_block());
+    }
+
+    #[test]
+    fn close_guard_never_blocks_without_a_listening_window() {
+        let guard = CloseGuard::default();
+        guard.set_unsaved(true);
         assert!(!guard.should_block());
     }
 }

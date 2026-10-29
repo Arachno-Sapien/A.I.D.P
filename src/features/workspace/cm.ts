@@ -7,7 +7,8 @@ import { LanguageDescription } from "@codemirror/language";
 import { unifiedMergeView } from "@codemirror/merge";
 
 export interface CreateStateOptions {
-  onChange?: (text: string) => void;
+  /** Called with the editor's new state after every edit or selection change. */
+  onUpdate?: (state: EditorState, docChanged: boolean) => void;
   onSave?: () => void;
 }
 
@@ -24,11 +25,11 @@ export function createState(
     languageCompartment.of([]),
   ];
 
-  if (options.onChange) {
+  if (options.onUpdate) {
     extensions.push(
       EditorView.updateListener.of((update) => {
-        if (update.docChanged) {
-          options.onChange?.(update.state.doc.toString());
+        if (update.docChanged || update.selectionSet) {
+          options.onUpdate?.(update.state, update.docChanged);
         }
       }),
     );

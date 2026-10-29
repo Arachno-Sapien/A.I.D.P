@@ -8,6 +8,7 @@ export function EditorPane() {
   const {
     tabs,
     active,
+    revision,
     conflict,
     setActive,
     save,
@@ -21,27 +22,26 @@ export function EditorPane() {
 
   const activeTab = tabs.find((t) => t.path === active);
 
-  // Manage single EditorView and swap states on tab change
+  // One EditorView shows the active tab's buffer. Edits flow back into the
+  // buffer through the state's listener; `revision` brings in a buffer the
+  // store replaced (reload, Accept).
   useEffect(() => {
-    if (!editorContainerRef.current) return;
-
     if (!active) {
-      if (viewRef.current) {
-        viewRef.current.destroy();
-        viewRef.current = null;
-      }
+      viewRef.current?.destroy();
+      viewRef.current = null;
       return;
     }
 
+    const container = editorContainerRef.current;
     const state = buffers.get(active);
-    if (!state) return;
+    if (!container || !state) return;
 
     if (!viewRef.current) {
-      viewRef.current = mountView(editorContainerRef.current, state);
-    } else {
+      viewRef.current = mountView(container, state);
+    } else if (viewRef.current.state !== state) {
       viewRef.current.setState(state);
     }
-  }, [active]);
+  }, [active, revision]);
 
   useEffect(() => {
     return () => {

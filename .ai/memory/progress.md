@@ -34,13 +34,11 @@ Plan (approved 2026-10-30, defaults for D1 to D3): `docs/superpowers/plans/2026-
 
 ## In progress
 
-Task: M3 Task 12: live check, RAM, review, close
-Tool + model: Antigravity (Gemini 3.8 Flash)
-Date: 2026-10-30
-Next step: Step 1 of Task 12: prepare aidp-big folder and perform live checks.
+Nothing in progress. Tasks 5 to 11 are reviewed and the review fixes are committed (Claude Code, Opus 5.5, 2026-10-30).
+Next step: Task 12 with the human: live check in `npm run tauri dev`, the release build (including how the editor looks under the release CSP), RAM, review, close.
 
 ## Next 3 tasks
 
-1. Task 7: editor tabs (CodeMirror 6, tab bar, dirty tracking, conflict bar).
-2. Task 8: workspace AI panel and Apply flow (two stores, selection context, diff display).
-3. Task 9: diff review and accept flow (@codemirror/merge, accept/reject).
+1. Task 12: live check, release build and CSP look, RAM measurement and budget.
+2. Task 12: review the whole M3 diff, tick boxes with the human, close the milestone, push with OK.
+3. M4 plan (agent tools and terminal).

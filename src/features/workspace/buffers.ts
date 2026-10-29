@@ -18,6 +18,12 @@ export const buffers = {
     return map.get(path)?.state;
   },
 
+  /** A buffer loaded from disk: its text counts as saved. */
+  open(path: string, state: EditorState): void {
+    map.set(path, { state, savedDoc: state.doc });
+  },
+
+  /** The editor's latest state; the saved text stays as it was. */
   set(path: string, state: EditorState): void {
     const existing = map.get(path);
     if (existing) {
@@ -52,10 +58,11 @@ export const buffers = {
     return !entry.savedDoc.eq(entry.state.doc);
   },
 
-  markSaved(path: string): void {
+  /** Pass the text that was written; edits made since then stay unsaved. */
+  markSaved(path: string, doc?: Text): void {
     const entry = map.get(path);
     if (entry) {
-      entry.savedDoc = entry.state.doc;
+      entry.savedDoc = doc ?? entry.state.doc;
     }
   },
 

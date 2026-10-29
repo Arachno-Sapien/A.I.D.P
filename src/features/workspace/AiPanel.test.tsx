@@ -61,6 +61,7 @@ describe("AiPanel", () => {
 
     useWorkspaceStore.setState({
       active: "src/a.ts",
+      selection: null,
       tabs: [
         {
           path: "src/a.ts",
@@ -133,6 +134,30 @@ describe("AiPanel", () => {
       ],
       expect.anything(),
     );
+  });
+
+  it("a selection can be sent from a file too large to attach", async () => {
+    buffers.open("src/a.ts", createState("x".repeat(100_001), "a.ts"));
+    useWorkspaceStore.setState({
+      selection: {
+        path: "src/a.ts",
+        info: { text: "xx", fromLine: 1, toLine: 1 },
+      },
+    });
+
+    render(<AiPanel />);
+    expect(screen.getByText("a.ts:1-1")).toBeDefined();
+
+    fireEvent.change(screen.getByRole("textbox"), {
+      target: { value: "What is this?" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /send/i }));
+
+    const userMsg = vi
+      .mocked(commands.sendMessage)
+      .mock.calls[0]?.[3].find((m) => m.role === "user");
+    expect(userMsg?.content).toContain("Selected lines 1-1 of src/a.ts:");
+    expect(userMsg?.content).not.toContain("File src/a.ts:");
   });
 
   it("Stop stops only the workspace reply", async () => {

@@ -15,7 +15,18 @@ vi.mock("../../lib/bindings", () => ({
 
 import { commands } from "../../lib/bindings";
 import { buffers } from "./buffers";
+import { createState } from "./cm";
 import { useWorkspaceStore } from "./store";
+
+const tab = (path: string, dirty: boolean) => ({
+  path,
+  name: path.split("/").pop() ?? path,
+  version: "v1",
+  lineEnding: "lf" as const,
+  hasBom: false,
+  isSecret: false,
+  dirty,
+});
 
 describe("useWorkspaceStore", () => {
   beforeEach(() => {
@@ -459,6 +470,7 @@ describe("useWorkspaceStore", () => {
       ],
     });
 
+    buffers.open("a.ts", createState("x", "a.ts"));
     useWorkspaceStore.getState().setDirty("a.ts", true);
     expect(commands.setUnsaved).toHaveBeenCalledWith(true);
 
@@ -495,6 +507,64 @@ describe("useWorkspaceStore", () => {
     await useWorkspaceStore.getState().discardAndProceed();
     expect(commands.openFolder).toHaveBeenCalled();
     expect(useWorkspaceStore.getState().dirtyPrompt).toBeNull();
+  });
+
+  it("keys a tab by the path that was asked for", async () => {
+    vi.mocked(commands.readFile).mockResolvedValueOnce({
+      status: "ok",
+      data: {
+        path: "src/a.ts",
+        text: "x",
+        version: "v1",
+        lineEnding: "lf",
+        hasBom: false,
+        isSecret: false,
+      },
+    });
+
+    await useWorkspaceStore.getState().openFile("inner/a.ts");
+
+    expect(useWorkspaceStore.getState().tabs[0]?.path).toBe("inner/a.ts");
+    expect(buffers.text("inner/a.ts")).toBe("x");
+  });
+
+  it("save never writes a tab whose text is missing", async () => {
+    useWorkspaceStore.setState({ tabs: [tab("gone.ts", true)], active: "gone.ts" });
+    buffers.remove("gone.ts");
+
+    await useWorkspaceStore.getState().save("gone.ts");
+
+    expect(commands.writeFile).not.toHaveBeenCalled();
+    expect(useWorkspaceStore.getState().error).toMatch(/gone\.ts/);
+  });
+
+  it("saveAll reports whether everything was saved", async () => {
+    buffers.open("a.ts", createState("x", "a.ts"));
+    useWorkspaceStore.setState({ tabs: [tab("a.ts", true)] });
+
+    vi.mocked(commands.writeFile).mockResolvedValueOnce({
+      status: "error",
+      error: { kind: "changedOnDisk" },
+    });
+    expect(await useWorkspaceStore.getState().saveAll()).toBe(false);
+
+    vi.mocked(commands.writeFile).mockResolvedValueOnce({
+      status: "ok",
+      data: "v2",
+    });
+    expect(await useWorkspaceStore.getState().saveAll()).toBe(true);
+  });
+
+  it("opening another folder drops the old folder's buffers", async () => {
+    buffers.open("a.ts", createState("old", "a.ts"));
+    vi.mocked(commands.openFolder).mockResolvedValueOnce({
+      status: "ok",
+      data: { name: "b", path: "/b", isGit: true },
+    });
+
+    await useWorkspaceStore.getState().openFolder();
+
+    expect(buffers.get("a.ts")).toBeUndefined();
   });
 });
 

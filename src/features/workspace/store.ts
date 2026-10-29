@@ -7,7 +7,7 @@ import {
   type WorkspaceInfo,
 } from "../../lib/bindings";
 import { applyProposal } from "./applyProposal";
-import { buffers } from "./buffers";
+import { buffers, type SelectionInfo } from "./buffers";
 import { createState } from "./cm";
 import { workspaceErrorText } from "./workspaceErrorText";
 
@@ -52,6 +52,10 @@ export interface WorkspaceStore {
   gitWarned: boolean;
   needsGitConfirm: boolean;
   dirtyPrompt: DirtyPromptAction;
+  /** The editor selection, kept here so the AI panel re-renders when it changes. */
+  selection: { path: string; info: SelectionInfo } | null;
+  /** Bumped when the store replaces a buffer (reload, Accept), so the open editor shows it. */
+  revision: number;
 
   loadRecent(): Promise<void>;
   openFolder(): Promise<void>;
@@ -66,6 +70,7 @@ export interface WorkspaceStore {
 
   openFile(path: string): Promise<void>;
   setDirty(path: string, dirty: boolean): void;
+  noteSelection(path: string): void;
   setActive(path: string): void;
   save(path: string, options?: { overwrite?: boolean }): Promise<void>;
   reload(path: string): Promise<void>;
@@ -76,7 +81,8 @@ export interface WorkspaceStore {
   confirmGit(): Promise<void>;
   rejectProposal(): void;
 
-  saveAll(): Promise<void>;
+  /** Saves every dirty tab; true only when nothing is left unsaved. */
+  saveAll(): Promise<boolean>;
   discardAndProceed(): Promise<void>;
   cancelPrompt(): void;
 }
@@ -84,6 +90,41 @@ export interface WorkspaceStore {
 function syncUnsaved(tabs: Tab[]) {
   void commands.setUnsaved(tabs.some((t) => t.dirty));
 }
+
+function sameSelection(a: SelectionInfo | null, b: SelectionInfo | null) {
+  if (a === null || b === null) return a === b;
+  return a.text === b.text && a.fromLine === b.fromLine && a.toLine === b.toLine;
+}
+
+// Every editor state writes itself back into `buffers`, which is what Save,
+// the AI context and tab switching read.
+function editorState(path: string, text: string, filename: string) {
+  return createState(text, filename, {
+    onUpdate: (state, docChanged) => {
+      buffers.set(path, state);
+      const store = useWorkspaceStore.getState();
+      if (docChanged) store.setDirty(path, buffers.isDirty(path));
+      store.noteSelection(path);
+    },
+    onSave: () => {
+      void useWorkspaceStore.getState().save(path);
+    },
+  });
+}
+
+const folderReset = {
+  children: {},
+  expanded: {},
+  error: null,
+  proposal: null,
+  gitWarned: false,
+  needsGitConfirm: false,
+  tabs: [],
+  active: null,
+  conflict: null,
+  dirtyPrompt: null,
+  selection: null,
+};
 
 export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   info: null,
@@ -99,6 +140,8 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   gitWarned: false,
   needsGitConfirm: false,
   dirtyPrompt: null,
+  selection: null,
+  revision: 0,
 
   loadRecent: async () => {
     const res = await commands.recentFolders();
@@ -121,19 +164,8 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       if (res.data === null) {
         return;
       }
-      set({
-        info: res.data,
-        children: {},
-        expanded: {},
-        error: null,
-        proposal: null,
-        gitWarned: false,
-        needsGitConfirm: false,
-        tabs: [],
-        active: null,
-        conflict: null,
-        dirtyPrompt: null,
-      });
+      buffers.clear();
+      set({ info: res.data, ...folderReset });
       syncUnsaved([]);
       const listRes = await commands.listDir("");
       if (listRes.status === "ok") {
@@ -156,19 +188,8 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   forceOpenRecent: async (path: string) => {
     const res = await commands.openRecent(path);
     if (res.status === "ok") {
-      set({
-        info: res.data,
-        children: {},
-        expanded: {},
-        error: null,
-        proposal: null,
-        gitWarned: false,
-        needsGitConfirm: false,
-        tabs: [],
-        active: null,
-        conflict: null,
-        dirtyPrompt: null,
-      });
+      buffers.clear();
+      set({ info: res.data, ...folderReset });
       syncUnsaved([]);
       const listRes = await commands.listDir("");
       if (listRes.status === "ok") {
@@ -192,19 +213,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   forceCloseFolder: async () => {
     await commands.closeFolder();
     buffers.clear();
-    set({
-      info: null,
-      children: {},
-      expanded: {},
-      error: null,
-      tabs: [],
-      active: null,
-      conflict: null,
-      proposal: null,
-      gitWarned: false,
-      needsGitConfirm: false,
-      dirtyPrompt: null,
-    });
+    set({ info: null, ...folderReset });
     syncUnsaved([]);
     void get().loadRecent();
   },
@@ -257,20 +266,13 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
     const res = await commands.readFile(path);
     if (res.status === "ok") {
       const file = res.data;
-      const filename = file.path.split("/").pop() || file.path;
-      const state = createState(file.text, filename, {
-        onChange: () => {
-          const dirty = buffers.isDirty(path);
-          get().setDirty(path, dirty);
-        },
-        onSave: () => {
-          void get().save(path);
-        },
-      });
-      buffers.set(path, state);
+      // The tab and its buffer use the path that was asked for. Rust may answer
+      // with the link target's path, and two keys for one tab lose its text.
+      const filename = path.split("/").pop() || path;
+      buffers.open(path, editorState(path, file.text, filename));
 
       const tab: Tab = {
-        path: file.path,
+        path,
         name: filename,
         version: file.version,
         lineEnding: file.lineEnding,
@@ -281,7 +283,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
 
       set((s) => ({
         tabs: [...s.tabs, tab],
-        active: file.path,
+        active: path,
         error: null,
       }));
     } else {
@@ -290,13 +292,21 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   },
 
   setDirty: (path: string, dirty: boolean) => {
-    set((s) => {
-      const nextTabs = s.tabs.map((t) =>
-        t.path === path ? { ...t, dirty } : t,
-      );
-      syncUnsaved(nextTabs);
-      return { tabs: nextTabs };
-    });
+    const tab = get().tabs.find((t) => t.path === path);
+    if (!tab || tab.dirty === dirty) return;
+    const nextTabs = get().tabs.map((t) =>
+      t.path === path ? { ...t, dirty } : t,
+    );
+    set({ tabs: nextTabs });
+    syncUnsaved(nextTabs);
+  },
+
+  noteSelection: (path: string) => {
+    const info = buffers.selection(path);
+    const current = get().selection;
+    const currentInfo = current?.path === path ? current.info : null;
+    if (sameSelection(currentInfo, info)) return;
+    set({ selection: info ? { path, info } : null });
   },
 
   setActive: (path: string) => {
@@ -307,12 +317,19 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
     const tab = get().tabs.find((t) => t.path === path);
     if (!tab) return;
 
-    const currentText = buffers.text(path) ?? "";
+    const state = buffers.get(path);
+    if (!state) {
+      set({
+        error: `The text of ${tab.name} is not loaded, so nothing was written. Copy your changes, then reopen the file.`,
+      });
+      return;
+    }
+    const written = state.doc;
     const expectedVersion = options?.overwrite ? null : tab.version;
 
     const res = await commands.writeFile({
       path,
-      text: currentText,
+      text: written.toString(),
       lineEnding: tab.lineEnding,
       hasBom: tab.hasBom,
       expectedVersion,
@@ -320,9 +337,11 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
 
     if (res.status === "ok") {
       const newVersion = res.data;
-      buffers.markSaved(path);
+      buffers.markSaved(path, written);
+      // Still dirty if the user typed while the file was being written.
+      const dirty = buffers.isDirty(path);
       const nextTabs = get().tabs.map((t) =>
-        t.path === path ? { ...t, version: newVersion, dirty: false } : t,
+        t.path === path ? { ...t, version: newVersion, dirty } : t,
       );
       set((s) => ({
         tabs: nextTabs,
@@ -342,21 +361,12 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   },
 
   reload: async (path: string) => {
+    const tab = get().tabs.find((t) => t.path === path);
     const res = await commands.readFile(path);
     if (res.status === "ok") {
       const file = res.data;
-      const filename = file.path.split("/").pop() || file.path;
-      const state = createState(file.text, filename, {
-        onChange: () => {
-          const dirty = buffers.isDirty(path);
-          get().setDirty(path, dirty);
-        },
-        onSave: () => {
-          void get().save(path);
-        },
-      });
-      buffers.set(path, state);
-      buffers.markSaved(path);
+      const filename = tab?.name ?? (path.split("/").pop() || path);
+      buffers.open(path, editorState(path, file.text, filename));
 
       const nextTabs = get().tabs.map((t) =>
         t.path === path
@@ -374,6 +384,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
         tabs: nextTabs,
         conflict: s.conflict?.path === path ? null : s.conflict,
         error: null,
+        revision: s.revision + 1,
       }));
       syncUnsaved(nextTabs);
     } else {
@@ -417,7 +428,11 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       });
       return;
     }
-    const doc = buffers.text(tab.path) ?? "";
+    const doc = buffers.text(tab.path);
+    if (doc === undefined) {
+      set({ error: `The text of ${tab.name} is not loaded. Reopen the file.` });
+      return;
+    }
     const res = applyProposal(doc, target.selection, code);
     if (!res.ok) {
       const msg =
@@ -469,29 +484,21 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
     }
 
     const newVersion = res.data;
-    const newState = createState(proposal.proposed, tab.name, {
-      onChange: () => {
-        get().setDirty(tab.path, buffers.isDirty(tab.path));
-      },
-      onSave: () => {
-        void get().save(tab.path);
-      },
-    });
-    buffers.set(tab.path, newState);
-    buffers.markSaved(tab.path);
+    buffers.open(tab.path, editorState(tab.path, proposal.proposed, tab.name));
 
     const nextTabs = get().tabs.map((t) =>
       t.path === proposal.path
         ? { ...t, version: newVersion, dirty: false }
         : t,
     );
-    set({
+    set((s) => ({
       tabs: nextTabs,
       proposal: null,
       needsGitConfirm: false,
       conflict: null,
       error: null,
-    });
+      revision: s.revision + 1,
+    }));
     syncUnsaved(nextTabs);
   },
 
@@ -510,6 +517,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
         await get().save(tab.path);
       }
     }
+    return !get().tabs.some((t) => t.dirty);
   },
 
   discardAndProceed: async () => {

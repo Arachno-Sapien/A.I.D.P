@@ -80,15 +80,15 @@ Milestone 3 introduces the coding workspace, allowing the desktop application to
 
 ### Path Confinement & `resolve`
 Every file read, file write, and directory listing operation is governed by `workspace::paths::resolve`:
-- **Relative paths only:** Absolute paths (e.g. `/etc/passwd`, `C:\Windows`) and drive-prefixed paths are rejected upfront with `WorkspaceError::PathEscapes`.
+- **Relative paths only:** Absolute paths (e.g. `/etc/passwd`, `C:\Windows`), drive-prefixed paths and `..` are rejected upfront with `WorkspaceError::OutsideFolder`.
 - **Colon rejection:** Colons (`:`) in any path component are strictly forbidden to prevent Windows alternate data stream exploits or drive specifiers.
 - **Component-by-component construction:** Paths are broken into normalized components (`Normal`) and pushed onto the canonical root directory.
-- **Canonicalization & Boundary Check:** The resolved path is canonicalized following symlinks and junctions, then verified with `resolved.starts_with(&canonical_root)`. If a symlink or `..` sequence escapes the opened workspace folder, the request is immediately rejected with `WorkspaceError::PathEscapes`.
+- **Canonicalization & Boundary Check:** The resolved path is canonicalized following symlinks and junctions, then verified with `resolved.starts_with(&canonical_root)`. If a symlink or junction leads outside the opened workspace folder, the request is rejected with `WorkspaceError::OutsideFolder`.
 - **Tested boundary conditions:** 21 automated integration tests in `tests/workspace.rs` prove that `..`, absolute paths, Windows drive letters, directory junctions pointing outside the workspace, and symlinks escaping the folder are rejected.
 
 ### Secret File Shielding
 Files containing sensitive credentials (`.env*`, `*.pem`, `*.key`, `id_rsa*`, `id_ed25519*`) are automatically protected:
-- **Detection:** `workspace::secret_files::is_secret` identifies sensitive file names and extensions, including when reached through directory symlinks.
+- **Detection:** `workspace::secret_files::is_secret` identifies sensitive file names and extensions. `read_file` checks both the requested name and the name of the file a link points to. Names are only a convention: a hard link can give a secret file any name, so this keeps accidental sends out rather than stopping a deliberate one.
 - **Marked on read:** `read_file` returns `is_secret: true`.
 - **AI Context Exclusion:** Secret files are automatically excluded from AI context chips (`chipsFor` initializes with `enabled: false, reason: "secret"`). They cannot be sent to cloud models unless the user explicitly and intentionally clicks `+ Add {filename}` in the UI.
 
@@ -97,8 +97,9 @@ Folder selection uses `tauri-plugin-dialog` v2:
 - **Rust-only invocation:** The dialog plugin is registered in Rust with zero permissions granted in `src-tauri/capabilities/default.json`. The web frontend cannot invoke dialog APIs directly.
 - **Recent folder validation:** `open_recent` verifies that any requested path matches an entry in the SQLite `settings` table before opening, preventing arbitrary path opening via forged IPC calls.
 
-### Release CSP & Styling
-- In release builds, `aidp.exe` compiles with a locked-down Content Security Policy (`script-src 'self'`). CodeMirror 6 syntax highlighting and one-dark themes render cleanly without requiring external script evaluation.
+### Release CSP and the editor
+- The release CSP is `default-src 'self' ipc: http://ipc.localhost`, with no inline styles (dev adds `style-src 'unsafe-inline'`). CodeMirror adds its styles at runtime through constructable stylesheets and the CSSOM, which this policy should allow.
+- **Not yet confirmed by eye.** The human checks the editor's look in the release build during the M3 live check (plan Task 12, step 4) and records the result here. If styles are missing, the fallback is `style-src 'self' 'unsafe-inline'` (styles only; scripts stay locked), with a decision record.
 
 ---
 
