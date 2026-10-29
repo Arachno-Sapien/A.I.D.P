@@ -102,3 +102,15 @@ pub fn link_dir(link: &std::path::Path, target: &std::path::Path) {
     }
 }
 
+/// Returns false when the OS refuses (Windows needs admin or Developer Mode for file symlinks).
+pub fn link_file(link: &std::path::Path, target: &std::path::Path) -> bool {
+    #[cfg(windows)]
+    {
+        std::os::windows::fs::symlink_file(target, link).is_ok()
+    }
+    #[cfg(unix)]
+    {
+        std::os::unix::fs::symlink(target, link).is_ok()
+    }
+}
+

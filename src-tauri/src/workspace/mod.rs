@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{Mutex, PoisonError};
 
 pub mod files;
 pub mod paths;
@@ -26,22 +26,28 @@ pub struct WorkspaceState {
 
 impl WorkspaceState {
     pub fn set(&self, path: PathBuf) {
-        if let Ok(mut lock) = self.root.lock() {
-            *lock = Some(path);
-        }
+        *self.root.lock().unwrap_or_else(PoisonError::into_inner) = Some(path);
     }
 
     pub fn clear(&self) {
-        if let Ok(mut lock) = self.root.lock() {
-            *lock = None;
-        }
+        *self.root.lock().unwrap_or_else(PoisonError::into_inner) = None;
     }
 
     pub fn root(&self) -> Result<PathBuf, WorkspaceError> {
-        let lock = self.root.lock().map_err(|e| WorkspaceError::Io {
-            message: e.to_string(),
-        })?;
-        lock.clone().ok_or(WorkspaceError::NoFolder)
+        self.root
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
+            .ok_or(WorkspaceError::NoFolder)
+    }
+}
+
+/// The folder path as the user knows it: no `\\?\` prefix, and `\\server\share` for network folders.
+pub fn display_path(path: &Path) -> String {
+    let s = path.to_string_lossy();
+    match s.strip_prefix(r"\\?\UNC\") {
+        Some(rest) => format!(r"\\{rest}"),
+        None => s.strip_prefix(r"\\?\").unwrap_or(&s).to_string(),
     }
 }
 
@@ -64,15 +70,9 @@ pub fn open(path: &Path) -> Result<(PathBuf, WorkspaceInfo), WorkspaceError> {
         .unwrap_or("")
         .to_string();
 
-    let path_str = canonical.to_string_lossy();
-    let display_path = path_str
-        .strip_prefix(r"\\?\")
-        .unwrap_or(&path_str)
-        .to_string();
-
     let info = WorkspaceInfo {
         name,
-        path: display_path,
+        path: display_path(&canonical),
         is_git,
     };
 
@@ -103,6 +103,30 @@ mod tests {
             Err(WorkspaceError::NoFolder)
         );
     }
+
+    #[test]
+    fn workspace_state_survives_a_poisoned_lock() {
+        let state = std::sync::Arc::new(WorkspaceState::default());
+        let s = state.clone();
+        let _ = std::thread::spawn(move || {
+            let _guard = s.root.lock();
+            panic!("poison the lock");
+        })
+        .join();
+
+        state.set(PathBuf::from("ws"));
+        assert_eq!(state.root(), Ok(PathBuf::from("ws")));
+        state.clear();
+        assert_eq!(state.root(), Err(WorkspaceError::NoFolder));
+    }
+
+    #[test]
+    fn display_path_strips_verbatim_prefixes() {
+        assert_eq!(display_path(Path::new(r"\\?\C:\work\app")), r"C:\work\app");
+        assert_eq!(
+            display_path(Path::new(r"\\?\UNC\server\share\app")),
+            r"\\server\share\app"
+        );
+        assert_eq!(display_path(Path::new("/home/u/app")), "/home/u/app");
+    }
 }
-
-

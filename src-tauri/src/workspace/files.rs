@@ -187,7 +187,8 @@ pub fn read_file(root: &Path, rel: &str) -> Result<FileContent, WorkspaceError> 
     let version = format!("{mtime_nanos}-{}", meta.len());
 
     let path = to_rel(root, &abs).unwrap_or_else(|| rel.to_string());
-    let is_secret = is_secret(rel);
+    // Check the link's target too: a link named notes.txt may point at .env.
+    let is_secret = is_secret(rel) || is_secret(&path);
 
     Ok(FileContent {
         path,

@@ -3,7 +3,7 @@ mod common;
 use aidp_lib::workspace::files::{list_dir, read_file, write_file, LineEnding, WriteFile};
 use aidp_lib::workspace::paths::resolve;
 use aidp_lib::workspace::{is_git, open, WorkspaceError};
-use common::{link_dir, TempDir};
+use common::{link_dir, link_file, TempDir};
 use std::fs::{self, canonicalize};
 
 #[test]
@@ -168,6 +168,19 @@ fn read_marks_secret_files() {
 
     let ts = read_file(root, "a.ts").unwrap();
     assert!(!ts.is_secret);
+}
+
+#[test]
+fn read_marks_a_link_to_a_secret_file() {
+    let temp = TempDir::new();
+    let root = temp.path();
+    fs::write(root.join(".env"), "SECRET=true").unwrap();
+    if !link_file(&root.join("notes.txt"), &root.join(".env")) {
+        eprintln!("skipped: this machine does not allow file symlinks");
+        return;
+    }
+
+    assert!(read_file(root, "notes.txt").unwrap().is_secret);
 }
 
 #[test]
