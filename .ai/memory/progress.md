@@ -32,13 +32,13 @@ The M1 key file (`config.local.json`, `src-tauri/src/config.rs` and the "Configu
 
 ## In progress
 
-Task: M2 Task 3: SQLite store for connections and models
+Task: M2 Task 4: Keychain wrapper (SecretStore, Keychain, MemoryStore)
 Tool + model: Antigravity (Gemini 3.8 Flash)
 Date: 2026-10-30
-Next step: Add rusqlite to Cargo.toml, write failing tests for db::mod and db::connections
+Next step: Add keyring crate to Cargo.toml, write failing tests for secrets.rs
 
 ## Next 3 tasks
 
-1. Execute Task 3: SQLite store for connections and models.
-2. Execute Task 4: Keychain wrapper (SecretStore, Keychain, MemoryStore).
-3. Execute Task 5: Connections service (add, test, replace key, delete, stream).
+1. Execute Task 4: Keychain wrapper (SecretStore, Keychain, MemoryStore).
+2. Execute Task 5: Connections service (add, test, replace key, delete, stream).
+3. Wait for human confirmation after Task 5.

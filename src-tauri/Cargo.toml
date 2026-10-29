@@ -28,6 +28,7 @@ async-trait = "0.1"
 tokio-util = "0.7"
 futures-util = "0.3"
 secrecy = "0.10"
+rusqlite = { version = "0.41", features = ["bundled"] }
 reqwest = { version = "0.13", default-features = false, features = ["native-tls", "charset", "http2", "system-proxy", "json", "stream"] }
 
 [dev-dependencies]

@@ -1,0 +1,277 @@
+pub mod connections;
+
+use rusqlite::Connection;
+use std::path::Path;
+
+const MIGRATIONS: &[&str] = &[r#"
+CREATE TABLE connections (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  kind TEXT NOT NULL,
+  label TEXT NOT NULL,
+  base_url TEXT NOT NULL,
+  key_hint TEXT NOT NULL,
+  last_tested_at INTEGER,
+  last_test_ok INTEGER
+);
+CREATE TABLE models (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  connection_id INTEGER NOT NULL REFERENCES connections(id) ON DELETE CASCADE,
+  model_id TEXT NOT NULL,
+  display_name TEXT NOT NULL,
+  context_window INTEGER,
+  is_default INTEGER NOT NULL DEFAULT 0,
+  UNIQUE (connection_id, model_id)
+);
+"#];
+
+pub fn open(path: &Path) -> rusqlite::Result<Connection> {
+    let mut conn = Connection::open(path)?;
+    conn.execute_batch("PRAGMA foreign_keys = ON;")?;
+    migrate(&mut conn)?;
+    Ok(conn)
+}
+
+pub fn open_in_memory() -> rusqlite::Result<Connection> {
+    let mut conn = Connection::open_in_memory()?;
+    conn.execute_batch("PRAGMA foreign_keys = ON;")?;
+    migrate(&mut conn)?;
+    Ok(conn)
+}
+
+fn migrate(conn: &mut Connection) -> rusqlite::Result<()> {
+    let current_version: u32 = conn.query_row("PRAGMA user_version;", [], |row| row.get(0))?;
+    let start = current_version as usize;
+    for (idx, sql) in MIGRATIONS.iter().enumerate().skip(start) {
+        let tx = conn.transaction()?;
+        tx.execute_batch(sql)?;
+        let next_version = (idx + 1) as i32;
+        tx.pragma_update(None, "user_version", next_version)?;
+        tx.commit()?;
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+    use crate::db::connections::*;
+    use crate::gateway::{ConnectionKind, ModelInfo};
+
+    #[test]
+    fn migrations_apply_once() {
+        let mut conn = open_in_memory().unwrap();
+        let version: i32 = conn
+            .query_row("PRAGMA user_version;", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(version, 1);
+
+        migrate(&mut conn).unwrap();
+        let version_after: i32 = conn
+            .query_row("PRAGMA user_version;", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(version_after, 1);
+    }
+
+    #[test]
+    fn deleting_a_connection_cascades_to_models() {
+        let mut conn = open_in_memory().unwrap();
+        let id = insert_connection(
+            &conn,
+            ConnectionKind::OpenaiCompat,
+            "OpenRouter",
+            "https://openrouter.ai/api/v1",
+            "1234",
+            100,
+        )
+        .unwrap();
+
+        set_models(
+            &mut conn,
+            id,
+            &[ModelInfo {
+                id: "m1".to_string(),
+                display_name: "Model 1".to_string(),
+                context_window: Some(4096),
+            }],
+        )
+        .unwrap();
+
+        let count: i64 = conn
+            .query_row("SELECT count(*) FROM models;", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 1);
+
+        let deleted = delete_connection(&conn, id).unwrap();
+        assert!(deleted);
+
+        let count_after: i64 = conn
+            .query_row("SELECT count(*) FROM models;", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count_after, 0);
+    }
+
+    #[test]
+    fn set_models_replaces_the_set_and_keeps_the_default() {
+        let mut conn = open_in_memory().unwrap();
+        let id = insert_connection(
+            &conn,
+            ConnectionKind::OpenaiCompat,
+            "OpenRouter",
+            "https://openrouter.ai/api/v1",
+            "1234",
+            100,
+        )
+        .unwrap();
+
+        let m_a = ModelInfo {
+            id: "a".to_string(),
+            display_name: "A".to_string(),
+            context_window: None,
+        };
+        let m_b = ModelInfo {
+            id: "b".to_string(),
+            display_name: "B".to_string(),
+            context_window: None,
+        };
+        let m_c = ModelInfo {
+            id: "c".to_string(),
+            display_name: "C".to_string(),
+            context_window: None,
+        };
+
+        set_models(&mut conn, id, &[m_a, m_b.clone()]).unwrap();
+        set_default_model(&mut conn, id, "b").unwrap();
+
+        set_models(&mut conn, id, &[m_b, m_c]).unwrap();
+
+        let rows = list_chat_models(&conn).unwrap();
+        assert_eq!(rows.len(), 2);
+        let b = rows.iter().find(|r| r.model_id == "b").unwrap();
+        assert!(b.is_default);
+        let c = rows.iter().find(|r| r.model_id == "c").unwrap();
+        assert!(!c.is_default);
+        assert!(rows.iter().all(|r| r.model_id != "a"));
+    }
+
+    #[test]
+    fn first_models_become_default_only_when_none_exists() {
+        let mut conn = open_in_memory().unwrap();
+        let id1 = insert_connection(
+            &conn,
+            ConnectionKind::OpenaiCompat,
+            "Conn 1",
+            "https://api1.com",
+            "1111",
+            100,
+        )
+        .unwrap();
+        let id2 = insert_connection(
+            &conn,
+            ConnectionKind::Anthropic,
+            "Conn 2",
+            "https://api2.com",
+            "2222",
+            100,
+        )
+        .unwrap();
+
+        let m1 = ModelInfo {
+            id: "m1".to_string(),
+            display_name: "M1".to_string(),
+            context_window: None,
+        };
+        let m2 = ModelInfo {
+            id: "m2".to_string(),
+            display_name: "M2".to_string(),
+            context_window: None,
+        };
+        let m3 = ModelInfo {
+            id: "m3".to_string(),
+            display_name: "M3".to_string(),
+            context_window: None,
+        };
+
+        set_models(&mut conn, id1, &[m1, m2]).unwrap();
+        set_models(&mut conn, id2, &[m3]).unwrap();
+
+        let rows = list_chat_models(&conn).unwrap();
+        let m1_row = rows.iter().find(|r| r.model_id == "m1").unwrap();
+        let m2_row = rows.iter().find(|r| r.model_id == "m2").unwrap();
+        let m3_row = rows.iter().find(|r| r.model_id == "m3").unwrap();
+
+        assert!(m1_row.is_default);
+        assert!(!m2_row.is_default);
+        assert!(!m3_row.is_default);
+    }
+
+    #[test]
+    fn set_default_model_clears_the_previous_default() {
+        let mut conn = open_in_memory().unwrap();
+        let id = insert_connection(
+            &conn,
+            ConnectionKind::OpenaiCompat,
+            "Conn",
+            "https://api.com",
+            "1234",
+            100,
+        )
+        .unwrap();
+
+        let m1 = ModelInfo {
+            id: "m1".to_string(),
+            display_name: "M1".to_string(),
+            context_window: None,
+        };
+        let m2 = ModelInfo {
+            id: "m2".to_string(),
+            display_name: "M2".to_string(),
+            context_window: None,
+        };
+
+        set_models(&mut conn, id, &[m1, m2]).unwrap();
+        let ok = set_default_model(&mut conn, id, "m2").unwrap();
+        assert!(ok);
+
+        let rows = list_chat_models(&conn).unwrap();
+        let m1_row = rows.iter().find(|r| r.model_id == "m1").unwrap();
+        let m2_row = rows.iter().find(|r| r.model_id == "m2").unwrap();
+        assert!(!m1_row.is_default);
+        assert!(m2_row.is_default);
+
+        let unknown_ok = set_default_model(&mut conn, id, "unknown").unwrap();
+        assert!(!unknown_ok);
+    }
+
+    #[test]
+    fn chat_models_list_the_default_first() {
+        let mut conn = open_in_memory().unwrap();
+        let id = insert_connection(
+            &conn,
+            ConnectionKind::OpenaiCompat,
+            "Conn",
+            "https://api.com",
+            "1234",
+            100,
+        )
+        .unwrap();
+
+        let m1 = ModelInfo {
+            id: "a_model".to_string(),
+            display_name: "A Model".to_string(),
+            context_window: None,
+        };
+        let m2 = ModelInfo {
+            id: "z_model".to_string(),
+            display_name: "Z Model".to_string(),
+            context_window: None,
+        };
+
+        set_models(&mut conn, id, &[m1, m2]).unwrap();
+        set_default_model(&mut conn, id, "z_model").unwrap();
+
+        let rows = list_chat_models(&conn).unwrap();
+        assert_eq!(rows.first().unwrap().model_id, "z_model");
+        assert!(rows.first().unwrap().is_default);
+    }
+}
