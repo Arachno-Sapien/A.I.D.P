@@ -1,10 +1,10 @@
 # Progress
 
-Updated: 2026-10-29 by Claude Code (Opus 5.5)
+Updated: 2026-10-29 by Antigravity (Gemini 3.8 Flash)
 
 ## Current milestone: M1 Chat with one cloud model
 
-M0 closed on 2026-10-29 (summary in `docs/phases/M0.md`). M1 plan: `docs/superpowers/plans/2026-10-29-m1-chat.md` (8 tasks), waiting for the human's OK. Phase doc: `docs/phases/M1.md`.
+M0 closed on 2026-10-29 (summary in `docs/phases/M0.md`). M1 plan: `docs/superpowers/plans/2026-10-29-m1-chat.md` (8 tasks). Phase doc: `docs/phases/M1.md`.
 
 - [ ] Type a message and get a streamed reply from one OpenAI-compatible provider
 - [ ] Stop cancels a reply midway
@@ -27,13 +27,18 @@ For M1 only, the key comes from a git-ignored local config file (`config.local.j
 ## Done
 
 - M0 Setup, closed 2026-10-29: app shell, typed IPC, gate, CI, docs, license, README, and the re-plan around the coding workspace. Details in `docs/phases/M0.md`; decisions 0001 to 0005 in `docs/decisions/`.
+- M1 Task 1: Gateway types (`ModelProvider`, `ChatEvent`, `ProviderError`, `Role`, `ChatMessage`, `ChatRequest`, `Usage`) and `SseLines` parser with tests.
 
 ## In progress
 
-None. To claim: task / tool + model / date started / next step.
+Plan: `docs/superpowers/plans/2026-10-29-m1-chat.md`
+Current task: Task 2: OpenAI-compatible adapter
+Agent: Antigravity (Gemini 3.8 Flash)
+Date: 2026-10-29
+Next step: Add reqwest, futures-util, secrecy dependencies and wiremock dev-dep, create decision 0006
 
 ## Next 3 tasks
 
-1. Human: review the M1 plan and say OK (or ask for changes). No code before that.
-2. Execute M1 plan Tasks 1 to 3 (gateway types and SSE parser, OpenAI-compatible adapter with wiremock tests, local config file), one commit per task.
-3. Execute Tasks 4 to 8 (commands and Stop, store, Markdown, chat screen with the human's check, review and close).
+1. Execute Task 2: `OpenAiCompat` adapter with wiremock tests and decision record 0006.
+2. Execute Task 3: Local config file loader for M1 key with security rules.
+3. Execute Task 4: Chat commands, Stop, and navigation guard.
