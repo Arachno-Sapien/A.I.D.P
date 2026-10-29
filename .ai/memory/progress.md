@@ -42,6 +42,6 @@ None. To claim: task / tool + model / date started / next step.
 
 ## Next 3 tasks
 
-1. Human: live check (M1 plan Task 7 step 4). Create `%APPDATA%\com.aidp.desktop\config.local.json`, then in `npm run tauri dev` test streaming, Copy, Stop after text has started, a link, a wrong key, and offline. Repeat streaming in the release build.
+1. Human: finish the live check (M1 plan Task 7 step 4). Done in the dev app on 2026-10-29 with a real OpenRouter model: streaming, Stop with the partial text kept and a normal follow-up, a link that stays put, a wrong key, and offline. Still to confirm in a fresh release build (`npm run tauri build -- --no-bundle`, then `src-tauri/target/release/aidp.exe`): one streamed reply, Copy pastes the exact code, and the new reply styling (headings, lists). Close any running `aidp.exe` before rebuilding, because Windows locks it.
 2. M1 plan Task 8: review the whole M1 diff, tick the M1 boxes only on that evidence, close M1 (phase doc, archive logs), push with the human's OK.
 3. Plan M2 (keys and providers).
