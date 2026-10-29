@@ -4,7 +4,7 @@ Updated: 2026-10-29 by Claude Code (Sonnet 5.5)
 
 ## Current milestone: M2 Keys and providers
 
-M1 is closed and pushed (summary in `docs/phases/M1.md`). The M2 plan is written: `docs/superpowers/plans/2026-10-29-m2-keys-providers.md` (10 tasks), waiting for the human's OK. Phase doc: `docs/phases/M2.md`.
+M1 is closed and pushed (summary in `docs/phases/M1.md`). The M2 plan is written and approved by the human on 2026-10-29 (decision D1: `remark-gfm` for tables stays in): `docs/superpowers/plans/2026-10-29-m2-keys-providers.md` (10 tasks). Phase doc: `docs/phases/M2.md`.
 
 - [ ] Add, test, and delete cloud connections from the Models page
 - [ ] Keys saved in Windows Credential Manager, never in SQLite
@@ -36,6 +36,6 @@ None. To claim: task / tool + model / date started / next step.
 
 ## Next 3 tasks
 
-1. Human: read the M2 plan and say OK. One decision inside it: D1, `remark-gfm` for tables (default yes; say "drop it" to remove Task 8 step 6).
+1. The M2 plan is approved (2026-10-29, `remark-gfm` kept). Start with Task 1 and claim it in "In progress" first. After Task 5 stop for a review: Tasks 1 to 5 are the security core (keychain, connections service).
 2. Execute M2 Tasks 1 to 5 (Rust: gateway helpers and `list_models`, Anthropic adapter, SQLite store, keychain wrapper, connections service), one commit per task, gate before each commit.
 3. Execute Tasks 6 to 8 (commands, frontend data layer, UI) as one working tree and one commit, then Task 9 (docs) and Task 10 (the human's live check, review, close). Do not tick any M2 box before the human confirms the live check.

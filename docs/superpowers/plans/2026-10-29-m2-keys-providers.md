@@ -1,5 +1,7 @@
 # M2 Keys and Providers Implementation Plan
 
+> **Status: approved by the human on 2026-10-29** (decision D1: `remark-gfm` stays in). Execute from Task 1. After Task 5, stop for a review before starting Task 6.
+
 > **For agentic workers:** execute task by task, in order, inline in one session (the tasks share files). In Claude Code, `superpowers:executing-plans` fits; in other tools, follow the steps directly. Steps use checkbox (`- [ ]`) syntax. **Get the human's OK on this plan before Task 1. Do not tick any milestone box, in any file, until the human confirms the live check in Task 10. Do not push; the human decides.**
 
 **Goal:** On first launch the app asks for a provider and key, stores the key in the OS keychain, lists the provider's models for the user to pick, and chats through OpenAI-compatible or Anthropic providers. A Models page tests, re-keys and deletes connections. M1's `config.local.json` path is deleted.
