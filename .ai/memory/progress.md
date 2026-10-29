@@ -34,10 +34,10 @@ Plan (approved 2026-10-30, defaults for D1 to D3): `docs/superpowers/plans/2026-
 
 ## In progress
 
-Task: M3 Task 3: read, write and list workspace files
+Task: M3 Task 4: workspace commands, recent folders, app state
 Tool + model: Antigravity (Gemini 3.8 Flash)
 Date: 2026-10-30
-Next step: Step 1 of Task 3: add `ignore = "0.4"` dependency to `Cargo.toml`, write failing tests in `tests/workspace.rs` and `workspace/files.rs`.
+Next step: Step 1 of Task 4: add `tauri-plugin-dialog@2` dependency, write migration 2 in `db/mod.rs` and `db/settings.rs`.
 
 ## Next 3 tasks
 

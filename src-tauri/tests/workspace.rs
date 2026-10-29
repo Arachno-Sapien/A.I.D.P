@@ -1,5 +1,7 @@
 mod common;
 
+use aidp_lib::workspace::files::{list_dir, read_file, write_file, LineEnding, WriteFile};
+use aidp_lib::workspace::is_git;
 use aidp_lib::workspace::paths::resolve;
 use aidp_lib::workspace::WorkspaceError;
 use common::{link_dir, TempDir};
@@ -137,4 +139,197 @@ fn missing_file_is_not_found() {
 
     assert_eq!(resolve(root, "nope.txt"), Err(WorkspaceError::NotFound));
 }
+
+#[test]
+fn read_refuses_large_files() {
+    let temp = TempDir::new();
+    let root = temp.path();
+    let large = root.join("large.txt");
+    let size = 2 * 1024 * 1024 + 1;
+    let data = vec![b'a'; size];
+    fs::write(&large, data).unwrap();
+
+    assert_eq!(
+        read_file(root, "large.txt"),
+        Err(WorkspaceError::TooLarge {
+            bytes: 2097153
+        })
+    );
+}
+
+#[test]
+fn read_marks_secret_files() {
+    let temp = TempDir::new();
+    let root = temp.path();
+    fs::write(root.join(".env"), "SECRET=true").unwrap();
+    fs::write(root.join("a.ts"), "export const a = 1;").unwrap();
+
+    let env = read_file(root, ".env").unwrap();
+    assert!(env.is_secret);
+
+    let ts = read_file(root, "a.ts").unwrap();
+    assert!(!ts.is_secret);
+}
+
+#[test]
+fn write_checks_the_version() {
+    let temp = TempDir::new();
+    let root = temp.path();
+    let a_txt = root.join("a.txt");
+    fs::write(&a_txt, "initial").unwrap();
+
+    let content = read_file(root, "a.txt").unwrap();
+    fs::write(&a_txt, "different content length!").unwrap();
+
+    let res = write_file(
+        root,
+        WriteFile {
+            path: "a.txt".into(),
+            text: "my write".into(),
+            line_ending: LineEnding::Lf,
+            has_bom: false,
+            expected_version: Some(content.version),
+        },
+    );
+    assert_eq!(res, Err(WorkspaceError::ChangedOnDisk));
+    assert_eq!(fs::read_to_string(&a_txt).unwrap(), "different content length!");
+
+    let ok_res = write_file(
+        root,
+        WriteFile {
+            path: "a.txt".into(),
+            text: "force write".into(),
+            line_ending: LineEnding::Lf,
+            has_bom: false,
+            expected_version: None,
+        },
+    );
+    assert!(ok_res.is_ok());
+    assert_eq!(fs::read_to_string(&a_txt).unwrap(), "force write");
+}
+
+#[test]
+fn write_keeps_crlf_and_bom() {
+    let temp = TempDir::new();
+    let root = temp.path();
+    let path = root.join("crlf_bom.txt");
+    fs::write(&path, b"\xEF\xBB\xBFhello\r\nworld\r\n").unwrap();
+
+    let content = read_file(root, "crlf_bom.txt").unwrap();
+    assert_eq!(content.line_ending, LineEnding::Crlf);
+    assert!(content.has_bom);
+
+    write_file(
+        root,
+        WriteFile {
+            path: "crlf_bom.txt".into(),
+            text: "x\ny\n".into(),
+            line_ending: content.line_ending,
+            has_bom: content.has_bom,
+            expected_version: Some(content.version),
+        },
+    )
+    .unwrap();
+
+    assert_eq!(
+        fs::read(&path).unwrap(),
+        vec![0xEF, 0xBB, 0xBF, b'x', b'\r', b'\n', b'y', b'\r', b'\n']
+    );
+}
+
+#[test]
+fn write_refuses_missing_files() {
+    let temp = TempDir::new();
+    let root = temp.path();
+
+    let res = write_file(
+        root,
+        WriteFile {
+            path: "missing.txt".into(),
+            text: "content".into(),
+            line_ending: LineEnding::Lf,
+            has_bom: false,
+            expected_version: None,
+        },
+    );
+    assert_eq!(res, Err(WorkspaceError::NotFound));
+    assert!(!root.join("missing.txt").exists());
+}
+
+#[test]
+fn list_dir_respects_gitignore() {
+    let temp = TempDir::new();
+    let root = temp.path();
+    fs::create_dir(root.join(".git")).unwrap();
+    fs::write(root.join(".gitignore"), "target/\n*.log\n").unwrap();
+    fs::create_dir(root.join("src")).unwrap();
+    fs::create_dir(root.join("target")).unwrap();
+    fs::create_dir(root.join(".github")).unwrap();
+    fs::write(root.join("a.log"), "log").unwrap();
+    fs::write(root.join("B.txt"), "text").unwrap();
+
+    let entries = list_dir(root, "").unwrap();
+    let names: Vec<_> = entries.iter().map(|e| e.name.as_str()).collect();
+    assert_eq!(names, vec![".github", "src", ".gitignore", "B.txt"]);
+}
+
+#[test]
+fn list_dir_applies_root_rules_below() {
+    let temp = TempDir::new();
+    let root = temp.path();
+    fs::create_dir(root.join(".git")).unwrap();
+    fs::write(root.join(".gitignore"), "target/\n*.log\n").unwrap();
+    let src = root.join("src");
+    fs::create_dir(&src).unwrap();
+    fs::write(src.join("x.log"), "log").unwrap();
+    fs::write(src.join("y.ts"), "code").unwrap();
+
+    let entries = list_dir(root, "src").unwrap();
+    let names: Vec<_> = entries.iter().map(|e| e.name.as_str()).collect();
+    let paths: Vec<_> = entries.iter().map(|e| e.path.as_str()).collect();
+    assert_eq!(names, vec!["y.ts"]);
+    assert_eq!(paths, vec!["src/y.ts"]);
+}
+
+#[test]
+fn list_dir_without_git_shows_everything() {
+    let temp = TempDir::new();
+    let root = temp.path();
+    fs::write(root.join(".gitignore"), "*.log\n").unwrap();
+    fs::write(root.join("a.log"), "log").unwrap();
+
+    let entries = list_dir(root, "").unwrap();
+    let names: Vec<_> = entries.iter().map(|e| e.name.as_str()).collect();
+    assert!(names.contains(&"a.log"));
+}
+
+#[test]
+fn list_dir_refuses_a_link_out() {
+    let temp_root = TempDir::new();
+    let root = temp_root.path();
+
+    let temp_outside = TempDir::new();
+    let outside_path = temp_outside.path();
+
+    let out_link = root.join("out");
+    link_dir(&out_link, outside_path);
+
+    assert_eq!(list_dir(root, "out"), Err(WorkspaceError::OutsideFolder));
+}
+
+#[test]
+fn is_git_detection() {
+    let temp = TempDir::new();
+    let root = temp.path();
+    fs::create_dir(root.join(".git")).unwrap();
+    let sub = root.join("sub");
+    fs::create_dir(&sub).unwrap();
+
+    assert!(is_git(root));
+    assert!(is_git(&sub));
+
+    let fresh = TempDir::new();
+    assert!(!is_git(fresh.path()));
+}
+
 
