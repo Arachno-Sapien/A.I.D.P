@@ -1,8 +1,10 @@
 # Progress
 
-Updated: 2026-10-30 by Antigravity (Gemini 3.8 Flash)
+Updated: 2026-10-30 by Claude Code (Opus 5.5)
 
 ## Current milestone: M3 Coding workspace
+
+Plan (approved 2026-10-30, defaults for D1 to D3): `docs/superpowers/plans/2026-10-30-m3-coding-workspace.md` (12 tasks; stop for a review after Task 4). Phase doc: `docs/phases/M3.md`.
 
 - [ ] Open a folder; the file tree respects .gitignore and stays responsive on a 10,000-file folder
 - [ ] Open, edit, and save files in CodeMirror 6 tabs, with unsaved changes marked
@@ -16,7 +18,7 @@ Updated: 2026-10-30 by Antigravity (Gemini 3.8 Flash)
 
 | | |
 | --- | --- |
-| Repo | https://github.com/Arachno-Sapien/A.I.D.P (public), branch `main`. M1 pushed 2026-10-29, CI green on the Windows runner (run 40917865542) |
+| Repo | https://github.com/Arachno-Sapien/A.I.D.P (public), branch `main`. M2 pushed 2026-10-30, CI green on the Windows runner (run 40949860167) |
 | Node / npm | v22.22.2 / 12.0.1 |
 | git / gh | 2.51.2 / 2.98.0 (gh logged in as Arachno-Sapien) |
 | Rust | rustc 1.99.1, cargo 1.99.1, stable-msvc |
@@ -32,13 +34,11 @@ Updated: 2026-10-30 by Antigravity (Gemini 3.8 Flash)
 
 ## In progress
 
-Task: M3 Planning (Coding workspace)
-Tool + model: Antigravity (Gemini 3.8 Flash)
-Date: 2026-10-30
-Next step: Write M3 implementation plan for coding workspace (file tree, tabs, AI panel, diffs, approvals).
+Nothing in progress. The M3 plan is approved and committed (Claude Code, Opus 5.5, 2026-10-30).
+Next step: Task 1 (M2 follow-ups in `src/features/models/` and `ChatScreen.tsx`), then Tasks 2 to 4; stop for a review after Task 4.
 
 ## Next 3 tasks
 
-1. Write M3 implementation plan (`docs/superpowers/plans/` or `docs/phases/M3.md`).
-2. Review M3 plan with human before touching code.
-3. Execute M3 tasks in small steps following TDD and the gate.
+1. Task 1: M2 follow-ups (Choose models keeps current picks; show swallowed errors).
+2. Task 2: workspace path checks and the secret-file filter (`src-tauri/src/workspace/`).
+3. Task 3: read, write and list workspace files.
