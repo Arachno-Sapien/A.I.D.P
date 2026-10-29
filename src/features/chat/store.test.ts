@@ -14,7 +14,7 @@ vi.mock("@tauri-apps/api/core", () => ({
 }));
 
 import { commands } from "../../lib/bindings";
-import { useChatStore } from "./store";
+import { createChatStore, useChatStore } from "./store";
 
 describe("useChatStore", () => {
   beforeEach(() => {
@@ -121,6 +121,7 @@ describe("useChatStore", () => {
     await useChatStore.getState().send("d", { connectionId: 1, modelId: "m1" });
 
     expect(commands.sendMessage).toHaveBeenCalledWith(
+      "chat",
       1,
       "m1",
       [
@@ -145,6 +146,7 @@ describe("useChatStore", () => {
     await useChatStore.getState().send("b", { connectionId: 1, modelId: "m1" });
 
     expect(commands.sendMessage).toHaveBeenCalledWith(
+      "chat",
       1,
       "m1",
       [
@@ -170,5 +172,42 @@ describe("useChatStore", () => {
     expect(assistant.role).toBe("assistant");
     expect(assistant.status).toBe("error");
     expect(assistant.commandError).toEqual({ kind: "keyMissing" });
+  });
+
+  it("sends content and a system message, shows the text", async () => {
+    await useChatStore
+      .getState()
+      .send(
+        "q",
+        { connectionId: 1, modelId: "m1" },
+        { content: "FULL", system: "SYS", chips: ["a.ts"] },
+      );
+
+    expect(commands.sendMessage).toHaveBeenCalledWith(
+      "chat",
+      1,
+      "m1",
+      [
+        { role: "system", content: "SYS" },
+        { role: "user", content: "FULL" },
+      ],
+      expect.anything(),
+    );
+
+    const msgs = useChatStore.getState().messages;
+    expect(msgs[0]?.role).toBe("user");
+    expect(msgs[0]?.text).toBe("q");
+    expect(msgs[0]?.chips).toEqual(["a.ts"]);
+    expect(msgs[0]?.content).toBe("FULL");
+  });
+
+  it("two stores stream independently", async () => {
+    const useWsChatStore = createChatStore("workspace");
+    useChatStore.setState({ streaming: true });
+
+    expect(useWsChatStore.getState().streaming).toBe(false);
+
+    await useWsChatStore.getState().stop();
+    expect(commands.stopReply).toHaveBeenCalledWith("workspace");
   });
 });

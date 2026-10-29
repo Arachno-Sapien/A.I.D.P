@@ -13,8 +13,8 @@ export const commands = {
 	setModels: (connectionId: number, models: ModelInfo_Deserialize[]) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("set_models", { connectionId, models })),
 	chatModels: () => typedError<ChatModel[], AppError_Serialize>(__TAURI_INVOKE("chat_models")),
 	setDefaultModel: (connectionId: number, modelId: string) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("set_default_model", { connectionId, modelId })),
-	sendMessage: (connectionId: number, modelId: string, messages: ChatMessage[], onEvent: Channel<ChatEvent_Deserialize>) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("send_message", { connectionId, modelId, messages, onEvent })),
-	stopReply: () => __TAURI_INVOKE<void>("stop_reply"),
+	sendMessage: (surface: ChatSurface, connectionId: number, modelId: string, messages: ChatMessage[], onEvent: Channel<ChatEvent_Deserialize>) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("send_message", { surface, connectionId, modelId, messages, onEvent })),
+	stopReply: (surface: ChatSurface) => __TAURI_INVOKE<void>("stop_reply", { surface }),
 	openFolder: () => typedError<WorkspaceInfo | null, WorkspaceError>(__TAURI_INVOKE("open_folder")),
 	recentFolders: () => typedError<string[], WorkspaceError>(__TAURI_INVOKE("recent_folders")),
 	openRecent: (path: string) => typedError<WorkspaceInfo, WorkspaceError>(__TAURI_INVOKE("open_recent", { path })),
@@ -61,6 +61,8 @@ export type ChatModel = {
 	displayName: string,
 	isDefault: boolean,
 };
+
+export type ChatSurface = "chat" | "workspace";
 
 export type ConnectionKind = "openaiCompat" | "anthropic";
 

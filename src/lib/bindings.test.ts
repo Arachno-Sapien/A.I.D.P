@@ -13,8 +13,8 @@ import { commands } from "./bindings";
 
 describe("generated IPC bindings", () => {
   it("stopReply calls stop_reply", async () => {
-    await commands.stopReply();
-    expect(invoke).toHaveBeenCalledWith("stop_reply");
+    await commands.stopReply("chat");
+    expect(invoke).toHaveBeenCalledWith("stop_reply", { surface: "chat" });
   });
 
   it("addConnection sends the typed input to add_connection", async () => {
@@ -36,10 +36,11 @@ describe("generated IPC bindings", () => {
 
   it("sendMessage sends the connection and model ids", async () => {
     const channel = new Channel();
-    await commands.sendMessage(1, "m", [], channel);
+    await commands.sendMessage("chat", 1, "m", [], channel);
     expect(invoke).toHaveBeenCalledWith(
       "send_message",
       expect.objectContaining({
+        surface: "chat",
         connectionId: 1,
         modelId: "m",
       })

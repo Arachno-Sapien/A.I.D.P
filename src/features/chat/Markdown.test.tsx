@@ -62,5 +62,21 @@ describe("Markdown", () => {
     expect(container.querySelectorAll("table th")).toHaveLength(2);
     expect(container.querySelectorAll("table td")).toHaveLength(2);
   });
+
+  it("shows Apply only when onApply is given", () => {
+    const onApply = vi.fn();
+    const { queryByRole, unmount } = render(
+      <Markdown text={"```ts\nconst a = 1;\n```"} />,
+    );
+    expect(queryByRole("button", { name: "Apply" })).toBeNull();
+    unmount();
+
+    const { getByRole } = render(
+      <Markdown text={"```ts\nconst a = 1;\n```"} onApply={onApply} />,
+    );
+    const applyButton = getByRole("button", { name: "Apply" });
+    fireEvent.click(applyButton);
+    expect(onApply).toHaveBeenCalledWith("const a = 1;", "ts");
+  });
 });
 
