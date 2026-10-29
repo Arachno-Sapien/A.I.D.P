@@ -3,6 +3,7 @@ pub mod connections;
 pub mod db;
 pub mod gateway;
 pub mod secrets;
+pub mod workspace;
 
 use std::sync::Arc;
 use std::time::Duration;
