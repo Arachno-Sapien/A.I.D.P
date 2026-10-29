@@ -4,7 +4,7 @@ Updated: 2026-10-29 by Antigravity (Gemini 3.8 Flash)
 
 ## Current milestone: M0 Setup
 
-- [x] `npm run tauri dev` opens an empty window on Windows (and `npm run tauri build -- --no-bundle` produces release binary)
+- [ ] `npm run tauri dev` opens an empty window on Windows. *Release binary builds; window not yet confirmed by the human (dev or release)*
 - [ ] CI runs clippy, tests, and typecheck on every push (workflow defined in `.github/workflows/ci.yml`; awaiting remote repo confirmation from human)
 - [x] AGENTS.md holds the stack, folder, security, documentation, and memory rules; docs/ and .ai/memory/ exist with templates.
 - [ ] Rust book chapters 1 to 9 read (human)
@@ -38,7 +38,10 @@ Updated: 2026-10-29 by Antigravity (Gemini 3.8 Flash)
 
 ## In progress
 
-None. To claim: task / tool + model / date started / next step.
+Task: M0 review fixes (MSVC-only manifest flag, CI action v5, docs, template leftovers), then human window check
+Agent: Claude Code (Opus 5.5)
+Date: 2026-10-29
+Next step: fixes committed; human confirms dev window (`npm run tauri dev`) and release `src-tauri/target/release/aidp.exe`, then tick the M0 window box
 
 ## Next 3 tasks
 
