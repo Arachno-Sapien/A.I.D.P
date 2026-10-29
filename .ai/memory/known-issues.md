@@ -4,6 +4,8 @@ Bugs, gotchas, and approaches that failed. Newest first. If you hit one of the "
 
 ## Seen in this repo
 
+- **2026-10-30 · Links in Windows tests.** Folder links: `mklink /J` (a junction) needs no admin rights. File symlinks (`std::os::windows::fs::symlink_file`) need admin or Developer Mode, so `tests/common::link_file` returns false and the test skips where they are refused. `FileType::is_symlink()` is true for junctions too, so `list_dir` lists them as files.
+- **2026-10-30 · Display paths on Windows.** `canonicalize` gives `\\?\C:\...` and, for network folders, `\\?\UNC\server\share\...`. Use `workspace::display_path`, which turns the second into `\\server\share\...`; stripping only `\\?\` leaves `UNC\...`, which does not reopen.
 - **2026-10-30 · Vitest without global test environment does not auto-cleanup JSDOM.** In `vite.config.ts`, `globals` is false, so `@testing-library/react` does not automatically register an afterEach cleanup hook. Each component test file (`*.test.tsx`) must import `cleanup` and register `afterEach(() => { cleanup(); })`, otherwise DOM nodes from earlier tests remain in `document.body` and cause `TestingLibraryElementError: Found multiple elements` in later tests.
 - **2026-10-30 · JSDOM lacks `element.scrollIntoView`.** `window` and DOM elements in JSDOM do not provide `scrollIntoView`. Call defensively using optional chaining: `ref.current?.scrollIntoView?.({ behavior: "smooth" })`.
 - **2026-10-30 · rusqlite bundled feature on Windows.** Enabled `features = ["bundled"]` in `Cargo.toml` so Windows MSVC builds compile embedded SQLite C source directly and do not require external SQLite DLLs or system libraries.
