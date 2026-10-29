@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { commands, type ModelInfo } from "../../lib/bindings";
+import { appErrorText } from "../chat/appErrorText";
 import { useModelsStore } from "./store";
 
 export interface ChooseModelsProps {
@@ -22,6 +23,7 @@ export function ChooseModels({
     () => new Set(initialSelected ?? []),
   );
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const filtered = available.filter(
     (m) =>
@@ -45,8 +47,14 @@ export function ChooseModels({
 
   const handleSave = async () => {
     setSaving(true);
+    setSaveError(null);
     const chosen = available.filter((m) => selectedIds.has(m.id));
-    await commands.setModels(connectionId, chosen);
+    const res = await commands.setModels(connectionId, chosen);
+    if (res.status === "error") {
+      setSaveError(appErrorText(res.error));
+      setSaving(false);
+      return;
+    }
     await useModelsStore.getState().refresh();
     setSaving(false);
     onSave();
@@ -60,6 +68,12 @@ export function ChooseModels({
           Pick which models from this connection should appear in the chat picker.
         </p>
       </div>
+
+      {saveError && (
+        <div className="mb-3 p-3 bg-red-950/50 border border-red-800/80 rounded-lg text-xs text-red-200">
+          {saveError}
+        </div>
+      )}
 
       {available.length === 0 ? (
         <div className="py-8 text-center text-sm text-neutral-400">

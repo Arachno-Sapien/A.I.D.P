@@ -129,4 +129,23 @@ describe("useModelsStore", () => {
       modelId: "m2",
     });
   });
+
+  it("refresh failure sets loadError", async () => {
+    vi.mocked(commands.listConnections).mockResolvedValue({
+      status: "error",
+      error: { kind: "storage", message: "disk read error" },
+    });
+    vi.mocked(commands.chatModels).mockResolvedValue({
+      status: "ok",
+      data: [],
+    });
+
+    await useModelsStore.getState().refresh();
+
+    const state = useModelsStore.getState();
+    expect(state.loaded).toBe(true);
+    expect(state.loadError).toBe(
+      "Couldn't read or write the local database: disk read error",
+    );
+  });
 });

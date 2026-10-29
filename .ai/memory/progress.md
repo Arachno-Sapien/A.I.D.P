@@ -34,8 +34,10 @@ Plan (approved 2026-10-30, defaults for D1 to D3): `docs/superpowers/plans/2026-
 
 ## In progress
 
-Nothing in progress. The M3 plan is approved and committed (Claude Code, Opus 5.5, 2026-10-30).
-Next step: Task 1 (M2 follow-ups in `src/features/models/` and `ChatScreen.tsx`), then Tasks 2 to 4; stop for a review after Task 4.
+Task: M3 Task 2: workspace path checks and the secret-file filter (`src-tauri/src/workspace/`)
+Tool + model: Antigravity (Gemini 3.8 Flash)
+Date: 2026-10-30
+Next step: Step 1 of Task 2: add `pub mod workspace;` to `lib.rs` with `paths.rs` and `secret_files.rs`, write failing tests in `tests/workspace.rs`.
 
 ## Next 3 tasks
 

@@ -16,7 +16,7 @@ export function ModelsScreen({
   startAdding = false,
   onAddFinished,
 }: ModelsScreenProps) {
-  const { connections, refresh } = useModelsStore();
+  const { connections, chatModels, loadError, refresh } = useModelsStore();
   const [internalAdding, setInternalAdding] = useState(false);
   const [testingId, setTestingId] = useState<number | null>(null);
   const [testResult, setTestResult] = useState<{
@@ -35,6 +35,7 @@ export function ModelsScreen({
   const [chooseModelsTarget, setChooseModelsTarget] = useState<{
     connectionId: number;
     available: ModelInfo[];
+    initialSelected?: string[];
   } | null>(null);
 
   const isAddingOpen = startAdding || internalAdding;
@@ -91,15 +92,37 @@ export function ModelsScreen({
   };
 
   const handleConfirmDelete = async (id: number) => {
-    await commands.deleteConnection(id);
+    const res = await commands.deleteConnection(id);
     setDeletingId(null);
+    if (res.status === "error") {
+      setTestResult({
+        id,
+        text: appErrorText(res.error),
+        isError: true,
+      });
+      return;
+    }
     await refresh();
   };
 
   const handleOpenChooseModels = async (id: number) => {
+    setTestResult(null);
     const res = await commands.availableModels(id);
     if (res.status === "ok") {
-      setChooseModelsTarget({ connectionId: id, available: res.data });
+      const currentPicks = chatModels
+        .filter((m) => m.connectionId === id)
+        .map((m) => m.modelId);
+      setChooseModelsTarget({
+        connectionId: id,
+        available: res.data,
+        initialSelected: currentPicks,
+      });
+    } else {
+      setTestResult({
+        id,
+        text: appErrorText(res.error),
+        isError: true,
+      });
     }
   };
 
@@ -121,7 +144,18 @@ export function ModelsScreen({
         </button>
       </div>
 
-      {connections.length === 0 ? (
+      {loadError ? (
+        <div className="flex-1 flex flex-col items-center justify-center py-16 text-center">
+          <div className="max-w-md w-full bg-neutral-900 border border-red-900/60 rounded-xl p-8 shadow-xl">
+            <h2 className="text-base font-semibold text-red-200 mb-2">
+              Unable to load connections
+            </h2>
+            <p className="text-xs text-red-400">
+              {loadError}
+            </p>
+          </div>
+        </div>
+      ) : connections.length === 0 ? (
         <div className="flex-1 flex flex-col items-center justify-center py-16 text-center">
           <div className="text-neutral-400 text-sm font-medium mb-3">
             No models yet
@@ -318,6 +352,7 @@ export function ModelsScreen({
             <ChooseModels
               connectionId={chooseModelsTarget.connectionId}
               available={chooseModelsTarget.available}
+              initialSelected={chooseModelsTarget.initialSelected}
               onSave={() => setChooseModelsTarget(null)}
               onCancel={() => setChooseModelsTarget(null)}
             />

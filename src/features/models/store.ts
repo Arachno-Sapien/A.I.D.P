@@ -4,6 +4,7 @@ import {
   type ChatModel,
   type ConnectionView,
 } from "../../lib/bindings";
+import { appErrorText } from "../chat/appErrorText";
 
 export interface SelectedModel {
   connectionId: number;
@@ -15,6 +16,7 @@ export interface ModelsStore {
   chatModels: ChatModel[];
   selected: SelectedModel | null;
   loaded: boolean;
+  loadError: string | null;
   refresh(): Promise<void>;
   select(m: SelectedModel): Promise<void>;
 }
@@ -24,12 +26,20 @@ export const useModelsStore = create<ModelsStore>((set) => ({
   chatModels: [],
   selected: null,
   loaded: false,
+  loadError: null,
 
   refresh: async () => {
     const [connRes, modelsRes] = await Promise.all([
       commands.listConnections(),
       commands.chatModels(),
     ]);
+
+    const loadError =
+      connRes.status === "error"
+        ? appErrorText(connRes.error)
+        : modelsRes.status === "error"
+        ? appErrorText(modelsRes.error)
+        : null;
 
     const connections = connRes.status === "ok" ? connRes.data : [];
     const chatModels = modelsRes.status === "ok" ? modelsRes.data : [];
@@ -53,6 +63,7 @@ export const useModelsStore = create<ModelsStore>((set) => ({
       chatModels,
       selected,
       loaded: true,
+      loadError,
     });
   },
 

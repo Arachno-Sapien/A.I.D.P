@@ -17,7 +17,7 @@ export function ChatScreen({
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const { connections, chatModels, selected, loaded, select } =
+  const { connections, chatModels, selected, loaded, loadError, select } =
     useModelsStore();
   const { messages, streaming, send, stop } = useChatStore();
 
@@ -89,7 +89,18 @@ export function ChatScreen({
       )}
 
       {/* Main Content Area */}
-      {loaded && connections.length === 0 ? (
+      {loaded && loadError ? (
+        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
+          <div className="max-w-md w-full bg-neutral-900 border border-red-900/60 rounded-xl p-8 shadow-xl">
+            <h2 className="text-base font-semibold text-red-200 mb-2">
+              Unable to load models
+            </h2>
+            <p className="text-xs text-red-400">
+              {loadError}
+            </p>
+          </div>
+        </div>
+      ) : loaded && connections.length === 0 ? (
         <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
           <div className="max-w-md w-full bg-neutral-900 border border-neutral-800 rounded-xl p-8 shadow-xl">
             <h2 className="text-base font-semibold text-white mb-2">

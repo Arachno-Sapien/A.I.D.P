@@ -95,4 +95,21 @@ describe("ChatScreen", () => {
     expect(optgroup?.getAttribute("label")).toBe("OpenRouter");
     expect(optgroup?.children.length).toBe(2);
   });
+
+  it("shows the load error instead of the first-run screen", () => {
+    useModelsStore.setState({
+      connections: [],
+      chatModels: [],
+      selected: null,
+      loaded: true,
+      loadError: "Couldn't read or write the local database: disk error",
+    });
+
+    render(<ChatScreen onStartAdding={vi.fn()} onNavigateToModels={vi.fn()} />);
+
+    expect(
+      screen.getByText("Couldn't read or write the local database: disk error"),
+    ).toBeDefined();
+    expect(screen.queryByText("Add a model to start chatting")).toBeNull();
+  });
 });
