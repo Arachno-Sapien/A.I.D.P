@@ -13,4 +13,9 @@ describe("generated IPC bindings", () => {
     await expect(commands.greet("Ada")).resolves.toBe("Hello, Ada!");
     expect(invoke).toHaveBeenCalledWith("greet", { name: "Ada" });
   });
+
+  it("stopReply calls stop_reply", async () => {
+    await commands.stopReply();
+    expect(invoke).toHaveBeenCalledWith("stop_reply");
+  });
 });

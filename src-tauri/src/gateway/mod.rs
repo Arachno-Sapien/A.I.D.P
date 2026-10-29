@@ -40,7 +40,7 @@ pub enum ProviderError {
     InvalidKey,
     RateLimited {
         #[serde(rename = "retryAfterSecs")]
-        retry_after_secs: Option<u64>,
+        retry_after_secs: Option<u32>,
     },
     ModelNotFound,
     ContextTooLong,

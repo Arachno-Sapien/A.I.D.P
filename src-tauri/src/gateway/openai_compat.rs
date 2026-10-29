@@ -78,7 +78,7 @@ fn map_http_error(status: u16, retry_after: Option<&str>, body: &str) -> Provide
     match status {
         401 | 403 => ProviderError::InvalidKey,
         429 => ProviderError::RateLimited {
-            retry_after_secs: retry_after.and_then(|h| h.trim().parse::<u64>().ok()),
+            retry_after_secs: retry_after.and_then(|h| h.trim().parse::<u32>().ok()),
         },
         404 => ProviderError::ModelNotFound,
         400 if body.contains("context_length_exceeded")
