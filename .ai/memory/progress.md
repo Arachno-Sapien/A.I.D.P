@@ -4,7 +4,7 @@ Updated: 2026-10-29 by Claude Code (Opus 5.5)
 
 ## Current milestone: M1 Chat with one cloud model
 
-M0 closed on 2026-10-29 (summary in `docs/phases/M0.md`). M1 has no plan yet.
+M0 closed on 2026-10-29 (summary in `docs/phases/M0.md`). M1 plan: `docs/superpowers/plans/2026-10-29-m1-chat.md` (8 tasks), waiting for the human's OK. Phase doc: `docs/phases/M1.md`.
 
 - [ ] Type a message and get a streamed reply from one OpenAI-compatible provider
 - [ ] Stop cancels a reply midway
@@ -34,6 +34,6 @@ None. To claim: task / tool + model / date started / next step.
 
 ## Next 3 tasks
 
-1. Write the M1 plan in `docs/superpowers/plans/`. Read `docs/design.md` "Model layer", AGENTS.md sections 4 and 6, and the "Streaming parsers" entry in `known-issues.md` first. Get the human's OK on the plan before writing code.
-2. Start `docs/phases/M1.md` with the plan summary (AGENTS.md section 10).
-3. Execute M1 task by task. Likely first task: `src-tauri/src/gateway/mod.rs` (ModelProvider trait, ChatEvent, ProviderError) and the OpenAI-compatible adapter, with wiremock tests for success, 401, 429 and a dropped stream.
+1. Human: review the M1 plan and say OK (or ask for changes). No code before that.
+2. Execute M1 plan Tasks 1 to 3 (gateway types and SSE parser, OpenAI-compatible adapter with wiremock tests, local config file), one commit per task.
+3. Execute Tasks 4 to 8 (commands and Stop, store, Markdown, chat screen with the human's check, review and close).
