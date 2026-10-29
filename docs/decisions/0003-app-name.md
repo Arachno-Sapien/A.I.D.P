@@ -28,4 +28,4 @@ Internal names stay `aidp`:
 ## Consequences
 
 - Renaming the display name later touches four places: `productName` and the window `title` in `src-tauri/tauri.conf.json`, `<title>` in `index.html`, and the heading in `src/App.tsx`.
-- The repository name is still open (AGENTS.md section 14).
+- Repository: https://github.com/Arachno-Sapien/A.I.D.P (settled 2026-10-29).

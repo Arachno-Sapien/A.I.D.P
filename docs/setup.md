@@ -29,8 +29,8 @@ Ensure the following tools are installed:
 
 1. **Clone the repository:**
    ```bash
-   git clone <repo-url> aidp
-   cd aidp
+   git clone https://github.com/Arachno-Sapien/A.I.D.P.git
+   cd A.I.D.P
    ```
 
 2. **Install frontend dependencies:**

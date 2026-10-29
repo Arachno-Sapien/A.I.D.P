@@ -394,10 +394,10 @@ Each milestone is done only when every box below is ticked, its phase doc is wri
 
 **M0 Setup**
 
-- [ ] `npm run tauri dev` opens an empty window on Windows
-- [ ] CI runs clippy, tests, and typecheck on every push
-- [ ] AGENTS.md holds the stack, folder, security, documentation, and memory rules; docs/ and .ai/memory/ exist with templates
-- [ ] Rust book chapters 1 to 9 read
+- [x] `npm run tauri dev` opens an empty window on Windows
+- [x] CI runs clippy, tests, and typecheck on every push
+- [x] AGENTS.md holds the stack, folder, security, documentation, and memory rules; docs/ and .ai/memory/ exist with templates
+- [x] Rust book chapters 1 to 9 read
 
 **M1 Chat with one cloud model**
 
@@ -471,7 +471,7 @@ The biggest risk is an agent-built Rust core you can't debug; the plan answers i
 
 **Open questions**
 
-- [x] App name: A.I.D.P (decision 0003). Repository name still open.
+- [x] App name: A.I.D.P (decision 0003). Repository: https://github.com/Arachno-Sapien/A.I.D.P
 - [ ] v0.1 for Windows only, or all three OSes?
 - [ ] Link to the Ollama installer, or download and run it from inside the app?
 - [ ] Chat export format: Markdown, JSON, or both?

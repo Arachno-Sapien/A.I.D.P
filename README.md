@@ -53,8 +53,8 @@ You'll need these on Windows:
 Then:
 
 ```bash
-git clone <repo-url> aidp
-cd aidp
+git clone https://github.com/Arachno-Sapien/A.I.D.P.git
+cd A.I.D.P
 npm ci
 npm run tauri dev
 ```

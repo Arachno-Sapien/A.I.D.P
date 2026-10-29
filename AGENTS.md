@@ -376,7 +376,7 @@ Test machines: dev laptop (RTX 3050 Ti 4 GB VRAM, 24 GB RAM) and one 8 GB RAM ma
 
 ## 14. Open questions (ask the human; don't decide silently)
 
-- Repository name (app name decided in `docs/decisions/0003-app-name.md`; the acronym expansion stays open)
+- The acronym's expansion. The display name A.I.D.P (decision 0003) and the repo https://github.com/Arachno-Sapien/A.I.D.P are settled; the expansion may change as features land.
 - v0.1 for Windows only, or all three OSes?
 - Link to the Ollama installer, or download and run it from inside the app?
 - Chat export format: Markdown, JSON, or both?
