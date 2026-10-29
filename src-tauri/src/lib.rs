@@ -2,6 +2,7 @@ pub mod commands;
 pub mod config;
 pub mod db;
 pub mod gateway;
+pub mod secrets;
 
 use tauri_specta::{collect_commands, Builder};
 
