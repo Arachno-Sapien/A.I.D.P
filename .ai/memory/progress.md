@@ -32,17 +32,18 @@ For M1 only, the key comes from a git-ignored local config file (`config.local.j
 - M1 Task 3: Local config file loader (`config.rs`) for M1 key with transport validation and secret redaction.
 - M1 Task 4: Chat commands (`chat_config`, `send_message`, `stop_reply`), `ChatState`, navigation guard plugin, and bindings.
 - M1 Task 5: Zustand chat store (`useChatStore`), normalized `errorText`, and unit tests.
+- M1 Task 6: Markdown renderer with raw HTML off, Prism syntax highlighting, Copy button, and tests.
 
 ## In progress
 
 Plan: `docs/superpowers/plans/2026-10-29-m1-chat.md`
-Current task: Task 6: Markdown replies with copyable code blocks
+Current task: Task 7: Chat screen, wiring, and manual verification
 Agent: Antigravity (Gemini 3.8 Flash)
 Date: 2026-10-29
-Next step: Install react-markdown, prism-react-renderer, testing-library/react, jsdom; create Markdown.tsx
+Next step: Create ChatScreen.tsx, update App.tsx, remove greet command, run gate, verify app
 
 ## Next 3 tasks
 
-1. Execute Task 6: Markdown replies with copyable code blocks.
-2. Execute Task 7: Chat screen, wiring, and manual verification.
-3. Execute Task 8: Review and close M1.
+1. Execute Task 7: Chat screen, wiring, and manual verification.
+2. Execute Task 8: Review and close M1.
+3. Prepare for M2: Keys and providers.
