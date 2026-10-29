@@ -34,13 +34,13 @@ Plan (approved 2026-10-30, defaults for D1 to D3): `docs/superpowers/plans/2026-
 
 ## In progress
 
-Task: M3 Task 6: workspace screen, virtualized file tree, navigation
+Task: M3 Task 7: editor tabs
 Tool + model: Antigravity (Gemini 3.8 Flash)
 Date: 2026-10-30
-Next step: Step 1 of Task 6: install `@tanstack/react-virtual@^3`, implement `workspace/tree.ts` and `workspace/store.ts`.
+Next step: Step 1 of Task 7: install codemirror packages, implement `workspace/cm.ts` and `workspace/buffers.ts`.
 
 ## Next 3 tasks
 
-1. Task 6: workspace screen, virtualized file tree, navigation (`@tanstack/react-virtual`, `FileTree.tsx`, `WorkspaceScreen.tsx`).
-2. Task 7: editor tabs (CodeMirror 6, tab bar, dirty tracking, conflict bar).
-3. Task 8: workspace AI panel and Apply flow (two stores, selection context, diff display).
+1. Task 7: editor tabs (CodeMirror 6, tab bar, dirty tracking, conflict bar).
+2. Task 8: workspace AI panel and Apply flow (two stores, selection context, diff display).
+3. Task 9: diff review and accept flow (@codemirror/merge, accept/reject).

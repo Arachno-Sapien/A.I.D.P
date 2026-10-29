@@ -2,15 +2,24 @@ import { useEffect, useState } from "react";
 import { ChatScreen } from "./features/chat/ChatScreen";
 import { ModelsScreen } from "./features/models/ModelsScreen";
 import { useModelsStore } from "./features/models/store";
+import { WorkspaceScreen } from "./features/workspace/WorkspaceScreen";
 import "./App.css";
 
 function App() {
-  const [screen, setScreen] = useState<"chat" | "models">("chat");
+  const [screen, setScreen] = useState<"chat" | "workspace" | "models">("chat");
+  const [hasVisitedWorkspace, setHasVisitedWorkspace] = useState(false);
   const [startAdding, setStartAdding] = useState(false);
 
   useEffect(() => {
-    useModelsStore.getState().refresh();
+    void useModelsStore.getState().refresh();
   }, []);
+
+  const handleSelectScreen = (next: "chat" | "workspace" | "models") => {
+    if (next === "workspace") {
+      setHasVisitedWorkspace(true);
+    }
+    setScreen(next);
+  };
 
   return (
     <div className="flex flex-col h-screen bg-neutral-950 text-neutral-100 font-sans">
@@ -22,7 +31,7 @@ function App() {
           <button
             type="button"
             aria-current={screen === "chat" ? "page" : undefined}
-            onClick={() => setScreen("chat")}
+            onClick={() => handleSelectScreen("chat")}
             className={`px-3 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer ${
               screen === "chat"
                 ? "bg-neutral-800 text-white"
@@ -33,8 +42,20 @@ function App() {
           </button>
           <button
             type="button"
+            aria-current={screen === "workspace" ? "page" : undefined}
+            onClick={() => handleSelectScreen("workspace")}
+            className={`px-3 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer ${
+              screen === "workspace"
+                ? "bg-neutral-800 text-white"
+                : "text-neutral-400 hover:text-neutral-200"
+            }`}
+          >
+            Workspace
+          </button>
+          <button
+            type="button"
             aria-current={screen === "models" ? "page" : undefined}
-            onClick={() => setScreen("models")}
+            onClick={() => handleSelectScreen("models")}
             className={`px-3 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer ${
               screen === "models"
                 ? "bg-neutral-800 text-white"
@@ -46,16 +67,27 @@ function App() {
         </nav>
       </header>
 
-      <main className="flex-1 overflow-hidden">
-        {screen === "chat" ? (
+      <main className="flex-1 overflow-hidden relative flex flex-col">
+        {screen === "chat" && (
           <ChatScreen
             onStartAdding={() => {
-              setScreen("models");
+              handleSelectScreen("models");
               setStartAdding(true);
             }}
-            onNavigateToModels={() => setScreen("models")}
+            onNavigateToModels={() => handleSelectScreen("models")}
           />
-        ) : (
+        )}
+        {hasVisitedWorkspace && (
+          <div
+            data-testid="workspace-container"
+            className={`flex-1 flex flex-col h-full ${
+              screen === "workspace" ? "" : "hidden"
+            }`}
+          >
+            <WorkspaceScreen />
+          </div>
+        )}
+        {screen === "models" && (
           <ModelsScreen
             startAdding={startAdding}
             onAddFinished={() => setStartAdding(false)}

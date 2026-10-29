@@ -12,6 +12,7 @@
     "tauri": "tauri"
   },
   "dependencies": {
+    "@tanstack/react-virtual": "^3.14.24",
     "@tauri-apps/api": "^2",
     "prism-react-renderer": "^2.4.1",
     "react": "^19.1.0",
