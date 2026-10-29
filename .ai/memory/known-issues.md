@@ -16,7 +16,7 @@ Bugs, gotchas, and approaches that failed. Newest first. If you hit one of the "
 
 ## From docs, not yet seen here (check when you get there)
 
-- **keyring 3.x has no default platform features.** Without them it silently uses an in-memory mock store and keys disappear on restart. Enable `windows-native` (plus `apple-native` / a Linux Secret Service feature when those ports start). Check that a saved key shows up in Windows Credential Manager.
+- **keyring 4.x picks the OS store itself** (checked in keyring 4.2.0 on 2026-10-29). Its default `v1` feature enables Windows Credential Manager, macOS Keychain and the Linux Secret Service per target, so `keyring = "4"` needs no platform features. The 3.x trap (no default features, so a silent in-memory store that loses keys on restart) no longer applies, but still confirm that a saved key shows up in Windows Credential Manager.
 - **rusqlite:** enable the `bundled` feature so Windows builds don't need a system SQLite.
 - **Streaming parsers:** network chunks don't line up with lines. Buffer bytes and split on newlines before parsing. OpenAI-compatible APIs send SSE `data:` lines ending with `data: [DONE]`; Anthropic sends SSE with named `event:` lines; Ollama `/api/chat` streams NDJSON (one JSON object per line). The OpenAI-compatible parser is done (`gateway/sse.rs`, tested with split UTF-8); Anthropic (M2) and Ollama (M5) still need theirs.
 - **tauri-specta and specta** versions must match. If they're still pre-release on crates.io, pin exact versions (`=x.y.z-rc.n`) for both.
