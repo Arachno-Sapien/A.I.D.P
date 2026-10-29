@@ -19,6 +19,7 @@ secrets.local.json
 !.env.example
 
 # IDE / Editor local files
+.serena/
 .kiro/
 .vscode/
 .idea/
@@ -27,3 +28,4 @@ secrets.local.json
 Thumbs.db
 [Dd]esktop.ini
 .DS_Store
+

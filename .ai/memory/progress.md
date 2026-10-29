@@ -1,6 +1,6 @@
 # Progress
 
-Updated: 2026-10-29 by Claude Code (Opus 5.5)
+Updated: 2026-10-29 by Antigravity (Gemini 3.8 Flash)
 
 ## Current milestone: M0 Setup
 
@@ -15,7 +15,7 @@ Updated: 2026-10-29 by Claude Code (Opus 5.5)
 | --- | --- |
 | Node | v22.22.2 ✓ |
 | npm | 12.0.1 ✓ |
-| git | 2.51.2 ✓ (project folder is **not** a git repo yet) |
+| git | 2.51.2 ✓ (repo initialized on master) |
 | gh | 2.98.0 ✓ |
 | Rust (rustup, cargo) | rustup 1.29.1, rustc 1.99.1, cargo 1.99.1 (stable-msvc) ✓ |
 | VS Build Tools, C++ workload | VS Build Tools 2022 & 2026, VC.Tools.x86.x64 ✓ |
@@ -25,19 +25,22 @@ Updated: 2026-10-29 by Claude Code (Opus 5.5)
 
 - AGENTS.md (shared rules), CLAUDE.md and GEMINI.md (pointers), .ai/memory/
 - 8 agent skills in `.agents/skills/` + `.claude/skills/`, recorded in `skills-lock.json` (AGENTS.md section 12)
+- Repo hygiene: `.gitattributes` (LF), `.gitignore` (ignoring `.serena/`), M0 plan reviewed and approved
 
 ## In progress
 
-Task: M0 Setup — Git init, .gitignore, and scaffold Tauri 2 + React + TS + Vite
+Plan: `docs/superpowers/plans/2026-10-29-m0-setup.md`
+Current task: Task 1 (Scaffold and harden)
+Provisional app name: `aidp`, identifier: `com.aidp.desktop`
 Agent: Antigravity (Gemini 3.8 Flash)
 Date: 2026-10-29
-Next step: git init, add .gitignore, commit docs and skills
+Next step: Scaffold outside repo into $TEMP/aidp-scaffold, copy into root, harden CSP and clippy lints
 
 ## Next 3 tasks
 
-1. `git init`, add `.gitignore` (`node_modules/`, `dist/`, `src-tauri/target/`, `config.local.json`, `.claude/settings.local.json`, `.kiro/`), first commit containing the docs and skills.
-2. Scaffold Tauri 2 + React + TypeScript + Vite into the repo root with `npm create tauri-app@latest`, keeping the existing files. Add the `typecheck` script.
-3. Verify `npm run tauri dev` opens an empty window and update docs.
+1. Task 1: Scaffold Tauri 2 + React + TS outside repo, copy in, remove opener, set strict CSP & clippy lints.
+2. Task 2: Configure typed IPC via tauri-specta, add Vitest with bindings test, verify gate and commit Tasks 1 & 2.
+3. Task 3: Configure Tailwind CSS v4, verify dev window and release build.
 
 ## Rest of M0
 
