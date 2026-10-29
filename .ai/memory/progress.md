@@ -1,19 +1,16 @@
 # Progress
 
-Updated: 2026-10-30 by Claude Code (Opus 5.5)
+Updated: 2026-10-30 by Antigravity (Gemini 3.8 Flash)
 
-## Current milestone: M2 Keys and providers
+## Current milestone: M3 Coding workspace
 
-M1 is closed and pushed (summary in `docs/phases/M1.md`). The M2 plan is written and approved by the human on 2026-10-29 (decision D1: `remark-gfm` for tables stays in): `docs/superpowers/plans/2026-10-29-m2-keys-providers.md` (10 tasks). Phase doc: `docs/phases/M2.md`.
-
-- [ ] Add, test, and delete cloud connections from the Models page
-- [ ] Keys saved in Windows Credential Manager, never in SQLite
-- [ ] Anthropic adapter streams replies
-- [ ] Every error kind shows a clear message in the UI
-
-Tasks 1 to 5 (gateway helpers, Anthropic adapter, SQLite store, keychain wrapper, connections service) are done and reviewed, 2026-10-30. No box is ticked: each needs the UI (Tasks 6 to 8) and the human's live check (Task 10).
-
-The M1 key file (`config.local.json`, `src-tauri/src/config.rs` and the "Configuration Required" panel) is deleted in M2. First launch asks for the provider details itself ("Add a model"), as the human asked on 2026-10-29. Carry-overs from M1 are in `docs/phases/M1.md` under "What's left".
+- [ ] Open a folder; the file tree respects .gitignore and stays responsive on a 10,000-file folder
+- [ ] Open, edit, and save files in CodeMirror 6 tabs, with unsaved changes marked
+- [ ] The AI panel sends the open file and selection as context, streams replies, and Stop works
+- [ ] Apply shows a diff; the file changes only after Accept
+- [ ] Tests prove that `..`, absolute paths, and symlinks pointing outside the folder are refused
+- [ ] A warning appears before the first AI edit in a folder without git
+- [ ] RAM with a mid-sized repo open is measured and the workspace budget recorded in the phase doc
 
 ## Repo and dev machine (checked 2026-10-29)
 
@@ -25,30 +22,23 @@ The M1 key file (`config.local.json`, `src-tauri/src/config.rs` and the "Configu
 | Rust | rustc 1.99.1, cargo 1.99.1, stable-msvc |
 | VS Build Tools | 2022 and 2026, C++ workload |
 | Ollama | installed, server not running |
-| Provider for live checks | OpenRouter free model; its details are in `%APPDATA%\com.aidp.desktop\config.local.json` (outside the repo) until M2 replaces that file |
+| Provider for live checks | OpenRouter free model; in-app connection stored in Windows Credential Manager and SQLite `aidp.db` |
 
 ## Done
 
 - M0 Setup, closed 2026-10-29: app shell, typed IPC, gate, CI, docs, license, README, and the re-plan around the coding workspace. Details in `docs/phases/M0.md`; decisions 0001 to 0005 in `docs/decisions/`.
 - M1 Chat with one cloud model, closed 2026-10-29: gateway types and SSE parser, the OpenAI-compatible adapter (9 fake-server tests), the M1 config loader, chat commands with Stop, the navigation guard, the Zustand store, Markdown with a Copy button, and the chat screen. Live-checked with a real OpenRouter model in the dev app and the release build; pushed, CI green. Details in `docs/phases/M1.md`; decision 0006 (`native-tls`) in `docs/decisions/`.
+- M2 Keys and providers, closed 2026-10-30: OS keychain integration via `keyring` v4 and `SecretStore` trait, local SQLite persistence (`aidp.db`), Anthropic adapter with usage tracking, connection management service, first-run flow, Models screen, model picker grouped by provider, GFM tables with `remark-gfm`, and security documentation. Live-checked with dev app; decision 0007 in `docs/decisions/`. Details in `docs/phases/M2.md`.
 
 ## In progress
 
-Task: M2 Task 10: Human check, review, close
+Task: M3 Planning (Coding workspace)
 Tool + model: Antigravity (Gemini 3.8 Flash)
 Date: 2026-10-30
-Completed in Task 9 (Docs):
-- Created `docs/security.md` and linked from `README.md`
-- Created `docs/decisions/0007-connections-storage.md`
-- Updated `docs/setup.md` with in-app model setup instructions
-- Updated `AGENTS.md` and `docs/design.md` trees, commands, and data model notes
-- Updated `.ai/memory/known-issues.md` with M2 findings (JSDOM cleanup, scrollIntoView, rusqlite bundled, keyring v4)
-- Updated `CHANGELOG.md` with M2 additions and removal of `config.local.json`
-- Updated `docs/phases/M2.md`
-Next step: Step 1 of Task 10: Human live check and smoke test on dev/release build.
+Next step: Write M3 implementation plan for coding workspace (file tree, tabs, AI panel, diffs, approvals).
 
 ## Next 3 tasks
 
-1. Task 10: Human check, review, close (live smoke check with OpenRouter / Anthropic).
-2. M3 Planning & kickoff (coding workspace: folder tree, tabs, AI panel).
-3. M3 Task execution.
+1. Write M3 implementation plan (`docs/superpowers/plans/` or `docs/phases/M3.md`).
+2. Review M3 plan with human before touching code.
+3. Execute M3 tasks in small steps following TDD and the gate.

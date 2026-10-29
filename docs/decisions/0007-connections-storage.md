@@ -50,3 +50,4 @@ The storage architecture must satisfy strict security and reliability criteria:
 1. **`SecretStore` Trait:** Implemented `SecretStore` in `src-tauri/src/secrets.rs`. The production app uses `Keychain`, storing credentials under service `com.aidp.desktop` and username `connection-{id}`. Tests use `MemoryStore`.
 2. **SQLite (`aidp.db`):** Used `rusqlite` with the `bundled` feature. Schema migrations are managed via sequential integer versions with `PRAGMA user_version`. The database stores metadata and a 4-character `key_hint` only.
 3. **`u32` IDs and Timestamps:** All database row IDs, foreign keys, and epoch timestamps crossing IPC are typed as `u32`.
+

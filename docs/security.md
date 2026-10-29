@@ -83,3 +83,4 @@ The database file contains **no secret keys**. Even if the database file is extr
 
 **Known honest limit:**
 - **Same-user access:** On Windows, entries stored in Windows Credential Manager under the current user account are accessible to any executable running under that same user session without elevated privileges. The OS keychain protects against offline disk theft, unauthorized users, and repository leakage, but does **not** protect against active malware running with your user permissions on your own machine.
+

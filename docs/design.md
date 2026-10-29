@@ -415,10 +415,10 @@ For M1 only, the key comes from a git-ignored local config file. M2 replaces it 
 
 **M2 Keys and providers**
 
-- [ ] Add, test, and delete cloud connections from the Models page
-- [ ] Keys saved in Windows Credential Manager, never in SQLite
-- [ ] Anthropic adapter streams replies
-- [ ] Every error kind shows a clear message in the UI
+- [x] Add, test, and delete cloud connections from the Models page
+- [x] Keys saved in Windows Credential Manager, never in SQLite
+- [x] Anthropic adapter streams replies
+- [x] Every error kind shows a clear message in the UI
 
 **M3 Coding workspace**
 
