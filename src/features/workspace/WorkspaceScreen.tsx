@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { AiPanel } from "./AiPanel";
 import { EditorPane } from "./EditorPane";
 import { FileTree } from "./FileTree";
 import { useWorkspaceStore } from "./store";
@@ -142,9 +143,9 @@ export function WorkspaceScreen() {
           <EditorPane />
         </div>
 
-        {/* Right: AI Panel placeholder */}
-        <div className="w-[380px] shrink-0 border-l border-neutral-800 bg-neutral-900/30 overflow-hidden flex items-center justify-center text-neutral-600 text-xs select-none">
-          Workspace AI
+        {/* Right: AI Panel */}
+        <div className="w-[380px] shrink-0 overflow-hidden flex flex-col">
+          <AiPanel />
         </div>
       </div>
     </div>

@@ -34,10 +34,10 @@ Plan (approved 2026-10-30, defaults for D1 to D3): `docs/superpowers/plans/2026-
 
 ## In progress
 
-Task: M3 Task 8: AI panel with context chips
+Task: M3 Task 9: apply, diff, Accept
 Tool + model: Antigravity (Gemini 3.8 Flash)
 Date: 2026-10-30
-Next step: Step 1 of Task 8: create context.test.ts, implement workspace/context.ts, chipsFor, AiPanel.tsx.
+Next step: Step 1 of Task 9: install `@codemirror/merge@^6`, create `applyProposal.ts`, `cm.ts: mountDiff`, and proposal store state.
 
 ## Next 3 tasks
 
