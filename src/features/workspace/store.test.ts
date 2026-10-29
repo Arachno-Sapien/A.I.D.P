@@ -7,6 +7,8 @@ vi.mock("../../lib/bindings", () => ({
     openRecent: vi.fn(),
     closeFolder: vi.fn().mockResolvedValue({ status: "ok", data: null }),
     listDir: vi.fn().mockResolvedValue({ status: "ok", data: [] }),
+    readFile: vi.fn(),
+    writeFile: vi.fn(),
   },
 }));
 
@@ -22,6 +24,9 @@ describe("useWorkspaceStore", () => {
       children: {},
       expanded: {},
       error: null,
+      tabs: [],
+      active: null,
+      conflict: null,
     });
   });
 
@@ -151,4 +156,131 @@ describe("useWorkspaceStore", () => {
     expect(commands.listDir).toHaveBeenCalledWith("src");
     expect(commands.listDir).toHaveBeenCalledWith("src/components");
   });
+
+  it("openFile activates an already-open tab without re-reading", async () => {
+    vi.mocked(commands.readFile).mockResolvedValue({
+      status: "ok",
+      data: {
+        path: "a.ts",
+        text: "hello",
+        version: "v1",
+        lineEnding: "lf",
+        hasBom: false,
+        isSecret: false,
+      },
+    });
+
+    await useWorkspaceStore.getState().openFile("a.ts");
+    expect(commands.readFile).toHaveBeenCalledTimes(1);
+    expect(useWorkspaceStore.getState().tabs).toHaveLength(1);
+    expect(useWorkspaceStore.getState().active).toBe("a.ts");
+
+    await useWorkspaceStore.getState().openFile("a.ts");
+    expect(commands.readFile).toHaveBeenCalledTimes(1);
+    expect(useWorkspaceStore.getState().tabs).toHaveLength(1);
+    expect(useWorkspaceStore.getState().active).toBe("a.ts");
+  });
+
+  it("save sends expectedVersion, clears dirty on success", async () => {
+    vi.mocked(commands.readFile).mockResolvedValueOnce({
+      status: "ok",
+      data: {
+        path: "a.ts",
+        text: "hello",
+        version: "v1",
+        lineEnding: "lf",
+        hasBom: false,
+        isSecret: false,
+      },
+    });
+    vi.mocked(commands.writeFile).mockResolvedValueOnce({
+      status: "ok",
+      data: "v2",
+    });
+
+    await useWorkspaceStore.getState().openFile("a.ts");
+    useWorkspaceStore.getState().setDirty("a.ts", true);
+    expect(useWorkspaceStore.getState().tabs[0]?.dirty).toBe(true);
+
+    await useWorkspaceStore.getState().save("a.ts");
+
+    expect(commands.writeFile).toHaveBeenCalledWith({
+      path: "a.ts",
+      text: "hello",
+      lineEnding: "lf",
+      hasBom: false,
+      expectedVersion: "v1",
+    });
+
+    expect(useWorkspaceStore.getState().tabs[0]?.dirty).toBe(false);
+    expect(useWorkspaceStore.getState().tabs[0]?.version).toBe("v2");
+  });
+
+  it("save with ChangedOnDisk sets the conflict bar, keeps dirty", async () => {
+    vi.mocked(commands.readFile).mockResolvedValueOnce({
+      status: "ok",
+      data: {
+        path: "a.ts",
+        text: "hello",
+        version: "v1",
+        lineEnding: "lf",
+        hasBom: false,
+        isSecret: false,
+      },
+    });
+    vi.mocked(commands.writeFile).mockResolvedValueOnce({
+      status: "error",
+      error: { kind: "changedOnDisk" },
+    });
+
+    await useWorkspaceStore.getState().openFile("a.ts");
+    useWorkspaceStore.getState().setDirty("a.ts", true);
+
+    await useWorkspaceStore.getState().save("a.ts");
+
+    expect(useWorkspaceStore.getState().tabs[0]?.dirty).toBe(true);
+    expect(useWorkspaceStore.getState().conflict).toEqual({
+      path: "a.ts",
+      kind: "changedOnDisk",
+    });
+  });
+
+  it("reload drops dirty changes, re-reads the file, clears conflict", async () => {
+    vi.mocked(commands.readFile)
+      .mockResolvedValueOnce({
+        status: "ok",
+        data: {
+          path: "a.ts",
+          text: "original content",
+          version: "v1",
+          lineEnding: "lf",
+          hasBom: false,
+          isSecret: false,
+        },
+      })
+      .mockResolvedValueOnce({
+        status: "ok",
+        data: {
+          path: "a.ts",
+          text: "updated content",
+          version: "v2",
+          lineEnding: "lf",
+          hasBom: false,
+          isSecret: false,
+        },
+      });
+
+    await useWorkspaceStore.getState().openFile("a.ts");
+    useWorkspaceStore.getState().setDirty("a.ts", true);
+    useWorkspaceStore.setState({
+      conflict: { path: "a.ts", kind: "changedOnDisk" },
+    });
+
+    await useWorkspaceStore.getState().reload("a.ts");
+
+    expect(useWorkspaceStore.getState().tabs[0]?.dirty).toBe(false);
+    expect(useWorkspaceStore.getState().tabs[0]?.version).toBe("v2");
+    expect(useWorkspaceStore.getState().conflict).toBeNull();
+  });
 });
+

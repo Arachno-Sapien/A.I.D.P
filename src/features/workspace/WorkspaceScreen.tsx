@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { EditorPane } from "./EditorPane";
 import { FileTree } from "./FileTree";
 import { useWorkspaceStore } from "./store";
 
@@ -16,6 +17,7 @@ export function WorkspaceScreen() {
     toggleDir,
     refreshTree,
     clearError,
+    openFile,
   } = useWorkspaceStore();
 
   useEffect(() => {
@@ -131,15 +133,13 @@ export function WorkspaceScreen() {
             childrenMap={children}
             expanded={expanded}
             onToggleDir={(path) => void toggleDir(path)}
-            onOpenFile={() => {
-              // Task 7 will wire up opening editor tabs
-            }}
+            onOpenFile={(path) => void openFile(path)}
           />
         </div>
 
-        {/* Center: Editor placeholder */}
-        <div className="flex-1 overflow-hidden bg-neutral-950 flex items-center justify-center text-neutral-600 text-xs select-none">
-          No file open
+        {/* Center: Editor */}
+        <div className="flex-1 overflow-hidden bg-neutral-950 flex flex-col">
+          <EditorPane />
         </div>
 
         {/* Right: AI Panel placeholder */}

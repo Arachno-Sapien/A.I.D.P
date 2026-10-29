@@ -34,10 +34,10 @@ Plan (approved 2026-10-30, defaults for D1 to D3): `docs/superpowers/plans/2026-
 
 ## In progress
 
-Task: M3 Task 7: editor tabs
+Task: M3 Task 8: AI panel with context chips
 Tool + model: Antigravity (Gemini 3.8 Flash)
 Date: 2026-10-30
-Next step: Step 1 of Task 7: install codemirror packages, implement `workspace/cm.ts` and `workspace/buffers.ts`.
+Next step: Step 1 of Task 8: create context.test.ts, implement workspace/context.ts, chipsFor, AiPanel.tsx.
 
 ## Next 3 tasks
 
