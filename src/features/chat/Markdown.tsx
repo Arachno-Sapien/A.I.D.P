@@ -1,6 +1,7 @@
 import { Highlight, themes } from "prism-react-renderer";
 import { type ComponentPropsWithoutRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 function CodeBlock({ code, language }: { code: string; language: string }) {
   const [copied, setCopied] = useState(false);
@@ -46,6 +47,7 @@ export function Markdown({ text }: { text: string }) {
     <div className="reply-md">
       <ReactMarkdown
         skipHtml
+        remarkPlugins={[remarkGfm]}
         components={{
           code: ({
             className,

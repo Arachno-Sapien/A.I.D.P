@@ -34,17 +34,18 @@ The M1 key file (`config.local.json`, `src-tauri/src/config.rs` and the "Configu
 
 ## In progress
 
-Task: M2 Task 8: UI: first-run flow, Models page, model picker (step 6 adds `remark-gfm`)
+Task: M2 Task 9: Docs
 Tool + model: Antigravity (Gemini 3.8 Flash)
 Date: 2026-10-30
-Completed files in Tasks 6-8 commit:
-- Task 6 done: `src-tauri/src/commands/connections.rs`, `src-tauri/src/commands/mod.rs`, `src-tauri/src/commands/chat.rs`, `src-tauri/src/lib.rs`, `src-tauri/src/config.rs` (deleted), `src/lib/bindings.ts` (regenerated), `src/lib/bindings.test.ts`
-- Task 7 done: `src/features/models/providers.ts`, `src/features/chat/errorText.ts`, `src/features/chat/errorText.test.ts`, `src/features/chat/appErrorText.ts`, `src/features/chat/appErrorText.test.ts`, `src/features/models/store.ts`, `src/features/models/store.test.ts`, `src/features/chat/store.ts`, `src/features/chat/store.test.ts`
-- Task 8 done: `src/features/models/ChooseModels.tsx`, `src/features/models/AddConnectionDialog.tsx`, `src/features/models/AddConnectionDialog.test.tsx`, `src/features/models/ModelsScreen.tsx`, `src/features/models/ModelsScreen.test.tsx`, `src/features/chat/ChatScreen.tsx`, `src/features/chat/ChatScreen.test.tsx`, `src/App.tsx`
-Next step: Step 6 of Task 8: add remark-gfm for tables in replies, then Task 9 (Docs).
+Completed in Task 8 step 6:
+- Installed `remark-gfm@4`
+- Added table and strikethrough support in `src/features/chat/Markdown.tsx`
+- Added table styling in `src/App.css`
+- Verified table rendering test in `src/features/chat/Markdown.test.tsx`
+Next step: Task 9: Docs (docs/security.md, docs/decisions/0007-connections-storage.md, docs/setup.md, AGENTS.md, docs/design.md, .ai/memory/known-issues.md, CHANGELOG.md, docs/phases/M2.md).
 
 ## Next 3 tasks
 
-1. Task 8 step 6: `remark-gfm` tables in replies (decision D1).
-2. Task 9: Docs (`docs/security.md`, `docs/decisions/0007-connections-storage.md`, `docs/setup.md`, `AGENTS.md`, `docs/design.md`, `.ai/memory/known-issues.md`, `CHANGELOG.md`, `docs/phases/M2.md`).
-3. Task 10: Human check, review, close.
+1. Task 9: Docs (`docs/security.md`, `docs/decisions/0007-connections-storage.md`, `docs/setup.md`, `AGENTS.md`, `docs/design.md`, `.ai/memory/known-issues.md`, `CHANGELOG.md`, `docs/phases/M2.md`).
+2. Task 10: Human check, review, close.
+3. M3 Planning & kickoff.

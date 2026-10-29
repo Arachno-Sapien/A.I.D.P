@@ -53,5 +53,14 @@ describe("Markdown", () => {
     expect(wrapper.querySelector("h2")?.textContent).toBe("Title");
     expect(wrapper.querySelectorAll("ol > li")).toHaveLength(2);
   });
+
+  it("renders a table", () => {
+    const { container } = render(
+      <Markdown text={"| a | b |\n| - | - |\n| 1 | 2 |"} />,
+    );
+
+    expect(container.querySelectorAll("table th")).toHaveLength(2);
+    expect(container.querySelectorAll("table td")).toHaveLength(2);
+  });
 });
 

@@ -43,3 +43,13 @@
 .reply-md :not(pre) > code {
   @apply rounded bg-neutral-800 px-1 py-0.5 text-[0.9em];
 }
+.reply-md table {
+  @apply border-collapse my-3 text-sm;
+}
+.reply-md th,
+.reply-md td {
+  @apply border border-neutral-700 px-2 py-1;
+}
+.reply-md th {
+  @apply bg-neutral-900 font-semibold text-left;
+}
