@@ -4,7 +4,7 @@ Shared rules for every AI coding agent on this project: Claude Code, Codex, Anti
 
 **Read this whole file before touching code.** Then follow section 1.
 
-- Full design (source of truth for behaviour, screens, schema): [`Desktop AI Model App Design Doc.md`](Desktop%20AI%20Model%20App%20Design%20Doc.md). It moves to `docs/design.md` during M0; update this link when it does.
+- Full design (source of truth for behaviour, screens, schema): [`docs/design.md`](docs/design.md).
 - Current state of the work: [`.ai/memory/progress.md`](.ai/memory/progress.md). This file holds rules, not status.
 
 ---
@@ -201,14 +201,13 @@ On Linux, the keyring needs a Secret Service (GNOME Keyring or KWallet). If none
 
 ## 8. Commands
 
-Prerequisites (Windows): Node ≥ 22, Rust stable with the **MSVC** toolchain (`rustup default stable-msvc`), Visual Studio Build Tools with "Desktop development with C++", WebView2 (preinstalled on Windows 11), Ollama for local models. `docs/setup.md` (written in M0) is the step-by-step version. Check `progress.md` for what is installed on the dev machine.
-
-These exist once the M0 scaffold lands:
+Prerequisites (Windows): Node ≥ 22, Rust stable with the **MSVC** toolchain (`rustup default stable-msvc`), Visual Studio Build Tools with "Desktop development with C++", WebView2 (preinstalled on Windows 11), Ollama for local models. `docs/setup.md` is the step-by-step version. Check `progress.md` for what is installed on the dev machine.
 
 | Purpose | Command |
 | --- | --- |
 | Install JS deps | `npm install` |
-| Run the app (dev, also regenerates `bindings.ts`) | `npm run tauri dev` |
+| Run the app (dev) | `npm run tauri dev` |
+| Regenerate `bindings.ts` | `cargo test --manifest-path src-tauri/Cargo.toml` (`export_bindings` test) |
 | Rust lint | `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings` |
 | Rust tests | `cargo test --manifest-path src-tauri/Cargo.toml` |
 | TS typecheck | `npm run typecheck` (script: `tsc --noEmit`) |

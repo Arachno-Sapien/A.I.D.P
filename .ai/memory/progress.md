@@ -30,11 +30,11 @@ Updated: 2026-10-29 by Antigravity (Gemini 3.8 Flash)
 ## In progress
 
 Plan: `docs/superpowers/plans/2026-10-29-m0-setup.md`
-Current task: Task 4 (Move the design doc and write the M0 docs)
+Current task: Task 5 (CI workflow)
 Provisional app name: `aidp`, identifier: `com.aidp.desktop`
 Agent: Antigravity (Gemini 3.8 Flash)
 Date: 2026-10-29
-Next step: Task 4: Move design doc to docs/design.md, update AGENTS.md, write setup/phase/decisions/changelog
+Next step: Task 5: Create .github/workflows/ci.yml, verify locally, commit
 
 ## Next 3 tasks
 
