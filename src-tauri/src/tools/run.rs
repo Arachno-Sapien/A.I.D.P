@@ -194,12 +194,21 @@ fn received_differently(c: char) -> bool {
 
 #[cfg(windows)]
 fn outside_ansi_code_page(c: char) -> bool {
-    use windows_sys::Win32::Globalization::{GetACP, WC_NO_BEST_FIT_CHARS, WideCharToMultiByte};
-    const CP_UTF8: u32 = 65001;
     // The process code page is the system's, the one child programs get, as
     // long as the app's manifest does not set `activeCodePage` (it doesn't).
     // SAFETY: takes no arguments.
-    let cp = unsafe { GetACP() };
+    let cp = unsafe { windows_sys::Win32::Globalization::GetACP() };
+    outside_code_page(c, cp)
+}
+
+/// Whether code page `cp` fails to hold `c` as itself: no exact mapping, a
+/// single ASCII byte, or a two-byte character whose trail byte is ASCII (`表`
+/// is 0x95 0x5C in code page 932, and 0x5C reads as `\` to a program unaware
+/// of two-byte characters).
+#[cfg(windows)]
+fn outside_code_page(c: char, cp: u32) -> bool {
+    use windows_sys::Win32::Globalization::{WC_NO_BEST_FIT_CHARS, WideCharToMultiByte};
+    const CP_UTF8: u32 = 65001;
     // UTF-8 holds every character, and it rejects the flag and `used_default`.
     if c.is_ascii() || cp == CP_UTF8 {
         return false;
@@ -221,7 +230,12 @@ fn outside_ansi_code_page(c: char) -> bool {
             &mut used_default,
         )
     };
-    n == 0 || used_default != 0 || (n == 1 && out[0].is_ascii())
+    let Some(bytes) = out.get(..n.max(0) as usize).filter(|b| !b.is_empty()) else {
+        return true;
+    };
+    used_default != 0
+        || (bytes.len() == 1 && bytes[0].is_ascii())
+        || bytes[1..].iter().any(u8::is_ascii)
 }
 
 #[cfg(not(windows))]
@@ -561,5 +575,22 @@ pub fn declined(is_command: bool) -> ToolRun {
         for_model,
         is_error: false,
         outcome: ToolOutcome::Declined,
+    }
+}
+
+#[cfg(all(test, windows))]
+mod tests {
+    use super::outside_code_page;
+
+    #[test]
+    fn code_page_check_table() {
+        // Code page 1252: é is held exactly; ∕ only by best fit; 日 not at all.
+        assert!(!outside_code_page('é', 1252));
+        assert!(outside_code_page('∕', 1252));
+        assert!(outside_code_page('日', 1252));
+        // Code page 932: 表 is 0x95 0x5C, a trail byte that reads as `\` to a
+        // program unaware of two-byte characters; あ is 0x82 0xA0.
+        assert!(outside_code_page('表', 932));
+        assert!(!outside_code_page('あ', 932));
     }
 }
