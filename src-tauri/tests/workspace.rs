@@ -1,10 +1,14 @@
 mod common;
 
-use aidp_lib::workspace::files::{list_dir, read_file, write_file, LineEnding, WriteFile};
-use aidp_lib::workspace::paths::resolve;
+use aidp_lib::workspace::files::{
+    create_file, list_dir, list_tree, read_file, write_file, LineEnding, WriteFile,
+};
+use aidp_lib::workspace::paths::{resolve, resolve_new};
+use aidp_lib::workspace::search::search;
 use aidp_lib::workspace::{is_git, open, WorkspaceError};
 use common::{link_dir, link_file, TempDir};
 use std::fs::{self, canonicalize};
+use std::path::Path;
 
 #[test]
 fn resolves_nested_paths() {
@@ -365,6 +369,132 @@ fn open_refuses_a_file() {
     fs::write(&a_txt, "hello").unwrap();
 
     assert_eq!(open(&a_txt), Err(WorkspaceError::NotFound));
+}
+
+#[test]
+fn resolve_new_table() {
+    let temp = TempDir::new();
+    let root = temp.path();
+
+    let a_txt = root.join("a.txt");
+    fs::write(&a_txt, "existing").unwrap();
+
+    let res = resolve_new(root, "a/b/new.txt").unwrap();
+    let canon_root = canonicalize(root).unwrap();
+    assert!(res.starts_with(&canon_root));
+    assert!(res.ends_with(Path::new("a").join("b").join("new.txt")));
+
+    assert_eq!(resolve_new(root, "a.txt"), Err(WorkspaceError::AlreadyExists));
+
+    assert_eq!(resolve_new(root, "new/../../x"), Err(WorkspaceError::OutsideFolder));
+    assert_eq!(resolve_new(root, "/x"), Err(WorkspaceError::OutsideFolder));
+    #[cfg(windows)]
+    assert_eq!(resolve_new(root, "C:\\x"), Err(WorkspaceError::OutsideFolder));
+    assert_eq!(resolve_new(root, "a.txt:s"), Err(WorkspaceError::OutsideFolder));
+
+    let outside = TempDir::new();
+    link_dir(&root.join("out"), outside.path());
+    assert_eq!(resolve_new(root, "out/new.txt"), Err(WorkspaceError::OutsideFolder));
+}
+
+#[test]
+fn list_tree_skips_ignored_and_secret() {
+    let temp = TempDir::new();
+    let root = temp.path();
+
+    fs::create_dir_all(root.join(".git")).unwrap();
+    fs::create_dir_all(root.join("target")).unwrap();
+    fs::create_dir_all(root.join("src")).unwrap();
+
+    fs::write(root.join(".gitignore"), "target/\n").unwrap();
+    fs::write(root.join("target/x"), "ignored").unwrap();
+    fs::write(root.join(".env"), "SECRET=1").unwrap();
+    fs::write(root.join("src/a.ts"), "export const a = 1;").unwrap();
+    fs::write(root.join("id_rsa"), "key").unwrap();
+
+    let (entries, has_more) = list_tree(root, "", 100).unwrap();
+    assert!(!has_more);
+    assert_eq!(entries, vec![".gitignore", "src/", "src/a.ts"]);
+}
+
+#[test]
+fn list_tree_caps_entries() {
+    let temp = TempDir::new();
+    let root = temp.path();
+
+    for i in 0..12 {
+        fs::write(root.join(format!("file_{i:02}.txt")), "content").unwrap();
+    }
+
+    let (entries, has_more) = list_tree(root, "", 5).unwrap();
+    assert!(has_more);
+    assert_eq!(entries.len(), 5);
+}
+
+#[test]
+fn create_file_writes_lf_and_refuses_existing() {
+    let temp = TempDir::new();
+    let root = temp.path();
+
+    let ver = create_file(root, "n/new.txt", "a\r\nb").unwrap();
+    assert!(!ver.is_empty());
+
+    let bytes = fs::read(root.join("n/new.txt")).unwrap();
+    assert_eq!(bytes, b"a\nb");
+
+    assert_eq!(create_file(root, "n/new.txt", "more"), Err(WorkspaceError::AlreadyExists));
+}
+
+#[test]
+fn search_finds_and_skips() {
+    let temp = TempDir::new();
+    let root = temp.path();
+
+    fs::create_dir_all(root.join(".git")).unwrap();
+    fs::create_dir_all(root.join("src")).unwrap();
+    fs::create_dir_all(root.join("target")).unwrap();
+
+    fs::write(root.join(".gitignore"), "target/\n").unwrap();
+    fs::write(root.join("target/ignored.txt"), "Foo in target").unwrap();
+    fs::write(root.join(".env"), "Foo in env").unwrap();
+    fs::write(root.join("src/binary.bin"), b"\0Foo binary").unwrap();
+    fs::write(root.join("src/a.ts"), "line 1\nline 2\nconst Foo = 42;\nline 4\n").unwrap();
+    fs::write(root.join("config.txt"), "-----BEGIN RSA PRIVATE KEY-----\nFoo in private key\n-----END RSA PRIVATE KEY-----\n").unwrap();
+
+    let (matches, has_more) = search(root, "", "Foo", 100).unwrap();
+    assert!(!has_more);
+    assert_eq!(matches.len(), 1);
+    assert_eq!(matches[0].path, "src/a.ts");
+    assert_eq!(matches[0].line, 3);
+    assert_eq!(matches[0].text, "const Foo = 42;");
+}
+
+#[test]
+fn search_caps_matches() {
+    let temp = TempDir::new();
+    let root = temp.path();
+
+    let lines = (0..150).map(|i| format!("needle {i}")).collect::<Vec<_>>().join("\n");
+    fs::write(root.join("many.txt"), lines).unwrap();
+
+    let (matches, has_more) = search(root, "", "needle", 100).unwrap();
+    assert!(has_more);
+    assert_eq!(matches.len(), 100);
+}
+
+#[test]
+fn read_marks_a_private_key_file() {
+    let temp = TempDir::new();
+    let root = temp.path();
+
+    fs::write(
+        root.join("config.txt"),
+        "-----BEGIN RSA PRIVATE KEY-----\nMIIE...\n-----END RSA PRIVATE KEY-----\n",
+    )
+    .unwrap();
+
+    let content = read_file(root, "config.txt").unwrap();
+    assert!(content.is_secret);
 }
 
 

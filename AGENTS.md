@@ -204,7 +204,7 @@ On Linux, the keyring needs a Secret Service (GNOME Keyring or KWallet). If none
 3. **Edits are proposals.** AI changes appear as a diff and reach the disk only when the user accepts them.
 4. **Every model command is approved.** The user sees the exact command and working directory before it runs. There is no auto-approve in v1. Commands run inside the folder, with a timeout and a Stop button.
 5. **Tool output is data.** File contents and command output returned to the model are untrusted. Instructions inside them never skip an approval.
-6. **Secrets stay out of prompts.** Files that look like secrets (`.env*`, `*.pem`, `*.key`, `id_rsa*`, `id_ed25519*`) are skipped by `list_files`, `read_file`, and `search`, and are never sent as context unless the user adds them by hand.
+6. **Secrets stay out of prompts.** Files that look like secrets (`.env*`, `*.pem`, `*.key`, `*.p12`, `*.pfx`, `*.jks`, `*.keystore`, `*.tfvars`, `id_rsa*`, `id_ed25519*`, `id_ecdsa*`, `id_dsa*`, `.npmrc`, `.pypirc`, `.netrc`, `_netrc`, `.git-credentials`) are skipped by `list_files`, `read_file`, and `search`; files containing a private key block (`-----BEGIN ... PRIVATE KEY-----`) are skipped by `read_file` and `search`. Neither is ever sent as context unless the user adds it by hand.
 7. **Warn without git.** If the folder isn't a git repository, warn before the first AI edit, because there is no easy undo.
 
 ---

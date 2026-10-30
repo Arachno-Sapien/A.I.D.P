@@ -8,6 +8,8 @@ export function workspaceErrorText(error: WorkspaceError): string {
       return "The requested path is outside the opened folder.";
     case "notFound":
       return "The requested file or folder was not found.";
+    case "alreadyExists":
+      return "A file with that name already exists.";
     case "notText":
       return "The file is binary or does not contain valid text.";
     case "tooLarge":

@@ -39,10 +39,10 @@ Carry-overs from M3 are in `docs/phases/M3.md` under "What's left": M4 reuses `w
 
 ## In progress
 
-Task: M4 Task 4: Workspace helpers for the tools (and D1)
+Task: M4 Task 5: Tool definitions and the file tools
 Tool + model: Antigravity (Gemini 3.8 Flash)
 Date: 2026-10-30
-Next step: Step 1 of Task 4: write failing tests in tests/workspace.rs for resolve_new, list_tree, search, create_file, and D1 widened secret filter.
+Next step: Step 1 of Task 5: write failing tests in tests/tools.rs for parse_table, specs_are_valid_schemas, tool_paths_outside_are_refused, read_file_refuses_secrets, read_file_ranges_and_cut, list_and_search_format, edit_file_table, edit_keeps_crlf_and_bom, edit_after_change_on_disk, create_file_flow.
 
 ## Next 3 tasks
 

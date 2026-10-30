@@ -103,22 +103,28 @@ pub fn encode(text: &str, le: LineEnding, bom: bool) -> Vec<u8> {
     out
 }
 
+pub(crate) fn walker(abs: &Path, max_depth: Option<usize>) -> ignore::Walk {
+    let mut builder = ignore::WalkBuilder::new(abs);
+    builder
+        .max_depth(max_depth)
+        .hidden(false)
+        .parents(true)
+        .require_git(true)
+        .sort_by_file_name(|a, b| a.cmp(b))
+        .filter_entry(|e| e.file_name() != ".git");
+    builder.build()
+}
+
 pub fn list_dir(root: &Path, rel: &str) -> Result<Vec<DirEntry>, WorkspaceError> {
     let abs = resolve(root, rel)?;
     if !abs.is_dir() {
         return Err(WorkspaceError::NotFound);
     }
 
-    let walker = ignore::WalkBuilder::new(&abs)
-        .max_depth(Some(1))
-        .hidden(false)
-        .parents(true)
-        .require_git(true)
-        .filter_entry(|e| e.file_name() != ".git")
-        .build();
+    let walk = walker(&abs, Some(1));
 
     let mut entries = Vec::new();
-    for entry_res in walker {
+    for entry_res in walk {
         let entry = entry_res.map_err(|e| WorkspaceError::Io {
             message: e.to_string(),
         })?;
@@ -188,7 +194,9 @@ pub fn read_file(root: &Path, rel: &str) -> Result<FileContent, WorkspaceError> 
 
     let path = to_rel(root, &abs).unwrap_or_else(|| rel.to_string());
     // Check the link's target too: a link named notes.txt may point at .env.
-    let is_secret = is_secret(rel) || is_secret(&path);
+    let is_secret = is_secret(rel)
+        || is_secret(&path)
+        || super::secret_files::has_private_key(&text);
 
     Ok(FileContent {
         path,
@@ -245,6 +253,94 @@ pub fn write_file(root: &Path, req: WriteFile) -> Result<String, WorkspaceError>
         .unwrap_or(0);
 
     Ok(format!("{new_mtime}-{}", new_meta.len()))
+}
+
+pub fn list_tree(
+    root: &Path,
+    rel: &str,
+    max: usize,
+) -> Result<(Vec<String>, bool), WorkspaceError> {
+    let abs = resolve(root, rel)?;
+    if !abs.is_dir() {
+        return Err(WorkspaceError::NotFound);
+    }
+
+    let walk = walker(&abs, None);
+    let mut entries = Vec::new();
+    let mut has_more = false;
+
+    for entry_res in walk {
+        let entry = entry_res.map_err(|e| WorkspaceError::Io {
+            message: e.to_string(),
+        })?;
+        if entry.depth() == 0 {
+            continue;
+        }
+
+        let name = entry.file_name().to_string_lossy();
+        if is_secret(&name) {
+            continue;
+        }
+
+        let mut rel_path = to_rel(root, entry.path()).unwrap_or_else(|| name.to_string());
+        let file_type = entry.file_type();
+        let is_symlink = file_type.as_ref().is_some_and(|ft| ft.is_symlink());
+        let is_dir = if is_symlink {
+            false
+        } else {
+            file_type.as_ref().is_some_and(|ft| ft.is_dir())
+        };
+
+        if is_dir {
+            rel_path.push('/');
+        }
+
+        if entries.len() >= max {
+            has_more = true;
+            break;
+        }
+        entries.push(rel_path);
+    }
+
+    Ok((entries, has_more))
+}
+
+pub fn create_file(root: &Path, rel: &str, text: &str) -> Result<String, WorkspaceError> {
+    let abs = super::paths::resolve_new(root, rel)?;
+    if let Some(parent) = abs.parent() {
+        fs::create_dir_all(parent).map_err(|e| WorkspaceError::Io {
+            message: e.to_string(),
+        })?;
+    }
+
+    let mut file = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&abs)
+        .map_err(|e| match e.kind() {
+            io::ErrorKind::AlreadyExists => WorkspaceError::AlreadyExists,
+            _ => WorkspaceError::Io {
+                message: e.to_string(),
+            },
+        })?;
+
+    use std::io::Write;
+    let bytes = encode(text, LineEnding::Lf, false);
+    file.write_all(&bytes).map_err(|e| WorkspaceError::Io {
+        message: e.to_string(),
+    })?;
+
+    let meta = file.metadata().map_err(|e| WorkspaceError::Io {
+        message: e.to_string(),
+    })?;
+
+    let mtime_nanos = meta
+        .modified()
+        .ok()
+        .and_then(|t| t.duration_since(SystemTime::UNIX_EPOCH).ok())
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    Ok(format!("{mtime_nanos}-{}", meta.len()))
 }
 
 #[cfg(test)]

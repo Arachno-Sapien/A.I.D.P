@@ -5,6 +5,7 @@ use std::sync::{Mutex, PoisonError};
 pub mod files;
 pub mod paths;
 pub mod recent;
+pub mod search;
 pub mod secret_files;
 
 pub fn is_git(root: &Path) -> bool {
@@ -85,6 +86,7 @@ pub enum WorkspaceError {
     NoFolder,
     OutsideFolder,
     NotFound,
+    AlreadyExists,
     NotText,
     TooLarge { bytes: u32 },
     ChangedOnDisk,

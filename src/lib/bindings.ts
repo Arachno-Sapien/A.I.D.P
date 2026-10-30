@@ -185,7 +185,7 @@ export type Usage_Serialize = {
 	tokensOut: number | null,
 };
 
-export type WorkspaceError = { kind: "noFolder" } | { kind: "outsideFolder" } | { kind: "notFound" } | { kind: "notText" } | { kind: "tooLarge"; bytes: number } | { kind: "changedOnDisk" } | { kind: "io"; message: string } | { kind: "storage"; message: string };
+export type WorkspaceError = { kind: "noFolder" } | { kind: "outsideFolder" } | { kind: "notFound" } | { kind: "alreadyExists" } | { kind: "notText" } | { kind: "tooLarge"; bytes: number } | { kind: "changedOnDisk" } | { kind: "io"; message: string } | { kind: "storage"; message: string };
 
 export type WorkspaceInfo = {
 	name: string,
