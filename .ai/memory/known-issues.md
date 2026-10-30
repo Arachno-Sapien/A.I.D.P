@@ -4,6 +4,7 @@ Bugs, gotchas, and approaches that failed. Newest first. If you hit one of the "
 
 ## Seen in this repo
 
+- **2026-10-31 · Reading CI results with `gh`.** `gh run list --commit <sha>` needs the full 40-character SHA; a short one returns nothing. A run can take over a minute to appear after a push. `gh run view --log` (and `--job --log`) dropped whole steps, so a green Ubuntu job showed no `cargo test` at all. For real counts, fetch the raw job log: `gh api --allow-escape-sequences repos/Arachno-Sapien/A.I.D.P/actions/jobs/<id>/logs` and sum the `test result:` lines. The API also returned 502s and steps with a null conclusion while the run was fine; retry rather than trust one call.
 - **2026-10-30 · Splitting model keys with colons.** Model identifiers can contain colons (e.g. `qwen2.5-coder:1.5b` or custom tag prefixes). Splitting on `:` blindly via `val.split(":")` breaks the model ID into multiple pieces. Split only on the first colon using `indexOf(":")` and `slice` (`parseModelKey`).
 - **2026-10-30 · JSDOM lacks `window.matchMedia`.** JSDOM does not provide `window.matchMedia` by default. In tests exercising system theme media queries, assign `window.matchMedia = vi.fn().mockImplementation(...)` rather than calling `vi.spyOn(window, "matchMedia")` which throws on undefined.
 - **2026-10-30 · Clippy derivable_impls on simple enum Defaults.** Writing manual `impl Default` for fieldless enums (`Theme`, `KeepAlive`) triggers `-D clippy::derivable-impls` under MSVC Rust. Use `#[derive(Default)]` and tag the default variant with `#[default]`.

@@ -17,7 +17,7 @@ Carry-overs: `docs/phases/M4.md` and `docs/phases/M5.md`, "What's left → To M6
 
 | | |
 | --- | --- |
-| Repo | https://github.com/Arachno-Sapien/A.I.D.P (public), branch `main`. M5 pushed 2026-10-30, CI green on the Windows runner (run 41093564688) |
+| Repo | https://github.com/Arachno-Sapien/A.I.D.P (public), branch `main`. CI runs the gate on Windows, macOS and Linux since `52185e8` (run 41112982172 green) |
 | Node / npm | v22.22.2 / 12.0.1 |
 | git / gh | 2.51.2 / 2.98.0 (gh logged in as Arachno-Sapien) |
 | Rust | rustc 1.99.1, cargo 1.99.1, stable-msvc |
@@ -38,8 +38,8 @@ Carry-overs: `docs/phases/M4.md` and `docs/phases/M5.md`, "What's left → To M6
 
 ## In progress
 
-M6 Task 1 (the gate on Windows, macOS and Linux), claimed by Claude Code (Opus 5.5) on 2026-10-31.
-Next step: after the human pushes the CI matrix change, read the macOS and Linux logs (`gh run view --log-failed`) and fix each failure test-first.
+M6 Task 1 done 2026-10-31 by Claude Code (Opus 5.5): CI run 41112982172 green on Windows, macOS and Linux, with 211 Rust tests (1 ignored) and 187 Vitest tests on each; nothing needed fixing.
+Next step: M6 Task 2 (`src-tauri/src/login_path.rs` with `extract_path` and `run_with_limit`, Ollama paths on macOS, `-l` for the macOS terminal, the shell named in the `run_command` description).
 
 ## Next 3 tasks
 
