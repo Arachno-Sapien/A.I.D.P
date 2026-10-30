@@ -123,12 +123,36 @@ pub fn parse(name: &str, input: &serde_json::Value) -> Result<ToolInput, String>
         "run_command" => {
             let args: RunCommandArgs = serde_json::from_value(input.clone())
                 .map_err(|e| format!("Invalid arguments for {name}: {e}."))?;
+            if let Some(c) = args.command.chars().find(|&c| is_hidden(c)) {
+                return Err(format!(
+                    "Invalid arguments for {name}: the command contains a hidden or control character (U+{:04X}), which would make the approval card differ from what runs. Use plain characters.",
+                    c as u32
+                ));
+            }
             Ok(ToolInput::RunCommand {
                 command: args.command,
             })
         }
         _ => Err(format!("There is no tool named {name}.")),
     }
+}
+
+/// Characters that hide or reorder text on screen: controls (tab and line
+/// breaks are visible and allowed), bidi overrides and isolates, zero-width
+/// and other invisible format characters. The user must see exactly what runs.
+fn is_hidden(c: char) -> bool {
+    (c.is_control() && !matches!(c, '\t' | '\n' | '\r'))
+        || matches!(
+            c,
+            '\u{00AD}'
+                | '\u{061C}'
+                | '\u{180E}'
+                | '\u{200B}'..='\u{200F}'
+                | '\u{2028}'..='\u{202E}'
+                | '\u{2060}'..='\u{2064}'
+                | '\u{2066}'..='\u{2069}'
+                | '\u{FEFF}'
+        )
 }
 
 #[derive(Debug, Clone, PartialEq)]

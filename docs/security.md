@@ -124,6 +124,7 @@ Milestone 4 introduces autonomous agent tool execution (`list_files`, `read_file
 ### Command Runner Boundaries
 - **Folder containment:** Model commands execute with the workspace root as their current working directory (`cwd`).
 - **Standard shell invocation:** Commands run via `cmd.exe /D /S /C "<command>"` on Windows (decision 0011) and `sh -c` on Unix, with no standard input (`Stdio::null()`).
+- **What you see is what runs:** a command containing a control character (other than tab and line breaks), a bidi override or isolate, or a zero-width or other invisible format character is refused before any approval card appears. Such characters could make the card read differently from what the shell runs.
 - **Hard execution timeout:** A mandatory 120-second timeout halts runaway commands.
 - **Process tree termination:** Stopping or timing out a command kills the entire process tree (`taskkill /F /T /PID` on Windows, `kill -9 -<pgid>` on Unix), preventing orphan processes from lingering in the background.
 - **Output tail truncation:** Process output is captured safely and capped at the last 20,000 characters to prevent memory exhaustion or token overflow.

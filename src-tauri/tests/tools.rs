@@ -105,6 +105,27 @@ fn parse_table() {
 }
 
 #[test]
+fn command_with_hidden_characters_is_refused() {
+    // A right-to-left override makes the approval card show text in a different
+    // order from what the shell runs; zero-width and control characters hide text.
+    for (command, code) in [
+        ("echo safe \u{202E}txt.exe", "U+202E"),
+        ("echo a\u{200B}b", "U+200B"),
+        ("echo \u{2066}x\u{2069}", "U+2066"),
+        ("echo a\u{1b}[2Kb", "U+001B"),
+    ] {
+        let err = parse("run_command", &json!({ "command": command })).unwrap_err();
+        assert!(
+            err.starts_with("Invalid arguments for run_command: the command contains a hidden or control character")
+                && err.contains(code),
+            "{command:?}: {err}"
+        );
+    }
+    // Tabs and line breaks are visible in the card and stay allowed.
+    assert!(parse("run_command", &json!({ "command": "echo a\tb\r\necho c" })).is_ok());
+}
+
+#[test]
 fn specs_are_valid_schemas() {
     let list = specs();
     let names: Vec<&str> = list.iter().map(|s| s.name).collect();
