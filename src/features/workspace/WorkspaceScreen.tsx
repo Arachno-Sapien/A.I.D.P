@@ -1,9 +1,11 @@
-import { useEffect } from "react";
+import React, { Suspense, useEffect, useState } from "react";
 import { AiPanel } from "./AiPanel";
 import { DiffView } from "./DiffView";
 import { EditorPane } from "./EditorPane";
 import { FileTree } from "./FileTree";
 import { useWorkspaceStore } from "./store";
+
+const LazyTerminalPanel = React.lazy(() => import("./TerminalPanel"));
 
 export function WorkspaceScreen() {
   const {
@@ -23,9 +25,23 @@ export function WorkspaceScreen() {
     openFile,
   } = useWorkspaceStore();
 
+  const [terminalOpen, setTerminalOpen] = useState(false);
+  const [terminalHeight, setTerminalHeight] = useState<number>(240);
+
   useEffect(() => {
     void loadRecent();
   }, [loadRecent]);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.key === "\\") {
+        e.preventDefault();
+        setTerminalOpen((open) => !open);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   if (!info) {
     return (
@@ -91,6 +107,17 @@ export function WorkspaceScreen() {
         <div className="flex items-center gap-2">
           <button
             type="button"
+            onClick={() => setTerminalOpen((open) => !open)}
+            className={`text-xs px-2 py-1 rounded transition-colors cursor-pointer ${
+              terminalOpen
+                ? "bg-neutral-800 text-neutral-100"
+                : "text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800"
+            }`}
+          >
+            Terminal
+          </button>
+          <button
+            type="button"
             onClick={() => void refreshTree()}
             className="text-xs text-neutral-400 hover:text-neutral-200 px-2 py-1 rounded hover:bg-neutral-800 transition-colors cursor-pointer"
           >
@@ -140,9 +167,21 @@ export function WorkspaceScreen() {
           />
         </div>
 
-        {/* Center: Editor or DiffView */}
-        <div className="flex-1 overflow-hidden bg-neutral-950 flex flex-col">
-          {proposal ? <DiffView /> : <EditorPane />}
+        {/* Center: Editor or DiffView + Terminal */}
+        <div className="flex-1 overflow-hidden bg-neutral-950 flex flex-col min-h-0">
+          <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+            {proposal ? <DiffView /> : <EditorPane />}
+          </div>
+          {terminalOpen && (
+            <Suspense fallback={<div className="h-60 bg-neutral-950" />}>
+              <LazyTerminalPanel
+                key={info.path}
+                height={terminalHeight}
+                onHeightChange={setTerminalHeight}
+                onClose={() => setTerminalOpen(false)}
+              />
+            </Suspense>
+          )}
         </div>
 
         {/* Right: AI Panel */}

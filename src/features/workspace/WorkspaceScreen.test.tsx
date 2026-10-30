@@ -14,6 +14,11 @@ vi.mock("../../lib/bindings", () => ({
   },
 }));
 
+vi.mock("./TerminalPanel", () => ({
+  default: () => <div data-testid="terminal-panel">Terminal Panel</div>,
+  TerminalPanel: () => <div data-testid="terminal-panel">Terminal Panel</div>,
+}));
+
 import { useWorkspaceStore } from "./store";
 import { WorkspaceScreen } from "./WorkspaceScreen";
 
@@ -69,5 +74,30 @@ describe("WorkspaceScreen", () => {
     fireEvent.click(recentItem);
 
     expect(openRecentMock).toHaveBeenCalledWith("/projects/first");
+  });
+
+  it("toggles the terminal panel", async () => {
+    useWorkspaceStore.setState({
+      info: { name: "my-app", path: "/projects/my-app", isGit: true },
+    });
+
+    render(<WorkspaceScreen />);
+
+    // Initially hidden
+    expect(screen.queryByTestId("terminal-panel")).toBeNull();
+
+    // Click Terminal button to toggle on
+    const terminalBtn = screen.getByRole("button", { name: "Terminal" });
+    fireEvent.click(terminalBtn);
+
+    expect(await screen.findByTestId("terminal-panel")).toBeDefined();
+
+    // Press Ctrl+\ to toggle off
+    fireEvent.keyDown(window, { key: "\\", ctrlKey: true });
+    expect(screen.queryByTestId("terminal-panel")).toBeNull();
+
+    // Press Ctrl+\ to toggle on
+    fireEvent.keyDown(window, { key: "\\", ctrlKey: true });
+    expect(await screen.findByTestId("terminal-panel")).toBeDefined();
   });
 });
