@@ -49,7 +49,7 @@ A **Tauri 2 desktop app** where one person connects cloud models (with their own
 - API keys stored only in the OS keychain and sent only to their own provider.
 - Full Ollama control from inside the app: detect, start, list, download, delete, unload models.
 - Light: **under 150 MB RAM at idle** with no model loaded and no folder open. The workspace gets its own budget, measured in M3 and M4.
-- Windows first (the dev machine), then macOS and Linux.
+- Windows, macOS and Linux in v0.1 (decision 0016). Windows is the dev machine and is tested first.
 
 **Not in v1. Don't build these, don't scaffold "for later":** practice area, browser automation, an MCP client (built-in agent tools are in v1, M4), user accounts or sync, a built-in inference engine, mobile apps.
 
@@ -363,7 +363,7 @@ If your tool doesn't load skills automatically (or looks in a different folder),
 
 ## 13. Milestones
 
-Decision 0005 moved the coding workspace into v1. v0.1 ships on Windows after roughly 16 weeks at 10–20 h/week (estimate, revisited in each phase doc). Every milestone ends with an app that runs. **A milestone is done only when every box in its checklist (design doc, "Milestones") is ticked, its phase doc is written, and its logs are summarised. Don't start the next one early.**
+Decision 0005 moved the coding workspace into v1. v0.1 ships on Windows, macOS and Linux (decision 0016) after roughly 16 weeks at 10–20 h/week (estimate, revisited in each phase doc). Every milestone ends with an app that runs. **A milestone is done only when every box in its checklist (design doc, "Milestones") is ticked, its phase doc is written, and its logs are summarised. Don't start the next one early.**
 
 | | Milestone | Done means |
 | --- | --- | --- |
@@ -373,7 +373,7 @@ Decision 0005 moved the coding workspace into v1. v0.1 ships on Windows after ro
 | M3 | Coding workspace | Open folder; file tree respects .gitignore; CodeMirror 6 tabs with save; AI panel with file + selection context and Stop; Apply → diff → Accept; path-escape tests; no-git warning; workspace RAM budget recorded |
 | M4 | Agent tools and terminal | `ChatEvent::ToolCall` in OpenAI-compatible + Anthropic adapters; list/read/search/edit/create/run tools inside the folder; diffs for edits, approval for every model command; secret files skipped; terminal panel; refusal tests |
 | M5 | Ollama, history, settings | Detect + start Ollama; local models in picker, Chat and workspace; download/delete/Free memory; chats survive restart; default model, theme, keep_alive settings |
-| M6 | v0.1 release | Idle RAM < 150 MB (no folder open), workspace within its budget; CI-built Windows installer on GitHub Releases; auto-update tested; tested on 8 GB RAM machine with a real project open |
+| M6 | v0.1 release | Idle RAM < 150 MB (no folder open), workspace within its budget; CI-built installers for Windows, macOS and Linux on GitHub Releases; auto-update tested; tested on 8 GB RAM machine with a real project open |
 
 Test machines: dev laptop (RTX 3050 Ti 4 GB VRAM, 24 GB RAM) and one 8 GB RAM machine or VM.
 
@@ -382,7 +382,6 @@ Test machines: dev laptop (RTX 3050 Ti 4 GB VRAM, 24 GB RAM) and one 8 GB RAM ma
 ## 14. Open questions (ask the human; don't decide silently)
 
 - The acronym's expansion. The display name A.I.D.P (decision 0003) and the repo https://github.com/Arachno-Sapien/A.I.D.P are settled; the expansion may change as features land.
-- v0.1 for Windows only, or all three OSes?
 - Chat export format: Markdown, JSON, or both?
 
 When one is answered, write a decision record and remove it from this list.

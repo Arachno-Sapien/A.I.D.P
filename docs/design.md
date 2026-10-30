@@ -15,7 +15,7 @@ The coding workspace is the main goal. It sits on top of the model layer, so the
 - API keys stored only in the operating system's keychain and sent only to their own provider.
 - Full Ollama control from inside the app: detect, start, list, download, delete, and unload models.
 - A light app that leaves memory for local models. Target: under 150 MB of RAM at idle with no model loaded and no folder open.
-- Windows first (the development machine), then macOS and Linux.
+- Windows, macOS and Linux in v0.1 (decision 0016). Windows is the development machine and is tested first.
 
 **Not in v1**
 
@@ -391,7 +391,7 @@ Next: Stop button cancels the stream
 
 ## Milestones
 
-Decision 0005 moved the coding workspace into v1, which adds two milestones. Rough estimate: v0.1 ships on Windows after about 16 weeks at 10 to 20 hours a week, plus 2 buffer weeks for exams. Revisit the estimate in each phase doc. Every milestone ends with an app that runs.
+Decision 0005 moved the coding workspace into v1, which adds two milestones. Rough estimate: v0.1 ships on Windows, macOS and Linux (decision 0016) after about 16 weeks at 10 to 20 hours a week, plus 2 buffer weeks for exams. Revisit the estimate in each phase doc. Every milestone ends with an app that runs.
 
 &#91;embedded content: roadmap · original 6-milestone plan; the list below replaces it\]
 
@@ -451,7 +451,7 @@ For M1 only, the key comes from a git-ignored local config file. M2 replaces it 
 **M6 v0.1 release**
 
 - [ ] Idle RAM (no folder open) under 150 MB; workspace RAM within the budget set in M3 and M4
-- [ ] Windows installer built by CI and published as a GitHub release
+- [ ] Installers for Windows, macOS and Linux built by CI and published as a GitHub release
 - [ ] Auto-update tested from one version to the next
 - [ ] Tested on an 8 GB RAM machine with a real project folder open
 
@@ -465,7 +465,7 @@ The biggest risk is an agent-built Rust core you can't debug; the plan answers i
 | Key leaks through logs or IPC | User's paid key exposed | Secret type, no command returns keys, review checklist |
 | Exams and coursework | Milestones slip | Two buffer weeks; each milestone ends in a working app |
 | Linux keyring missing | Keys can't be saved | Clear error; Linux ships after Windows |
-| WebView differences across OSes | UI looks or behaves differently | Windows first; test macOS and Linux before their release |
+| WebView differences across OSes | UI looks or behaves differently | Windows first; macOS and Linux tested before v0.1 ships |
 | Unsigned installer | Windows shows an "unknown publisher" warning | Document how to proceed; sign once the app has users |
 | Provider API changes | An adapter breaks | Fake-server tests catch it; adapters are isolated files |
 | Small local models handle tools poorly | Agent tools don't work with them | Capability flags limit those models to the M3 workspace |
@@ -477,7 +477,7 @@ The biggest risk is an agent-built Rust core you can't debug; the plan answers i
 **Open questions**
 
 - [x] App name: A.I.D.P (decision 0003). Repository: https://github.com/Arachno-Sapien/A.I.D.P
-- [ ] v0.1 for Windows only, or all three OSes?
+- [x] v0.1 on Windows, macOS and Linux (decision 0016)
 - [x] Link to the Ollama installer, or download and run it from inside the app? Link to installer on ollama.com; the app starts it if stopped (decision 0013)
 - [ ] Chat export format: Markdown, JSON, or both?
 - [x] Open source from day one: yes, MIT OR Apache-2.0 (decision 0004)

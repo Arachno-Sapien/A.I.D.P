@@ -7,11 +7,11 @@ Updated: 2026-10-30 by Claude Code (Opus 5.5)
 Not started. No plan yet. Phase doc and plan come first (`docs/phases/M6.md`, `docs/superpowers/plans/`).
 
 - [ ] Idle RAM (no folder open) under 150 MB; workspace RAM within the budget set in M3 and M4
-- [ ] Windows installer built by CI and published as a GitHub release
+- [ ] Installers for Windows, macOS and Linux built by CI and published as a GitHub release
 - [ ] Auto-update tested from one version to the next
 - [ ] Tested on an 8 GB RAM machine with a real project open
 
-Carry-overs: `docs/phases/M4.md` and `docs/phases/M5.md`, "What's left → To M6" (release RAM with the terminal and a local model, a job object for orphan processes, full-width lookalikes in commands, the cut-off Agent label). Open question for the human (AGENTS.md section 14): v0.1 for Windows only, or all three OSes?
+Carry-overs: `docs/phases/M4.md` and `docs/phases/M5.md`, "What's left → To M6" (release RAM with the terminal and a local model, a job object for orphan processes, full-width lookalikes in commands, the cut-off Agent label). The human answered the OS question: v0.1 ships on Windows, macOS and Linux (decision 0016).
 
 ## Repo and dev machine (checked 2026-10-30)
 
@@ -39,7 +39,7 @@ Carry-overs: `docs/phases/M4.md` and `docs/phases/M5.md`, "What's left → To M6
 ## In progress
 
 Nothing claimed. M5 was closed by Claude Code (Opus 5.5) at the human's request, taking over Antigravity's Task 12 claim.
-Next step: the human answers whether v0.1 is Windows only, then Claude Code writes the M6 plan.
+Next step: Claude Code writes the M6 plan (decision 0016 lists the macOS and Linux points to put to the human).
 
 ## Next 3 tasks
 

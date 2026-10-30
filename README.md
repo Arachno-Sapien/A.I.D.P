@@ -8,7 +8,7 @@ The name stands for AI Independent Development Platform, at least for now. The m
 
 Early. You can chat with one OpenAI-compatible provider (OpenAI, OpenRouter, Groq, DeepSeek or a local server). Replies stream in, Stop works, and code blocks have a Copy button. For now the provider details live in a local config file, which the setup guide describes. Next come the keychain, a screen for adding providers, and Anthropic support, then the coding workspace.
 
-Windows is the first platform. macOS and Linux follow after v0.1.
+v0.1 is planned for Windows, macOS and Linux. Windows is the development machine and is tested first.
 
 ## What v0.1 will do
 
@@ -114,7 +114,7 @@ v0.1 is split into seven milestones, and each one ends with an app that runs. Th
 4. M3: the coding workspace. File tree, editor, the AI panel, and edits as diffs. Done.
 5. M4: agent tools and a terminal. The model can read, search and edit files and run commands, each with your approval. Done.
 6. M5: Ollama, chat history and settings. Done.
-7. M6: the v0.1 release. A Windows installer built by CI, auto-update, and a test run on an 8 GB RAM machine.
+7. M6: the v0.1 release. Installers for Windows, macOS and Linux built by CI, auto-update, and a test run on an 8 GB RAM machine.
 
 After v0.1 come an MCP client for outside tools, browser checks with Playwright, and the practice area.
 
