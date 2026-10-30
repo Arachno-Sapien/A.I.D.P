@@ -83,9 +83,13 @@ impl TempDir {
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_nanos();
+        // Tests run in parallel and can read the same clock tick; the counter keeps
+        // names unique, and create_dir fails loudly if two ever collide.
+        static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        let seq = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let pid = std::process::id();
-        let path = std::env::temp_dir().join(format!("aidp-test-{pid}-{nanos}"));
-        std::fs::create_dir_all(&path).unwrap();
+        let path = std::env::temp_dir().join(format!("aidp-test-{pid}-{nanos}-{seq}"));
+        std::fs::create_dir(&path).unwrap();
         Self {
             path: std::fs::canonicalize(path).unwrap(),
         }
