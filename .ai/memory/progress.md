@@ -39,11 +39,11 @@ Carry-overs: `docs/phases/M3.md` and `docs/phases/M4.md`, "What's left → To M5
 ## In progress
 
 Claimed by Antigravity (Gemini 2.5 Pro), 2026-10-30.
-Task: M5 Task 10 - Light and system theme.
-Next step: Step 1 - write failing tests for theme switching and styling.
+Task: M5 Task 11 - Docs (decisions 0013 to 0015, user guide, security, setup, changelog).
+Next step: Step 1 - write decision records 0013 to 0015 and update documentation.
 
 ## Next 3 tasks
 
-1. M5 Task 10 (Light and system theme).
-2. M5 Task 11 (Security check, docs, user guide).
-3. M5 Task 12 (Live check and milestone close).
+1. M5 Task 11 (Security check, docs, user guide).
+2. M5 Task 12 (Live check and milestone close).
+3. M6 Polish and packaging.

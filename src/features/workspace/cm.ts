@@ -12,16 +12,32 @@ export interface CreateStateOptions {
   onSave?: () => void;
 }
 
+export const themeCompartment = new Compartment();
+
+export function themeExtension(theme: "dark" | "light"): Extension {
+  return theme === "dark" ? oneDark : [];
+}
+
+export function setEditorTheme(
+  view: EditorView,
+  theme: "dark" | "light",
+): void {
+  view.dispatch({
+    effects: themeCompartment.reconfigure(themeExtension(theme)),
+  });
+}
+
 export function createState(
   doc: string,
   filename: string,
   options: CreateStateOptions = {},
+  theme: "dark" | "light" = "dark",
 ): EditorState {
   const languageCompartment = new Compartment();
 
   const extensions: Extension[] = [
     basicSetup,
-    oneDark,
+    themeCompartment.of(themeExtension(theme)),
     languageCompartment.of([]),
   ];
 
@@ -71,12 +87,13 @@ export function mountDiff(
   parent: HTMLElement,
   original: string,
   proposed: string,
+  theme: "dark" | "light" = "dark",
 ): EditorView {
   const state = EditorState.create({
     doc: proposed,
     extensions: [
       basicSetup,
-      oneDark,
+      themeCompartment.of(themeExtension(theme)),
       EditorState.readOnly.of(true),
       EditorView.editable.of(false),
       unifiedMergeView({ original, mergeControls: false }),
@@ -88,4 +105,3 @@ export function mountDiff(
     parent,
   });
 }
-

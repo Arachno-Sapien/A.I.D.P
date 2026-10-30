@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { EditorView } from "@codemirror/view";
 import { buffers } from "./buffers";
-import { mountView } from "./cm";
+import { mountView, setEditorTheme } from "./cm";
+import { useSettingsStore } from "../settings/store";
 import { useWorkspaceStore } from "./store";
 
 export function EditorPane() {
@@ -19,6 +20,13 @@ export function EditorPane() {
   const [confirmDiscard, setConfirmDiscard] = useState<string | null>(null);
   const editorContainerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
+  const resolved = useSettingsStore((s) => s.resolved);
+
+  useEffect(() => {
+    if (viewRef.current) {
+      setEditorTheme(viewRef.current, resolved);
+    }
+  }, [resolved]);
 
   const activeTab = tabs.find((t) => t.path === active);
 
@@ -38,10 +46,12 @@ export function EditorPane() {
 
     if (!viewRef.current) {
       viewRef.current = mountView(container, state);
+      setEditorTheme(viewRef.current, resolved);
     } else if (viewRef.current.state !== state) {
       viewRef.current.setState(state);
+      setEditorTheme(viewRef.current, resolved);
     }
-  }, [active, revision]);
+  }, [active, revision, resolved]);
 
   useEffect(() => {
     return () => {

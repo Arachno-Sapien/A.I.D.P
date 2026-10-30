@@ -15,7 +15,9 @@ let mockRows = 24;
 vi.mock("@xterm/xterm", () => {
   return {
     Terminal: class {
+      options: any;
       constructor(options: any) {
+        this.options = options;
         capturedOptions = options;
       }
       open = mockOpen;
@@ -92,5 +94,16 @@ describe("mountTerminal", () => {
 
     expect(mockFit).toHaveBeenCalled();
     expect(onResize).toHaveBeenCalledWith(120, 40);
+  });
+
+  it("terminal follows the theme", () => {
+    const el = document.createElement("div");
+    const term = mountTerminal(el, { onInput: vi.fn(), onResize: vi.fn() });
+
+    term.setTheme("light");
+    expect(capturedOptions.theme.background).toBe("#fafafa");
+
+    term.setTheme("dark");
+    expect(capturedOptions.theme.background).toBe("#0a0a0a");
   });
 });

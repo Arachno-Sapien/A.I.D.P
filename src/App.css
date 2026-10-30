@@ -1,5 +1,29 @@
 @import "tailwindcss";
 
+:root {
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --color-neutral-50: oklch(14.5% 0 none);
+  --color-neutral-100: oklch(20.5% 0 none);
+  --color-neutral-200: oklch(26.9% 0 none);
+  --color-neutral-300: oklch(37.1% 0 none);
+  --color-neutral-400: oklch(43.9% 0 none);
+  --color-neutral-500: oklch(55.6% 0 none);
+  --color-neutral-600: oklch(70.8% 0 none);
+  --color-neutral-700: oklch(87% 0 none);
+  --color-neutral-800: oklch(92.2% 0 none);
+  --color-neutral-900: oklch(97% 0 none);
+  --color-neutral-950: oklch(98.5% 0 none);
+  --color-black: #fff;
+  --color-white: #000;
+  --color-red-400: oklch(50.5% 0.213 27.518);
+  --color-amber-400: oklch(55.5% 0.163 48.998);
+  --color-green-400: oklch(52.7% 0.154 150.069);
+}
+
 /*
  * Tailwind's reset strips the look of headings, lists and spacing.
  * This gives model replies (src/features/chat/Markdown.tsx) theirs back.

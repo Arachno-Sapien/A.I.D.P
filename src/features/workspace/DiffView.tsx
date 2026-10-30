@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { mountDiff } from "./cm";
+import { useSettingsStore } from "../settings/store";
 import { useWorkspaceStore } from "./store";
 
 export function DiffView() {
@@ -10,6 +11,7 @@ export function DiffView() {
     rejectProposal,
     confirmGit,
   } = useWorkspaceStore();
+  const resolved = useSettingsStore((s) => s.resolved);
   const editorRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -18,11 +20,12 @@ export function DiffView() {
       editorRef.current,
       proposal.original,
       proposal.proposed,
+      resolved,
     );
     return () => {
       view.destroy();
     };
-  }, [proposal?.path, proposal?.original, proposal?.proposed]);
+  }, [proposal?.path, proposal?.original, proposal?.proposed, resolved]);
 
   if (!proposal) return null;
 

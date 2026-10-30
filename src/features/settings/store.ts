@@ -1,9 +1,11 @@
 import { create } from "zustand";
 import { commands, type KeepAlive, type Theme } from "../../lib/bindings";
 import { appErrorText } from "../chat/appErrorText";
+import { applyTheme, setSystemChangeCallback } from "./theme";
 
 export interface SettingsStore {
   theme: Theme;
+  resolved: "dark" | "light";
   keepAlive: KeepAlive;
   loaded: boolean;
   loadError: string | null;
@@ -13,37 +15,48 @@ export interface SettingsStore {
   setKeepAlive(keepAlive: KeepAlive): Promise<void>;
 }
 
-export const useSettingsStore = create<SettingsStore>((set) => ({
-  theme: "dark",
-  keepAlive: "ollamaDefault",
-  loaded: false,
-  loadError: null,
+export const useSettingsStore = create<SettingsStore>((set) => {
+  setSystemChangeCallback((resolved) => {
+    set({ resolved });
+  });
 
-  load: async () => {
-    const res = await commands.getSettings();
-    if (res.status === "ok") {
-      set({
-        theme: res.data.theme,
-        keepAlive: res.data.keepAlive,
-        loaded: true,
-        loadError: null,
-      });
-    } else {
-      set({
-        loaded: true,
-        loadError: appErrorText(res.error),
-      });
-    }
-  },
+  return {
+    theme: "dark",
+    resolved: "dark",
+    keepAlive: "ollamaDefault",
+    loaded: false,
+    loadError: null,
 
-  setTheme: async (theme: Theme) => {
-    set({ theme });
-    await commands.setTheme(theme);
-  },
+    load: async () => {
+      const res = await commands.getSettings();
+      if (res.status === "ok") {
+        const resolved = applyTheme(res.data.theme);
+        set({
+          theme: res.data.theme,
+          resolved,
+          keepAlive: res.data.keepAlive,
+          loaded: true,
+          loadError: null,
+        });
+      } else {
+        const resolved = applyTheme("dark");
+        set({
+          resolved,
+          loaded: true,
+          loadError: appErrorText(res.error),
+        });
+      }
+    },
 
-  setKeepAlive: async (keepAlive: KeepAlive) => {
-    set({ keepAlive });
-    await commands.setKeepAlive(keepAlive);
-  },
-}));
+    setTheme: async (theme: Theme) => {
+      const resolved = applyTheme(theme);
+      set({ theme, resolved });
+      await commands.setTheme(theme);
+    },
 
+    setKeepAlive: async (keepAlive: KeepAlive) => {
+      set({ keepAlive });
+      await commands.setKeepAlive(keepAlive);
+    },
+  };
+});

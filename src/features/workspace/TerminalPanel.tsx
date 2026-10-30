@@ -1,6 +1,7 @@
 import { Channel } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { commands, type TerminalEvent } from "../../lib/bindings";
+import { useSettingsStore } from "../settings/store";
 import { mountTerminal, type MountedTerminal } from "./term";
 import { workspaceErrorText } from "./workspaceErrorText";
 
@@ -32,6 +33,11 @@ export function TerminalPanel({
   const [isExited, setIsExited] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const resolved = useSettingsStore((s) => s.resolved);
+
+  useEffect(() => {
+    termRef.current?.setTheme(resolved);
+  }, [resolved]);
 
   const startTerminal = useCallback(async () => {
     if (!termRef.current) return;
@@ -59,6 +65,7 @@ export function TerminalPanel({
     if (!containerRef.current) return;
 
     const term = mountTerminal(containerRef.current, {
+      theme: resolved,
       onInput: (data) => {
         void commands.terminalWrite(data);
       },

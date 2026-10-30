@@ -5,14 +5,34 @@ import { Terminal as Xterm } from "@xterm/xterm";
 export interface TerminalOpts {
   onInput(data: string): void;
   onResize(cols: number, rows: number): void;
+  theme?: "dark" | "light";
 }
 
 export interface MountedTerminal {
   write(data: string): void;
   fit(): void;
+  setTheme(theme: "dark" | "light"): void;
   dispose(): void;
   readonly cols: number;
   readonly rows: number;
+}
+
+export const DARK_THEME = {
+  background: "#0a0a0a",
+  foreground: "#e5e5e5",
+  cursor: "#f5f5f5",
+  selectionBackground: "#333333",
+};
+
+export const LIGHT_THEME = {
+  background: "#fafafa",
+  foreground: "#171717",
+  cursor: "#171717",
+  selectionBackground: "#d4d4d4",
+};
+
+export function terminalTheme(theme: "dark" | "light") {
+  return theme === "dark" ? DARK_THEME : LIGHT_THEME;
 }
 
 export function mountTerminal(
@@ -23,17 +43,14 @@ export function mountTerminal(
     typeof navigator !== "undefined" &&
     /windows|win32/i.test(navigator.userAgent);
 
+  const initialTheme = opts.theme ?? "dark";
+
   const term = new Xterm({
     fontFamily:
       "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
     fontSize: 12,
     scrollback: 1000,
-    theme: {
-      background: "#0a0a0a",
-      foreground: "#e5e5e5",
-      cursor: "#f5f5f5",
-      selectionBackground: "#333333",
-    },
+    theme: terminalTheme(initialTheme),
     windowsPty: isWindows ? { backend: "conpty" } : undefined,
   });
 
@@ -68,6 +85,9 @@ export function mountTerminal(
       term.write(data);
     },
     fit: performFit,
+    setTheme: (theme: "dark" | "light") => {
+      term.options.theme = terminalTheme(theme);
+    },
     dispose: () => {
       term.dispose();
     },
