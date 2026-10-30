@@ -4,7 +4,7 @@ Updated: 2026-10-30 by Claude Code (Opus 5.5)
 
 ## Current milestone: M4 Agent tools and terminal
 
-Planned, not started. Plan: `docs/superpowers/plans/2026-10-30-m4-agent-tools.md` (12 tasks; stop for review after Task 7). Phase doc: `docs/phases/M4.md`. No code until the human approves the plan and answers D1 to D3.
+Plan approved 2026-10-30 with the defaults for D1 (widen rule 6), D2 (limits) and D3 (shells). Plan: `docs/superpowers/plans/2026-10-30-m4-agent-tools.md` (12 tasks; stop for review after Task 7). Phase doc: `docs/phases/M4.md`. No code yet.
 
 - [ ] `ChatEvent::ToolCall` and tool calling in the OpenAI-compatible and Anthropic adapters
 - [ ] `list_files`, `read_file`, `search`, `edit_file`, `create_file`, and `run_command` work inside the folder
@@ -39,11 +39,11 @@ Carry-overs from M3 are in `docs/phases/M3.md` under "What's left": M4 reuses `w
 
 ## In progress
 
-M4 plan written (Claude Code, Opus 5.5, 2026-10-30). Not executed.
-Next step: the human reviews `docs/superpowers/plans/2026-10-30-m4-agent-tools.md` and answers D1 (widen the secret-file list in rule 6), D2 (limits) and D3 (shells); then M4 Task 1 (capability column, migration 3).
+M4 plan written and approved (Claude Code, Opus 5.5, 2026-10-30). Not executed.
+Next step: M4 Task 1: add a nullable `supports_tools` column (migration 3 in `src-tauri/src/db/mod.rs`), `ModelInfo.supports_tools` and `ChatModel.supports_tools`, filled from OpenRouter's `supported_parameters`, and always yes for Anthropic.
 
 ## Next 3 tasks
 
-1. Human review of the M4 plan, with answers to D1 to D3.
-2. M4 Tasks 1 to 7 (capability, both adapters, workspace helpers, file tools, command runner, the loop); stop for review after Task 7.
+1. M4 Tasks 1 to 7 (capability, both adapters, workspace helpers with the wider secret list, file tools, command runner, the loop).
+2. Review of Tasks 1 to 7 by Claude Code before any UI work.
 3. M4 Tasks 8 to 12 (agent UI, terminal backend and panel, docs, live check and close).

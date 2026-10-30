@@ -1,6 +1,6 @@
 # M4 Agent Tools and Terminal Implementation Plan
 
-> **Status: waiting for the human's review and answers to D1 to D3.** Execute from Task 1 only after approval. After Task 7, stop for a review before starting Task 8.
+> **Status: approved by the human on 2026-10-30 with the defaults for D1 (widen the secret-file list: yes, decision 0010), D2 (the limits as listed) and D3 (cmd.exe for model commands, PowerShell in the terminal, decision 0011).** Execute from Task 1. After Task 7, stop for a review before starting Task 8.
 
 > **For agentic workers:** execute task by task, in order, inline in one session (the tasks share files). In Claude Code, `superpowers:executing-plans` fits; in other tools, follow the steps directly. Steps use checkbox (`- [ ]`) syntax. **Do not tick any milestone box, in any file, until the human confirms the live check in Task 12. Do not push; the human decides.**
 
