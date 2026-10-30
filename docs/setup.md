@@ -37,7 +37,7 @@ Ensure the following tools are installed:
    ```bash
    npm install
    ```
-   All editor components (CodeMirror 6, `@codemirror/merge`), virtualization (`@tanstack/react-virtual`), and Rust dialog plugins are handled by npm and cargo dependencies. There is nothing additional to install beyond `npm install`.
+   All editor components (CodeMirror 6, `@codemirror/merge`), terminal packages (`@xterm/xterm`, `@xterm/addon-fit`), virtualization (`@tanstack/react-virtual`), and Rust backend crates (including `portable-pty`, which builds directly with the MSVC toolchain without additional C/C++ dependencies) are handled by standard npm and cargo dependencies. There is nothing additional to install beyond `npm install`.
 
 3. **Restore agent skills (if working with AI agents):**
    ```bash

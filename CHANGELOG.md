@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Autonomous agent tools in workspace AI panel: `list_files`, `read_file`, `search`, `edit_file`, `create_file`, and `run_command` with boundary confinement and secret file shielding.
+- User approval gate for model edits and commands: interactive diff review for file modifications and creation, and approval cards showing exact commands and working directory before execution; no auto-approve bypass.
+- Built-in terminal panel running native shell (`powershell.exe -NoLogo` on Windows, `$SHELL` on Unix; decision 0011) via `@xterm/xterm`, `@xterm/addon-fit`, and `portable-pty`, toggled via top bar or `Ctrl+\`.
+- Extended secret file shielding: automatically excludes package manager credentials, SSH/TLS keys, certificates, keystores, and detected private key blocks across all tools (decision 0010).
+- Tool calling support in `openai_compat` and `anthropic` model provider adapters, preserving Claude thinking blocks in multi-turn tool loops.
+- SQLite migration 3 adding `supports_tools` capability flag to `models` table.
 - Workspace screen: open folders, virtualized file tree respecting `.gitignore` via `ignore` and `@tanstack/react-virtual`, recent folders history stored in SQLite `settings` table.
 - CodeMirror 6 editor tabs: syntax highlighting via `@codemirror/language-data` with one-dark theme, dirty edit tracking, line ending and BOM preservation, conflict bar for files changed or deleted on disk.
 - Workspace AI panel: multi-turn chat on `"workspace"` surface with context chips for open files and line selections, secret file auto-exclusion, and custom system contract.

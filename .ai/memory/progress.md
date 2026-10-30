@@ -40,11 +40,11 @@ Carry-overs from M3 are in `docs/phases/M3.md` under "What's left": M4 reuses `w
 ## In progress
 
 Claimed by Antigravity (Gemini 2.5 Pro), 2026-10-30.
-Task: M4 Task 11 - Docs (security, decision 0011, stack) and phase doc.
-Next step: Step 1 - update docs/security.md, docs/decisions/0011-command-and-terminal-shells.md, AGENTS.md, docs/design.md, docs/setup.md, CHANGELOG.md.
+Task: M4 Task 12 - Live check and milestone close.
+Next step: Step 1 - prepare scratch git folder, run live check in dev mode, measure RAM in release build.
 
 ## Next 3 tasks
 
-1. M4 Task 11: docs (security, decision 0011, stack) and phase doc.
-2. M4 Task 12: live check and close.
-3. M5: local models (Ollama).
+1. M4 Task 12: live check and close.
+2. M5: local models (Ollama).
+3. M6: polish and distribution.

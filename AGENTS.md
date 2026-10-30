@@ -68,7 +68,7 @@ Chosen for low memory use and tools agents know well. **No new dependency withou
 | Styling | Tailwind CSS (no component library) |
 | UI state | Zustand |
 | Typed IPC | tauri-specta (generates `src/lib/bindings.ts`) |
-| HTTP + async | reqwest (native-tls, decision 0006) + tokio (cancellation: `tokio_util::sync::CancellationToken`) |
+| HTTP + async | reqwest (native-tls, decision 0006) + tokio (process, cancellation: `tokio_util::sync::CancellationToken`) |
 | Key storage | `keyring` crate (Windows Credential Manager / macOS Keychain / Linux Secret Service) |
 | Secret handling | `secrecy` crate (`Secret` prints as `[REDACTED]`) |
 | Database | SQLite via `rusqlite` (bundled), accessed only from Rust |
@@ -77,7 +77,7 @@ Chosen for low memory use and tools agents know well. **No new dependency withou
 | Folder picker (M3) | tauri-plugin-dialog, called from Rust only |
 | Code editor (M3) | CodeMirror 6, with @codemirror/merge for diffs, @codemirror/language-data (not Monaco: too heavy for the RAM target) |
 | File walking and search (M3) | `ignore` crate (respects .gitignore) |
-| Terminal (M4) | xterm.js + `portable-pty` |
+| Terminal (M4) | `@xterm/xterm` 6 + `@xterm/addon-fit` with `portable-pty` |
 | Tests | `cargo test` + wiremock (fake provider servers), Vitest |
 | Builds | GitHub Actions + tauri-action |
 
@@ -109,7 +109,7 @@ pub trait ModelProvider: Send + Sync {
         req: ChatRequest,
         out: Channel<ChatEvent>,
         cancel: CancellationToken,
-    ) -> Result<Usage, ProviderError>;
+    ) -> Result<Reply, ProviderError>;
 }
 ```
 
@@ -119,7 +119,7 @@ pub trait ModelProvider: Send + Sync {
 | `anthropic.rs` | Claude models. System prompt sits outside the message list; different stream events |
 | `ollama_chat.rs` | Local Ollama via `/api/chat`, so the app can set `num_ctx` and `keep_alive` per request |
 
-- **Streaming:** Rust sends `ChatEvent::Delta(text)` through a Tauri `Channel`, then exactly one `Done(usage)` or `Error(kind)`.
+- **Streaming:** Rust sends `ChatEvent::Delta(text)`, `ToolCall`, and `ToolResult` through a Tauri `Channel`, then exactly one `Done(usage)` or `Error(kind)`. Within one message the loop sends each provider's assistant message back unchanged.
 - **Stop:** cancels the token. The adapter drops the HTTP stream and saves the partial reply with status `stopped`.
 - **Normalized errors:** every adapter maps provider responses into exactly these: `InvalidKey` (401, 403), `RateLimited` (429, with retry time if sent), `ModelNotFound`, `ContextTooLong`, `Offline` (no internet / Ollama not running), `ProviderError` (5xx and anything unexpected), `Cancelled`. The UI shows one message per kind, the same everywhere.
 - **Capabilities per model:** streaming, tool calling, vision, context window stored as yes / no / unknown. Fill from the provider where it reports them (Ollama `/api/show`), otherwise user-set.

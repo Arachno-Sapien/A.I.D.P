@@ -70,7 +70,7 @@ pub trait ModelProvider: Send + Sync {
         req: ChatRequest,
         out: Channel<ChatEvent>,
         cancel: CancellationToken,
-    ) -> Result<Usage, ProviderError>;
+    ) -> Result<Reply, ProviderError>;
 }
 ```
 
@@ -84,7 +84,7 @@ pub trait ModelProvider: Send + Sync {
 
 **Streaming and stopping**
 
-- Rust sends tokens to the UI through a Tauri Channel as `ChatEvent::Delta(text)`, then one `Done(usage)` or `Error(kind)`.
+- Rust sends tokens and events to the UI through a Tauri Channel as `ChatEvent::Delta(text)`, `ToolCall`, and `ToolResult`, then one `Done(usage)` or `Error(kind)`. Within one message the loop sends each provider's assistant message back unchanged.
 - The Stop button cancels the token. The adapter drops the HTTP stream and saves the partial reply with status `stopped`.
 
 **Normalized errors.** Every adapter maps provider responses into one list, so the UI shows the same message everywhere:
@@ -188,12 +188,12 @@ Other local servers (LM Studio, llama.cpp) connect through the OpenAI-compatible
 
 ## Data model
 
-Five SQLite tables in one local file, read and written only by Rust. No table ever holds a full API key. All record IDs, foreign keys, and epoch timestamps are `u32` across the IPC boundary to ensure safe serialization without JavaScript `BigInt` precision loss. Note that in M2, the `models` table has only the columns M2 uses (`id`, `connection_id`, `model_id`, `display_name`, `context_window`, `is_default`); model capability columns (`supports_tools`, `supports_vision`) arrive in a later migration (M4). The `settings` table arrives in M3 (`key, value` text columns, migration 2, storing recent workspaces).
+Five SQLite tables in one local file, read and written only by Rust. No table ever holds a full API key. All record IDs, foreign keys, and epoch timestamps are `u32` across the IPC boundary to ensure safe serialization without JavaScript `BigInt` precision loss. Note that in M2, the `models` table has only the columns M2 uses (`id`, `connection_id`, `model_id`, `display_name`, `context_window`, `is_default`); M4 migration 3 adds `supports_tools` (`supports_vision` waits until something uses it). The `settings` table arrives in M3 (`key, value` text columns, migration 2, storing recent workspaces).
 
 | Table | Holds | Key columns |
 | --- | --- | --- |
 | connections | One row per provider setup | id, kind (openai\_compat / anthropic / ollama), label, base\_url, key\_hint (last 4), last\_tested\_at, last\_test\_ok |
-| models | Models the user chose to show | id, connection\_id, model\_id, display\_name, context\_window, supports\_tools, supports\_vision, is\_default, hidden |
+| models | Models the user chose to show | id, connection\_id, model\_id, display\_name, context\_window, supports\_tools, is\_default, hidden |
 | conversations | One row per chat | id, title, model\_ref, system\_prompt, workspace\_path (null for plain chats), created\_at, updated\_at |
 | messages | Every message in a chat | id, conversation\_id, role, content\_parts (JSON: text; tool\_call and tool\_result from M4), model\_ref, status (complete / stopped / error), error\_kind, tokens\_in, tokens\_out, created\_at |
 | settings | App preferences | key, value (theme, default model, keep\_alive, history location, recent workspaces) |

@@ -104,7 +104,36 @@ Folder selection uses `tauri-plugin-dialog` v2:
 
 ---
 
-## 8. Threat Model & Boundaries
+## 8. Agent Tools & Terminal Security
+
+Milestone 4 introduces autonomous agent tool execution (`list_files`, `read_file`, `search`, `edit_file`, `create_file`, `run_command`) and an integrated terminal panel. The design enforces defense-in-depth across the boundary:
+
+### Approval Decided in Rust
+- **Name-based authorization:** Approval requirements are decided strictly by the tool's name in the Rust core (`tools::approvals`), never by the model, the UI, or a tool's output.
+- **No auto-approve path:** There is no auto-approve bypass in v1. Edits, file creations, and system commands must wait for explicit user approval via `answer_tool`.
+- **Atomic approval registration:** Every pending approval is registered in the core `Approvals` table before its `ChatEvent::ToolCall` event is emitted. Every call gets exactly one result.
+- **Untrusted model content:** Tool outputs and file contents returned to the model are treated as data, not instructions. Prompt injections inside repository files (e.g. `del notes.txt`) cannot skip an approval gate.
+
+### Expanded Secret File Shielding
+- **Strict filter across all tools:** The secret file filter (decision 0010) governs `list_files`, `read_file`, `search`, and `edit_file`.
+- **Shielded credential names:** `.env*`, `*.pem`, `*.key`, `*.p12`, `*.pfx`, `*.jks`, `*.keystore`, `*.tfvars`, `id_rsa*`, `id_ed25519*`, `id_ecdsa*`, `id_dsa*`, `.npmrc`, `.pypirc`, `.netrc`, `_netrc`, and `.git-credentials` are excluded from directory listings and searches, and refused on direct read.
+- **Content inspection:** Files containing PEM private key blocks (`-----BEGIN ... PRIVATE KEY-----`) are blocked from model access on read and search.
+
+### Command Runner Boundaries
+- **Folder containment:** Model commands execute with the workspace root as their current working directory (`cwd`).
+- **Standard shell invocation:** Commands run via `cmd.exe /D /S /C "<command>"` on Windows (decision 0011) and `sh -c` on Unix, with no standard input (`Stdio::null()`).
+- **Hard execution timeout:** A mandatory 120-second timeout halts runaway commands.
+- **Process tree termination:** Stopping or timing out a command kills the entire process tree (`taskkill /F /T /PID` on Windows, `kill -9 -<pgid>` on Unix), preventing orphan processes from lingering in the background.
+- **Output tail truncation:** Process output is captured safely and capped at the last 20,000 characters to prevent memory exhaustion or token overflow.
+
+### Integrated Terminal Isolation
+- **User's native shell:** The terminal runs the user's interactive shell (`powershell.exe -NoLogo` on Windows, `$SHELL` on Unix; decision 0011) in the workspace folder.
+- **Lifecycle tied to workspace:** The terminal session is terminated and cleaned up immediately when the user closes or switches the workspace folder.
+- **Zero capability expansion:** The terminal requires no new Tauri capability permissions. The xterm CSS is bundled locally and complies with the release CSP.
+
+---
+
+## 9. Threat Model & Boundaries
 
 **What this protects against:**
 - **Disk theft & backup leakage:** Stolen project files, SQLite database backups, or source code repositories do not expose your API keys.
