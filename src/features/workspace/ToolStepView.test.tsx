@@ -46,6 +46,21 @@ describe("ToolStepView", () => {
 
     expect(screen.queryByRole("button", { name: "Run" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Deny" })).toBeNull();
+
+    // The command stays on the card once answered and once it has run, so
+    // the history shows what ran.
+    expect(screen.getByText("npm test && del x")).toBeDefined();
+    rerender(
+      <ToolStepView
+        step={{
+          ...answeredStep,
+          outcome: { status: "command", exitCode: 1, output: "", timedOut: false },
+        }}
+        onAnswer={onAnswer}
+      />,
+    );
+    expect(screen.getByText("npm test && del x")).toBeDefined();
+    expect(screen.getByText("in C:\\projects\\demo")).toBeDefined();
   });
 
   it("command output renders as text", () => {

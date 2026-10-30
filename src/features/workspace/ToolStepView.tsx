@@ -44,7 +44,8 @@ export function ToolStepView({ step, onAnswer }: ToolStepViewProps) {
         )}
       </div>
 
-      {showApproval && step.action.tool === "runCommand" && (
+      {/* The command stays after it is answered, so the history shows what ran. */}
+      {step.action.tool === "runCommand" && (
         <div className="mt-2 space-y-2">
           <div className="text-xs text-neutral-400">
             in {step.action.folder}
@@ -52,22 +53,24 @@ export function ToolStepView({ step, onAnswer }: ToolStepViewProps) {
           <pre className="p-2 rounded bg-neutral-950 font-mono text-xs text-neutral-200 overflow-x-auto whitespace-pre-wrap">
             {step.action.command}
           </pre>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => onAnswer?.(step.id, true)}
-              className="px-2.5 py-1 bg-green-600 hover:bg-green-500 text-white text-xs font-semibold rounded transition-colors cursor-pointer"
-            >
-              Run
-            </button>
-            <button
-              type="button"
-              onClick={() => onAnswer?.(step.id, false)}
-              className="px-2.5 py-1 bg-neutral-700 hover:bg-neutral-600 text-neutral-200 text-xs font-semibold rounded transition-colors cursor-pointer"
-            >
-              Deny
-            </button>
-          </div>
+          {showApproval && (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => onAnswer?.(step.id, true)}
+                className="px-2.5 py-1 bg-green-600 hover:bg-green-500 text-white text-xs font-semibold rounded transition-colors cursor-pointer"
+              >
+                Run
+              </button>
+              <button
+                type="button"
+                onClick={() => onAnswer?.(step.id, false)}
+                className="px-2.5 py-1 bg-neutral-700 hover:bg-neutral-600 text-neutral-200 text-xs font-semibold rounded transition-colors cursor-pointer"
+              >
+                Deny
+              </button>
+            </div>
+          )}
         </div>
       )}
 
