@@ -30,15 +30,10 @@ pub fn search(
 
     let walk = walker(&abs, None);
     for entry_res in walk {
-        let entry = entry_res.map_err(|e| WorkspaceError::Io {
-            message: e.to_string(),
-        })?;
-        if entry.depth() == 0 {
-            continue;
-        }
-
-        let file_type = entry.file_type();
-        if file_type.as_ref().is_some_and(|ft| ft.is_dir()) {
+        // An unreadable folder is skipped, not fatal.
+        let Ok(entry) = entry_res else { continue };
+        // Regular files only: a link named notes.txt may point at .env or outside the folder.
+        if !entry.file_type().is_some_and(|ft| ft.is_file()) {
             continue;
         }
 

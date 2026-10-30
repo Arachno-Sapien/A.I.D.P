@@ -270,9 +270,8 @@ pub fn list_tree(
     let mut has_more = false;
 
     for entry_res in walk {
-        let entry = entry_res.map_err(|e| WorkspaceError::Io {
-            message: e.to_string(),
-        })?;
+        // An unreadable folder is skipped, not fatal.
+        let Ok(entry) = entry_res else { continue };
         if entry.depth() == 0 {
             continue;
         }

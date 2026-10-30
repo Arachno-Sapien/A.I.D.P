@@ -395,6 +395,29 @@ fn resolve_new_table() {
     let outside = TempDir::new();
     link_dir(&root.join("out"), outside.path());
     assert_eq!(resolve_new(root, "out/new.txt"), Err(WorkspaceError::OutsideFolder));
+
+    // A file that exists outside must not answer "already exists": that would tell the model it is there.
+    fs::write(outside.path().join("there.txt"), "x").unwrap();
+    assert_eq!(resolve_new(root, "out/there.txt"), Err(WorkspaceError::OutsideFolder));
+}
+
+#[test]
+fn search_skips_links() {
+    let temp = TempDir::new();
+    let root = temp.path();
+    let outside = TempDir::new();
+    fs::write(outside.path().join("creds.txt"), "needle-outside").unwrap();
+    fs::write(root.join(".env"), "needle-env").unwrap();
+
+    // Windows needs Developer Mode or admin for file links; skip the check without them.
+    if !link_file(&root.join("notes.txt"), &root.join(".env"))
+        || !link_file(&root.join("out.txt"), &outside.path().join("creds.txt"))
+    {
+        return;
+    }
+
+    let (matches, _) = search(root, "", "needle", 100).unwrap();
+    assert!(matches.is_empty(), "search read through a link: {matches:?}");
 }
 
 #[test]

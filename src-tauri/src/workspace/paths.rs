@@ -70,12 +70,12 @@ pub fn resolve_new(root: &Path, rel: &str) -> Result<PathBuf, WorkspaceError> {
         }
     }
 
-    if std::fs::symlink_metadata(&candidate).is_ok() {
-        return Err(WorkspaceError::AlreadyExists);
-    }
-
-    let mut current = candidate.as_path();
-    let mut missing_suffix = Vec::new();
+    // Check the folder boundary before existence, so "already exists" never
+    // reveals a file outside the folder through a link.
+    let Some(mut current) = candidate.parent() else {
+        return Err(WorkspaceError::OutsideFolder);
+    };
+    let mut missing_suffix: Vec<&std::ffi::OsStr> = candidate.file_name().into_iter().collect();
 
     while std::fs::symlink_metadata(current).is_err() {
         if let Some(file_name) = current.file_name() {
@@ -98,6 +98,10 @@ pub fn resolve_new(root: &Path, rel: &str) -> Result<PathBuf, WorkspaceError> {
 
     if !canon_ancestor.starts_with(&canon_root) {
         return Err(WorkspaceError::OutsideFolder);
+    }
+
+    if std::fs::symlink_metadata(&candidate).is_ok() {
+        return Err(WorkspaceError::AlreadyExists);
     }
 
     let mut result = canon_ancestor;

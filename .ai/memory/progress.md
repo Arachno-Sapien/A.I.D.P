@@ -39,10 +39,10 @@ Carry-overs from M3 are in `docs/phases/M3.md` under "What's left": M4 reuses `w
 
 ## In progress
 
-Task: M4 Review of Tasks 1 to 7 (Backend agent tools and loop)
-Tool + model: Antigravity (Gemini 3.8 Flash)
+Task: Fix the review findings on M4 Tasks 1 to 7 (search follows links, Stop blocked by background processes, one-line read, Anthropic panic, create_file names, blank arguments, unreadable entries)
+Tool + model: Claude Code (Opus 5.5)
 Date: 2026-10-30
-Next step: Human / Claude Code review of Tasks 1 to 7 before starting Task 8 (Agent mode in the AI panel).
+Next step: `workspace/search.rs`: skip links and unreadable entries (test `search_skips_links`), then the file tools, the command runner and the adapters.
 
 ## Next 3 tasks
 
