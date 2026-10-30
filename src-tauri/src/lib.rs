@@ -53,6 +53,10 @@ fn specta_builder() -> Builder<tauri::Wry> {
         commands::workspace::write_file,
         commands::chat::run_agent,
         commands::tools::answer_tool,
+        commands::terminal::terminal_open,
+        commands::terminal::terminal_write,
+        commands::terminal::terminal_resize,
+        commands::terminal::terminal_close,
         close_guard::set_unsaved,
         close_guard::watch_close,
         close_guard::quit_app,
@@ -86,6 +90,7 @@ pub fn run() -> tauri::Result<()> {
         .manage(commands::chat::ChatState::default())
         .manage(workspace::WorkspaceState::default())
         .manage(tools::approvals::Approvals::default())
+        .manage(tools::pty::TerminalState::default())
         .manage(close_guard::CloseGuard::default())
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {

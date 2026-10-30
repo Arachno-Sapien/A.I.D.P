@@ -39,12 +39,13 @@ Carry-overs from M3 are in `docs/phases/M3.md` under "What's left": M4 reuses `w
 
 ## In progress
 
-Task 8 completed by Antigravity (Gemini 2.5 Pro), 2026-10-30.
-Next step: M4 Task 9 - Terminal backend (portable-pty).
+Task 9 completed by Antigravity (Gemini 2.5 Pro), 2026-10-30.
+Next step: M4 Task 10 - Terminal panel (@xterm/xterm, @xterm/addon-fit).
 
 ## Next 3 tasks
 
-1. M4 Tasks 9 and 10: terminal backend and panel.
+1. M4 Task 10: terminal panel (@xterm/xterm, @xterm/addon-fit).
 2. M4 Task 11: docs and phase doc.
+3. M4 Task 12: live check and close.
 3. M4 Task 12: live check and close.
 3. M4 Tasks 11 and 12: docs, live check, close.

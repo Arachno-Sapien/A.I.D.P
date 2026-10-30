@@ -7,6 +7,7 @@ use std::time::Duration;
 pub mod agent;
 pub mod approvals;
 pub mod command;
+pub mod pty;
 pub mod run;
 
 pub const COMMAND_TIMEOUT: Duration = Duration::from_secs(120);

@@ -24,6 +24,10 @@ export const commands = {
 	writeFile: (req: WriteFile_Deserialize) => typedError<string, WorkspaceError>(__TAURI_INVOKE("write_file", { req })),
 	runAgent: (connectionId: number, modelId: string, messages: ChatMessage[], onEvent: Channel<ChatEvent_Deserialize>) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("run_agent", { connectionId, modelId, messages, onEvent })),
 	answerTool: (id: number, approve: boolean) => __TAURI_INVOKE<boolean>("answer_tool", { id, approve }),
+	terminalOpen: (cols: number, rows: number, onEvent: Channel<TerminalEvent>) => typedError<null, WorkspaceError>(__TAURI_INVOKE("terminal_open", { cols, rows, onEvent })),
+	terminalWrite: (data: string) => typedError<null, WorkspaceError>(__TAURI_INVOKE("terminal_write", { data })),
+	terminalResize: (cols: number, rows: number) => typedError<null, WorkspaceError>(__TAURI_INVOKE("terminal_resize", { cols, rows })),
+	terminalClose: () => typedError<null, WorkspaceError>(__TAURI_INVOKE("terminal_close")),
 	setUnsaved: (unsaved: boolean) => __TAURI_INVOKE<void>("set_unsaved", { unsaved }),
 	watchClose: (onClose: Channel<boolean>) => __TAURI_INVOKE<void>("watch_close", { onClose }),
 	quitApp: () => __TAURI_INVOKE<void>("quit_app"),
@@ -166,6 +170,8 @@ export type ProviderError_Deserialize = { kind: "invalidKey" } | { kind: "rateLi
 export type ProviderError_Serialize = { kind: "invalidKey" } | { kind: "rateLimited"; retryAfterSecs: number | null } | { kind: "modelNotFound" } | { kind: "contextTooLong" } | { kind: "offline" } | { kind: "provider"; message: string } | { kind: "cancelled" };
 
 export type Role = "system" | "user" | "assistant";
+
+export type TerminalEvent = { event: "output"; data: string } | { event: "exit" };
 
 export type ToolAction = { tool: "listFiles"; path: string } | { tool: "readFile"; path: string } | { tool: "search"; query: string; path: string } | { tool: "editFile"; path: string; before: string; after: string } | { tool: "createFile"; path: string; text: string } | { tool: "runCommand"; command: string; folder: string } | { tool: "invalid"; name: string };
 

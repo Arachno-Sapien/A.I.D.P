@@ -124,4 +124,32 @@ describe("generated IPC bindings", () => {
       approve: true,
     });
   });
+
+  it("terminalOpen sends cols, rows, and onEvent", async () => {
+    const channel = new Channel();
+    await commands.terminalOpen(80, 24, channel as any);
+    expect(invoke).toHaveBeenCalledWith("terminal_open", {
+      cols: 80,
+      rows: 24,
+      onEvent: channel,
+    });
+  });
+
+  it("terminalWrite sends data", async () => {
+    await commands.terminalWrite("ls\n");
+    expect(invoke).toHaveBeenCalledWith("terminal_write", { data: "ls\n" });
+  });
+
+  it("terminalResize sends cols and rows", async () => {
+    await commands.terminalResize(100, 30);
+    expect(invoke).toHaveBeenCalledWith("terminal_resize", {
+      cols: 100,
+      rows: 30,
+    });
+  });
+
+  it("terminalClose calls terminal_close", async () => {
+    await commands.terminalClose();
+    expect(invoke).toHaveBeenCalledWith("terminal_close");
+  });
 });
