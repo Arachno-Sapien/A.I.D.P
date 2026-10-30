@@ -15,6 +15,7 @@ import {
   type SelectionContext,
 } from "./context";
 import { useWorkspaceStore } from "./store";
+import { ToolStepView } from "./ToolStepView";
 
 export interface AiPanelProps {
   onApply?: (code: string, language: string, message: UiMessage) => void;
@@ -22,14 +23,35 @@ export interface AiPanelProps {
 
 export function AiPanel({ onApply }: AiPanelProps) {
   const { tabs, active, selection, propose } = useWorkspaceStore();
-  const { messages, streaming, send, stop } = useWorkspaceChatStore();
-  const { selected } = useModelsStore();
+  const { messages, streaming, send, stop, answer } = useWorkspaceChatStore();
+  const { chatModels, selected } = useModelsStore();
 
   const [fileRemoved, setFileRemoved] = useState<Record<string, boolean>>({});
   const [fileAdded, setFileAdded] = useState<Record<string, boolean>>({});
   const [selectionRemoved, setSelectionRemoved] = useState<
     Record<string, boolean>
   >({});
+
+  const currentModel = selected
+    ? chatModels.find(
+        (m) =>
+          m.connectionId === selected.connectionId &&
+          m.modelId === selected.modelId,
+      )
+    : null;
+  const supportsTools = currentModel?.supportsTools ?? null;
+
+  const modelKey = selected ? `${selected.connectionId}:${selected.modelId}` : "";
+  const [lastModelKey, setLastModelKey] = useState(modelKey);
+  const [userAgentOn, setUserAgentOn] = useState<boolean | null>(null);
+
+  if (modelKey !== lastModelKey) {
+    setLastModelKey(modelKey);
+    setUserAgentOn(null);
+  }
+
+  const isAgentDisabled = supportsTools === false;
+  const isAgent = isAgentDisabled ? false : (userAgentOn ?? (supportsTools === true));
 
   const activeTab = tabs.find((t) => t.path === active);
 
@@ -122,9 +144,10 @@ export function AiPanel({ onApply }: AiPanelProps) {
 
     const extra: SendExtra = {
       content,
-      system: WORKSPACE_SYSTEM,
+      system: isAgent ? undefined : WORKSPACE_SYSTEM,
       chips: chipLabels.length > 0 ? chipLabels : undefined,
       target,
+      agent: isAgent ? true : undefined,
     };
 
     await send(question, selected, extra);
@@ -140,7 +163,27 @@ export function AiPanel({ onApply }: AiPanelProps) {
 
   return (
     <div className="flex flex-col h-full bg-neutral-900/30 border-l border-neutral-800 text-neutral-100">
-      <ModelPicker />
+      <ModelPicker>
+        <label
+          className={`flex items-center gap-1.5 text-xs select-none ${
+            isAgentDisabled
+              ? "text-neutral-500 cursor-not-allowed"
+              : "text-neutral-300 cursor-pointer"
+          }`}
+          title={isAgentDisabled ? "This model can't use tools" : undefined}
+        >
+          <input
+            type="checkbox"
+            aria-label="Agent"
+            checked={isAgent}
+            disabled={isAgentDisabled}
+            title={isAgentDisabled ? "This model can't use tools" : undefined}
+            onChange={(e) => setUserAgentOn(e.target.checked)}
+            className="rounded bg-neutral-800 border-neutral-700 text-neutral-100 focus:ring-0 focus:ring-offset-0 cursor-pointer disabled:cursor-not-allowed"
+          />
+          <span className="font-medium">Agent</span>
+        </label>
+      </ModelPicker>
 
       {/* Chips row */}
       {activeTab && (
@@ -214,7 +257,16 @@ export function AiPanel({ onApply }: AiPanelProps) {
       )}
 
       {/* Message list */}
-      <MessageList messages={messages} onApply={handleApply} />
+      <MessageList
+        messages={messages}
+        onApply={handleApply}
+        renderStep={(step) => (
+          <ToolStepView
+            step={step}
+            onAnswer={(id, approve) => void answer(id, approve)}
+          />
+        )}
+      />
 
       {/* Composer */}
       <Composer

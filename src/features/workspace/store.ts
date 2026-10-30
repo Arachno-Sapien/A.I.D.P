@@ -30,6 +30,7 @@ export interface Proposal {
   path: string;
   original: string;
   proposed: string;
+  toolId?: number;
 }
 
 export type DirtyPromptAction =
@@ -74,8 +75,15 @@ export interface WorkspaceStore {
   setActive(path: string): void;
   save(path: string, options?: { overwrite?: boolean }): Promise<void>;
   reload(path: string): Promise<void>;
+  reloadIfClean(path: string): Promise<void>;
   closeTab(path: string): void;
 
+  showToolProposal(
+    toolId: number,
+    path: string,
+    original: string,
+    proposed: string,
+  ): void;
   propose(target: ApplyTarget, code: string): Promise<void>;
   acceptProposal(): Promise<void>;
   confirmGit(): Promise<void>;
@@ -159,6 +167,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   },
 
   forceOpenFolder: async () => {
+    await commands.stopReply("workspace");
     const res = await commands.openFolder();
     if (res.status === "ok") {
       if (res.data === null) {
@@ -186,6 +195,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   },
 
   forceOpenRecent: async (path: string) => {
+    await commands.stopReply("workspace");
     const res = await commands.openRecent(path);
     if (res.status === "ok") {
       buffers.clear();
@@ -211,6 +221,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   },
 
   forceCloseFolder: async () => {
+    await commands.stopReply("workspace");
     await commands.closeFolder();
     buffers.clear();
     set({ info: null, ...folderReset });
@@ -396,6 +407,14 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
     }
   },
 
+  reloadIfClean: async (path: string) => {
+    const tab = get().tabs.find((t) => t.path === path);
+    if (!tab || tab.dirty) {
+      return;
+    }
+    await get().reload(path);
+  },
+
   closeTab: (path: string) => {
     buffers.remove(path);
     const remaining = get().tabs.filter((t) => t.path !== path);
@@ -412,7 +431,24 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
     syncUnsaved(remaining);
   },
 
+  showToolProposal: (
+    toolId: number,
+    path: string,
+    original: string,
+    proposed: string,
+  ) => {
+    set({
+      proposal: { toolId, path, original, proposed },
+      error: null,
+    });
+  },
+
   propose: async (target: ApplyTarget, code: string) => {
+    if (get().proposal?.toolId !== undefined) {
+      set({ error: "Answer the proposed change first." });
+      return;
+    }
+
     let tab = get().tabs.find((t) => t.path === target.path);
     if (!tab) {
       await get().openFile(target.path);
@@ -458,6 +494,12 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
 
     if (info && !info.isGit && !gitWarned) {
       set({ needsGitConfirm: true });
+      return;
+    }
+
+    if (proposal.toolId !== undefined) {
+      await commands.answerTool(proposal.toolId, true);
+      set({ proposal: null, needsGitConfirm: false, error: null });
       return;
     }
 
@@ -508,6 +550,10 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   },
 
   rejectProposal: () => {
+    const { proposal } = get();
+    if (proposal?.toolId !== undefined) {
+      void commands.answerTool(proposal.toolId, false);
+    }
     set({ proposal: null, needsGitConfirm: false });
   },
 

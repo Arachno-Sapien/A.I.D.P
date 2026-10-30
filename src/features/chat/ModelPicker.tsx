@@ -1,6 +1,11 @@
+import type { ReactNode } from "react";
 import { useModelsStore } from "../models/store";
 
-export function ModelPicker() {
+export interface ModelPickerProps {
+  children?: ReactNode;
+}
+
+export function ModelPicker({ children }: ModelPickerProps = {}) {
   const { chatModels, selected, loaded, select } = useModelsStore();
 
   if (!loaded || chatModels.length === 0) {
@@ -50,6 +55,7 @@ export function ModelPicker() {
           })}
         </select>
       </div>
+      {children}
     </div>
   );
 }

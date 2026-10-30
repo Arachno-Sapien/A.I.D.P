@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../../lib/bindings", () => ({
   commands: {
     sendMessage: vi.fn().mockResolvedValue({ status: "ok", data: null }),
+    runAgent: vi.fn().mockResolvedValue({ status: "ok", data: null }),
+    answerTool: vi.fn().mockResolvedValue(true),
     stopReply: vi.fn(),
   },
 }));
@@ -209,5 +211,147 @@ describe("useChatStore", () => {
 
     await useWsChatStore.getState().stop();
     expect(commands.stopReply).toHaveBeenCalledWith("workspace");
+  });
+
+  it("agent send calls runAgent", async () => {
+    await useChatStore.getState().send(
+      "agent task",
+      { connectionId: 1, modelId: "m1" },
+      { agent: true, system: "SHOULD NOT BE ADDED" },
+    );
+
+    expect(commands.runAgent).toHaveBeenCalledWith(
+      1,
+      "m1",
+      [{ role: "user", content: "agent task" }],
+      expect.anything(),
+    );
+    expect(commands.sendMessage).not.toHaveBeenCalled();
+
+    const state = useChatStore.getState();
+    const assistant = state.messages[1];
+    expect(assistant.parts).toEqual([]);
+  });
+
+  it("tool events build parts in order", () => {
+    useChatStore.setState({
+      messages: [
+        {
+          id: "1",
+          role: "assistant",
+          text: "",
+          parts: [],
+          status: "streaming",
+        },
+      ],
+      streaming: true,
+    });
+
+    useChatStore.getState().applyEvent("1", { event: "delta", data: "First text. " });
+    useChatStore.getState().applyEvent("1", {
+      event: "toolCall",
+      data: {
+        id: 42,
+        action: { tool: "readFile", path: "src/main.rs" },
+        needsAnswer: false,
+      },
+    });
+    useChatStore.getState().applyEvent("1", {
+      event: "toolResult",
+      data: {
+        id: 42,
+        outcome: { status: "ok", summary: "read 10 lines" },
+      },
+    });
+    useChatStore.getState().applyEvent("1", { event: "delta", data: "Second text." });
+
+    const msg = useChatStore.getState().messages[0];
+    expect(msg.text).toBe("First text. Second text.");
+    expect(msg.parts).toEqual([
+      { kind: "text", text: "First text. " },
+      {
+        kind: "step",
+        step: {
+          id: 42,
+          action: { tool: "readFile", path: "src/main.rs" },
+          needsAnswer: false,
+          outcome: { status: "ok", summary: "read 10 lines" },
+        },
+      },
+      { kind: "text", text: "Second text." },
+    ]);
+  });
+
+  it("unfinished steps end stopped", () => {
+    useChatStore.setState({
+      messages: [
+        {
+          id: "1",
+          role: "assistant",
+          text: "",
+          parts: [],
+          status: "streaming",
+        },
+      ],
+      streaming: true,
+    });
+
+    useChatStore.getState().applyEvent("1", {
+      event: "toolCall",
+      data: {
+        id: 10,
+        action: { tool: "runCommand", command: "del x", folder: "C:\\test" },
+        needsAnswer: true,
+      },
+    });
+
+    useChatStore.getState().applyEvent("1", {
+      event: "error",
+      data: { kind: "cancelled" },
+    });
+
+    const msg = useChatStore.getState().messages[0];
+    expect(msg.status).toBe("stopped");
+    expect(msg.parts).toEqual([
+      {
+        kind: "step",
+        step: {
+          id: 10,
+          action: { tool: "runCommand", command: "del x", folder: "C:\\test" },
+          needsAnswer: true,
+          outcome: { status: "stopped" },
+        },
+      },
+    ]);
+  });
+
+  it("answer marks the step and calls answerTool", async () => {
+    useChatStore.setState({
+      messages: [
+        {
+          id: "1",
+          role: "assistant",
+          text: "",
+          parts: [
+            {
+              kind: "step",
+              step: {
+                id: 3,
+                action: { tool: "runCommand", command: "npm test", folder: "C:\\test" },
+                needsAnswer: true,
+              },
+            },
+          ],
+          status: "streaming",
+        },
+      ],
+      streaming: true,
+    });
+
+    await useChatStore.getState().answer(3, true);
+
+    expect(commands.answerTool).toHaveBeenCalledWith(3, true);
+    const step = (useChatStore.getState().messages[0].parts?.[0] as any)?.step;
+    expect(step.answered).toBe(true);
   });
 });

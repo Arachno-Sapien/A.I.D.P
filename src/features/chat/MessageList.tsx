@@ -1,15 +1,20 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { appErrorText } from "./appErrorText";
 import { errorText } from "./errorText";
 import { Markdown } from "./Markdown";
-import type { UiMessage } from "./store";
+import type { ToolStep, UiMessage } from "./store";
 
 export interface MessageListProps {
   messages: UiMessage[];
   onApply?: (code: string, language: string, message: UiMessage) => void;
+  renderStep?: (step: ToolStep) => ReactNode;
 }
 
-export function MessageList({ messages, onApply }: MessageListProps) {
+export function MessageList({
+  messages,
+  onApply,
+  renderStep,
+}: MessageListProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -58,15 +63,34 @@ export function MessageList({ messages, onApply }: MessageListProps) {
               </div>
             ) : (
               <>
-                <Markdown
-                  text={msg.text}
-                  applyDisabled={msg.status === "streaming"}
-                  onApply={
-                    onApply
-                      ? (code, language) => onApply(code, language, msg)
-                      : undefined
-                  }
-                />
+                {msg.parts && msg.parts.length > 0 ? (
+                  msg.parts.map((part, idx) =>
+                    part.kind === "text" ? (
+                      <Markdown
+                        key={idx}
+                        text={part.text}
+                        applyDisabled={msg.status === "streaming"}
+                        onApply={
+                          onApply
+                            ? (code, language) => onApply(code, language, msg)
+                            : undefined
+                        }
+                      />
+                    ) : (
+                      <div key={idx}>{renderStep?.(part.step)}</div>
+                    ),
+                  )
+                ) : (
+                  <Markdown
+                    text={msg.text}
+                    applyDisabled={msg.status === "streaming"}
+                    onApply={
+                      onApply
+                        ? (code, language) => onApply(code, language, msg)
+                        : undefined
+                    }
+                  />
+                )}
                 {msg.status === "streaming" && (
                   <span className="inline-block w-2 h-4 bg-neutral-400 animate-pulse ml-1 align-middle" />
                 )}

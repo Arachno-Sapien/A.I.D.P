@@ -10,6 +10,8 @@ vi.mock("../../lib/bindings", () => ({
     readFile: vi.fn(),
     writeFile: vi.fn(),
     setUnsaved: vi.fn().mockResolvedValue(undefined),
+    answerTool: vi.fn().mockResolvedValue(true),
+    stopReply: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
@@ -565,6 +567,78 @@ describe("useWorkspaceStore", () => {
     await useWorkspaceStore.getState().openFolder();
 
     expect(buffers.get("a.ts")).toBeUndefined();
+  });
+
+  it("a tool edit proposal never writes from the UI", async () => {
+    useWorkspaceStore.getState().showToolProposal(42, "a.ts", "before", "after");
+
+    expect(useWorkspaceStore.getState().proposal).toEqual({
+      toolId: 42,
+      path: "a.ts",
+      original: "before",
+      proposed: "after",
+    });
+
+    await useWorkspaceStore.getState().acceptProposal();
+
+    expect(commands.answerTool).toHaveBeenCalledWith(42, true);
+    expect(commands.writeFile).not.toHaveBeenCalled();
+    expect(useWorkspaceStore.getState().proposal).toBeNull();
+
+    // Now test reject
+    useWorkspaceStore.getState().showToolProposal(43, "b.ts", "orig", "prop");
+    useWorkspaceStore.getState().rejectProposal();
+
+    expect(commands.answerTool).toHaveBeenCalledWith(43, false);
+    expect(commands.writeFile).not.toHaveBeenCalled();
+    expect(useWorkspaceStore.getState().proposal).toBeNull();
+  });
+
+  it("asks once without git before a tool edit", async () => {
+    useWorkspaceStore.setState({
+      info: { name: "no-git", path: "/test", isGit: false },
+      gitWarned: false,
+    });
+
+    useWorkspaceStore.getState().showToolProposal(99, "a.ts", "b", "a");
+
+    await useWorkspaceStore.getState().acceptProposal();
+
+    expect(useWorkspaceStore.getState().needsGitConfirm).toBe(true);
+    expect(commands.answerTool).not.toHaveBeenCalled();
+
+    await useWorkspaceStore.getState().confirmGit();
+
+    expect(commands.answerTool).toHaveBeenCalledWith(99, true);
+    expect(useWorkspaceStore.getState().needsGitConfirm).toBe(false);
+    expect(useWorkspaceStore.getState().gitWarned).toBe(true);
+  });
+
+  it("Apply waits for a pending tool proposal", async () => {
+    buffers.open("a.ts", createState("old", "a.ts"));
+    useWorkspaceStore.setState({
+      tabs: [tab("a.ts", false)],
+    });
+
+    useWorkspaceStore.getState().showToolProposal(77, "b.ts", "x", "y");
+
+    await useWorkspaceStore
+      .getState()
+      .propose({ path: "a.ts", selection: null }, "new code");
+
+    expect(useWorkspaceStore.getState().error).toBe("Answer the proposed change first.");
+    expect(useWorkspaceStore.getState().proposal?.toolId).toBe(77);
+  });
+
+  it("switching folders stops the agent", async () => {
+    vi.mocked(commands.openFolder).mockResolvedValueOnce({
+      status: "ok",
+      data: { name: "f", path: "/f", isGit: true },
+    });
+
+    await useWorkspaceStore.getState().forceOpenFolder();
+
+    expect(commands.stopReply).toHaveBeenCalledWith("workspace");
   });
 });
 

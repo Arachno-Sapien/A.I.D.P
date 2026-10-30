@@ -16,6 +16,8 @@ vi.mock("../../lib/bindings", () => ({
     sendMessage: vi.fn(),
     stopReply: vi.fn(),
     listChatModels: vi.fn(),
+    runAgent: vi.fn().mockResolvedValue({ status: "ok", data: null }),
+    answerTool: vi.fn().mockResolvedValue(true),
   },
 }));
 
@@ -169,5 +171,107 @@ describe("AiPanel", () => {
     fireEvent.click(stopBtn);
 
     expect(commands.stopReply).toHaveBeenCalledWith("workspace");
+  });
+
+  it("agent switch follows the model", async () => {
+    // 1. Model with supportsTools: true -> agent switch is checked
+    vi.mocked(useModelsStore).mockReturnValue({
+      chatModels: [
+        {
+          connectionId: 1,
+          modelId: "tool-model",
+          displayName: "Tool Model",
+          connectionLabel: "Provider",
+          supportsTools: true,
+        },
+      ],
+      selected: { connectionId: 1, modelId: "tool-model" },
+      loaded: true,
+      select: vi.fn(),
+      load: vi.fn(),
+    } as any);
+
+    render(<AiPanel />);
+    const agentCheckbox = screen.getByRole("checkbox", { name: /agent/i });
+    expect((agentCheckbox as HTMLInputElement).checked).toBe(true);
+    expect((agentCheckbox as HTMLInputElement).disabled).toBe(false);
+
+    // Sending with agent ON calls runAgent and no system message
+    fireEvent.change(screen.getByRole("textbox"), {
+      target: { value: "Run agent task" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /send/i }));
+
+    expect(commands.runAgent).toHaveBeenCalled();
+    const runAgentMsgs = vi.mocked(commands.runAgent).mock.calls[0][2];
+    expect(runAgentMsgs.some((m) => m.role === "system")).toBe(false);
+    expect(commands.sendMessage).not.toHaveBeenCalled();
+
+    // 2. Model with supportsTools: null -> agent switch is off (unchecked)
+    cleanup();
+    useWorkspaceChatStore.getState().clear();
+    vi.mocked(useModelsStore).mockReturnValue({
+      chatModels: [
+        {
+          connectionId: 1,
+          modelId: "unknown-model",
+          displayName: "Unknown Model",
+          connectionLabel: "Provider",
+          supportsTools: null,
+        },
+      ],
+      selected: { connectionId: 1, modelId: "unknown-model" },
+      loaded: true,
+      select: vi.fn(),
+      load: vi.fn(),
+    } as any);
+
+    render(<AiPanel />);
+    const unknownCheckbox = screen.getByRole("checkbox", { name: /agent/i });
+    expect((unknownCheckbox as HTMLInputElement).checked).toBe(false);
+    expect((unknownCheckbox as HTMLInputElement).disabled).toBe(false);
+
+    // When off, sending calls sendMessage with WORKSPACE_SYSTEM
+    fireEvent.change(screen.getByRole("textbox"), {
+      target: { value: "Standard question" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /send/i }));
+
+    expect(commands.sendMessage).toHaveBeenCalledWith(
+      "workspace",
+      1,
+      "unknown-model",
+      expect.arrayContaining([
+        { role: "system", content: WORKSPACE_SYSTEM },
+      ]),
+      expect.anything(),
+    );
+
+    // 3. Model with supportsTools: false -> agent switch is disabled with title
+    cleanup();
+    vi.mocked(useModelsStore).mockReturnValue({
+      chatModels: [
+        {
+          connectionId: 1,
+          modelId: "no-tool-model",
+          displayName: "No Tool Model",
+          connectionLabel: "Provider",
+          supportsTools: false,
+        },
+      ],
+      selected: { connectionId: 1, modelId: "no-tool-model" },
+      loaded: true,
+      select: vi.fn(),
+      load: vi.fn(),
+    } as any);
+
+    render(<AiPanel />);
+    const disabledCheckbox = screen.getByRole("checkbox", { name: /agent/i });
+    expect((disabledCheckbox as HTMLInputElement).checked).toBe(false);
+    expect((disabledCheckbox as HTMLInputElement).disabled).toBe(true);
+    expect(
+      disabledCheckbox.getAttribute("title") ||
+        disabledCheckbox.parentElement?.getAttribute("title"),
+    ).toBe("This model can't use tools");
   });
 });
