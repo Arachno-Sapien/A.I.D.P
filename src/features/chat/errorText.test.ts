@@ -34,7 +34,7 @@ describe("errorText", () => {
 
   it("formats offline", () => {
     expect(errorText({ kind: "offline" })).toBe(
-      "Can't reach the provider. Check your internet connection.",
+      "Can't reach the provider. Check your internet connection, or start Ollama on the Models page.",
     );
   });
 

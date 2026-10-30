@@ -15,6 +15,16 @@ export interface SelectedModel {
   modelId: string;
 }
 
+export function parseModelKey(value: string): SelectedModel | null {
+  const colonIndex = value.indexOf(":");
+  if (colonIndex === -1) return null;
+  const connStr = value.slice(0, colonIndex);
+  const modelId = value.slice(colonIndex + 1);
+  const connectionId = Number(connStr);
+  if (!Number.isInteger(connectionId) || !modelId) return null;
+  return { connectionId, modelId };
+}
+
 export interface PullProgress {
   name: string;
   status: string;

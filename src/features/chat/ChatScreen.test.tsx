@@ -31,6 +31,15 @@ describe("ChatScreen", () => {
       messages: [],
       streaming: false,
     });
+    useModelsStore.setState({
+      connections: [],
+      chatModels: [],
+      selected: null,
+      loaded: false,
+      loadError: null,
+      ollama: null,
+      localModels: [],
+    });
   });
 
   afterEach(() => {
@@ -123,5 +132,36 @@ describe("ChatScreen", () => {
       screen.getByText("Couldn't read or write the local database: disk error"),
     ).toBeDefined();
     expect(screen.queryByText("Add a model to start chatting")).toBeNull();
+  });
+
+  it("suggests a local download", () => {
+    useModelsStore.setState({
+      connections: [
+        {
+          id: 3,
+          kind: "ollama",
+          label: "Ollama (local)",
+          baseUrl: "http://127.0.0.1:11434",
+          keyHint: "",
+          lastTestedAt: 100,
+          lastTestOk: true,
+        },
+      ],
+      chatModels: [],
+      selected: null,
+      loaded: true,
+      ollama: { state: "running", version: "0.5.0" },
+    });
+
+    const onNavigate = vi.fn();
+    render(
+      <ChatScreen onStartAdding={vi.fn()} onNavigateToModels={onNavigate} />,
+    );
+
+    expect(screen.getByText("Download a local model")).toBeDefined();
+    const btn = screen.getByRole("button", { name: "Go to Models" });
+    expect(btn).toBeDefined();
+    btn.click();
+    expect(onNavigate).toHaveBeenCalled();
   });
 });

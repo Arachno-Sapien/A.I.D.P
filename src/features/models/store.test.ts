@@ -9,7 +9,7 @@ vi.mock("../../lib/bindings", () => ({
 }));
 
 import { commands } from "../../lib/bindings";
-import { useModelsStore } from "./store";
+import { parseModelKey, useModelsStore } from "./store";
 
 describe("useModelsStore", () => {
   beforeEach(() => {
@@ -159,5 +159,15 @@ describe("useModelsStore", () => {
     expect(state.loadError).toBe(
       "Couldn't read or write the local database: disk read error",
     );
+  });
+
+  it("parses keys on the first colon", () => {
+    expect(parseModelKey("3:qwen2.5-coder:1.5b")).toEqual({
+      connectionId: 3,
+      modelId: "qwen2.5-coder:1.5b",
+    });
+    expect(parseModelKey("x:y")).toBeNull();
+    expect(parseModelKey("3")).toBeNull();
+    expect(parseModelKey("")).toBeNull();
   });
 });

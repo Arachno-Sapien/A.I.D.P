@@ -19,6 +19,10 @@ vi.mock("./lib/bindings", () => ({
     }),
     deleteConversation: vi.fn().mockResolvedValue({ status: "ok", data: null }),
     appendMessage: vi.fn().mockResolvedValue({ status: "ok", data: 1 }),
+    ollamaStatus: vi.fn().mockResolvedValue({
+      status: "ok",
+      data: { state: "stopped" },
+    }),
   },
 }));
 

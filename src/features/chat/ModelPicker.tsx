@@ -1,12 +1,12 @@
 import type { ReactNode } from "react";
-import { useModelsStore } from "../models/store";
+import { parseModelKey, useModelsStore } from "../models/store";
 
 export interface ModelPickerProps {
   children?: ReactNode;
 }
 
 export function ModelPicker({ children }: ModelPickerProps = {}) {
-  const { chatModels, selected, loaded, select } = useModelsStore();
+  const { chatModels, selected, loaded, select, ollama } = useModelsStore();
 
   if (!loaded || chatModels.length === 0) {
     return null;
@@ -16,8 +16,13 @@ export function ModelPicker({ children }: ModelPickerProps = {}) {
     ? `${selected.connectionId}:${selected.modelId}`
     : "";
 
-  const uniqueConnectionIds = Array.from(
-    new Set(chatModels.map((m) => m.connectionId)),
+  const isOllamaRunning = ollama?.state === "running";
+
+  const cloudModels = chatModels.filter((m) => !m.isLocal);
+  const localModels = chatModels.filter((m) => m.isLocal);
+
+  const uniqueCloudConnectionIds = Array.from(
+    new Set(cloudModels.map((m) => m.connectionId)),
   );
 
   return (
@@ -28,15 +33,15 @@ export function ModelPicker({ children }: ModelPickerProps = {}) {
           aria-label="Model"
           value={selectedValue}
           onChange={(e) => {
-            const [connId, modId] = e.target.value.split(":");
-            if (connId && modId) {
-              select({ connectionId: Number(connId), modelId: modId });
+            const parsed = parseModelKey(e.target.value);
+            if (parsed) {
+              void select(parsed);
             }
           }}
           className="bg-neutral-800 border border-neutral-700/80 rounded px-2.5 py-1 text-xs text-neutral-100 focus:outline-none focus:border-neutral-600 cursor-pointer"
         >
-          {uniqueConnectionIds.map((connId) => {
-            const groupModels = chatModels.filter(
+          {uniqueCloudConnectionIds.map((connId) => {
+            const groupModels = cloudModels.filter(
               (m) => m.connectionId === connId,
             );
             const label = groupModels[0]?.connectionLabel ?? "";
@@ -53,6 +58,21 @@ export function ModelPicker({ children }: ModelPickerProps = {}) {
               </optgroup>
             );
           })}
+          {localModels.length > 0 && (
+            <optgroup label="Local · Ollama">
+              {localModels.map((m) => (
+                <option
+                  key={`${m.connectionId}:${m.modelId}`}
+                  value={`${m.connectionId}:${m.modelId}`}
+                  disabled={!isOllamaRunning}
+                >
+                  {isOllamaRunning
+                    ? m.displayName
+                    : `${m.displayName} (Ollama stopped)`}
+                </option>
+              ))}
+            </optgroup>
+          )}
         </select>
       </div>
       {children}

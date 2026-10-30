@@ -18,7 +18,7 @@ function App() {
     useWorkspaceStore();
 
   useEffect(() => {
-    void useModelsStore.getState().refresh();
+    void useModelsStore.getState().refreshOllama();
     const channel = new Channel<boolean>();
     channel.onmessage = (closeRequested) => {
       if (closeRequested) {
