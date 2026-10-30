@@ -4,12 +4,16 @@ import { commands } from "./lib/bindings";
 import { ChatScreen } from "./features/chat/ChatScreen";
 import { ModelsScreen } from "./features/models/ModelsScreen";
 import { useModelsStore } from "./features/models/store";
+import { SettingsScreen } from "./features/settings/SettingsScreen";
+import { useSettingsStore } from "./features/settings/store";
 import { WorkspaceScreen } from "./features/workspace/WorkspaceScreen";
 import { useWorkspaceStore } from "./features/workspace/store";
 import "./App.css";
 
 function App() {
-  const [screen, setScreen] = useState<"chat" | "workspace" | "models">("chat");
+  const [screen, setScreen] = useState<
+    "chat" | "workspace" | "models" | "settings"
+  >("chat");
   const [hasVisitedWorkspace, setHasVisitedWorkspace] = useState(false);
   const [startAdding, setStartAdding] = useState(false);
   const [quitPrompt, setQuitPrompt] = useState(false);
@@ -19,6 +23,7 @@ function App() {
 
   useEffect(() => {
     void useModelsStore.getState().refreshOllama();
+    void useSettingsStore.getState().load();
     const channel = new Channel<boolean>();
     channel.onmessage = (closeRequested) => {
       if (closeRequested) {
@@ -28,7 +33,9 @@ function App() {
     void commands.watchClose(channel);
   }, []);
 
-  const handleSelectScreen = (next: "chat" | "workspace" | "models") => {
+  const handleSelectScreen = (
+    next: "chat" | "workspace" | "models" | "settings",
+  ) => {
     if (next === "workspace") {
       setHasVisitedWorkspace(true);
     }
@@ -78,6 +85,18 @@ function App() {
           >
             Models
           </button>
+          <button
+            type="button"
+            aria-current={screen === "settings" ? "page" : undefined}
+            onClick={() => handleSelectScreen("settings")}
+            className={`px-3 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer ${
+              screen === "settings"
+                ? "bg-neutral-800 text-white"
+                : "text-neutral-400 hover:text-neutral-200"
+            }`}
+          >
+            Settings
+          </button>
         </nav>
       </header>
 
@@ -107,6 +126,7 @@ function App() {
             onAddFinished={() => setStartAdding(false)}
           />
         )}
+        {screen === "settings" && <SettingsScreen />}
       </main>
 
       {/* Quit Prompt Modal */}

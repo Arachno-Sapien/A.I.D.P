@@ -84,6 +84,87 @@ pub struct ChatModel {
     pub context_tokens: Option<u32>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type, Default)]
+#[serde(rename_all = "camelCase")]
+pub enum Theme {
+    #[default]
+    Dark,
+    Light,
+    System,
+}
+
+impl Theme {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Dark => "dark",
+            Self::Light => "light",
+            Self::System => "system",
+        }
+    }
+
+    pub fn from_str_opt(s: Option<&str>) -> Self {
+        match s {
+            Some("light") => Self::Light,
+            Some("system") => Self::System,
+            _ => Self::Dark,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type, Default)]
+#[serde(rename_all = "camelCase")]
+pub enum KeepAlive {
+    #[default]
+    OllamaDefault,
+    FiveMinutes,
+    ThirtyMinutes,
+    OneHour,
+    UntilFreed,
+    AfterEachReply,
+}
+
+impl KeepAlive {
+    pub fn seconds(&self) -> Option<i32> {
+        match self {
+            Self::OllamaDefault => None,
+            Self::FiveMinutes => Some(300),
+            Self::ThirtyMinutes => Some(1800),
+            Self::OneHour => Some(3600),
+            Self::UntilFreed => Some(-1),
+            Self::AfterEachReply => Some(0),
+        }
+    }
+
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::OllamaDefault => "ollamaDefault",
+            Self::FiveMinutes => "fiveMinutes",
+            Self::ThirtyMinutes => "thirtyMinutes",
+            Self::OneHour => "oneHour",
+            Self::UntilFreed => "untilFreed",
+            Self::AfterEachReply => "afterEachReply",
+        }
+    }
+
+    pub fn from_str_opt(s: Option<&str>) -> Self {
+        match s {
+            Some("fiveMinutes") => Self::FiveMinutes,
+            Some("thirtyMinutes") => Self::ThirtyMinutes,
+            Some("oneHour") => Self::OneHour,
+            Some("untilFreed") => Self::UntilFreed,
+            Some("afterEachReply") => Self::AfterEachReply,
+            _ => Self::OllamaDefault,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct AppSettings {
+    pub theme: Theme,
+    pub keep_alive: KeepAlive,
+}
+
 #[derive(Serialize, Deserialize, Type, Clone, Debug, PartialEq)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum AppError {
@@ -436,6 +517,23 @@ impl Services {
         crate::db::settings::set(&conn, key, value).map_err(AppError::from)
     }
 
+    pub fn get_settings(&self) -> Result<AppSettings, AppError> {
+        let theme_str = self.setting("theme")?;
+        let keep_alive_str = self.setting("keep_alive")?;
+        Ok(AppSettings {
+            theme: Theme::from_str_opt(theme_str.as_deref()),
+            keep_alive: KeepAlive::from_str_opt(keep_alive_str.as_deref()),
+        })
+    }
+
+    pub fn set_theme(&self, theme: Theme) -> Result<(), AppError> {
+        self.set_setting("theme", theme.as_str())
+    }
+
+    pub fn set_keep_alive(&self, keep_alive: KeepAlive) -> Result<(), AppError> {
+        self.set_setting("keep_alive", keep_alive.as_str())
+    }
+
     pub fn ensure_ollama_connection(&self) -> Result<u32, AppError> {
         let db = self.db.lock().map_err(|e| AppError::Storage {
             message: e.to_string(),
@@ -499,9 +597,11 @@ impl Services {
             Ok((nc, cw)) => (nc.map(|v| v as u32), cw.map(|v| v as u32)),
             Err(_) => (None, None),
         };
+        let keep_alive_str = crate::db::settings::get(&db, "keep_alive").ok().flatten();
+        let keep_alive = KeepAlive::from_str_opt(keep_alive_str.as_deref()).seconds();
         LocalOptions {
             num_ctx: Some(local_num_ctx(num_ctx_val, context_window_val)),
-            keep_alive: None,
+            keep_alive,
         }
     }
 
@@ -705,5 +805,20 @@ impl Services {
             )
             .await?;
         Ok(reply.usage)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn keep_alive_seconds_table() {
+        assert_eq!(KeepAlive::OllamaDefault.seconds(), None);
+        assert_eq!(KeepAlive::FiveMinutes.seconds(), Some(300));
+        assert_eq!(KeepAlive::ThirtyMinutes.seconds(), Some(1800));
+        assert_eq!(KeepAlive::OneHour.seconds(), Some(3600));
+        assert_eq!(KeepAlive::UntilFreed.seconds(), Some(-1));
+        assert_eq!(KeepAlive::AfterEachReply.seconds(), Some(0));
     }
 }

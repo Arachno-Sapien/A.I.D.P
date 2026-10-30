@@ -42,6 +42,9 @@ export const commands = {
 	ollamaDelete: (name: string) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("ollama_delete", { name })),
 	ollamaUnload: (name: string) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("ollama_unload", { name })),
 	setModelContext: (modelId: string, numCtx: number) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("set_model_context", { modelId, numCtx })),
+	getSettings: () => typedError<AppSettings, AppError_Serialize>(__TAURI_INVOKE("get_settings")),
+	setTheme: (theme: Theme) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("set_theme", { theme })),
+	setKeepAlive: (keepAlive: KeepAlive) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("set_keep_alive", { keepAlive })),
 	setUnsaved: (unsaved: boolean) => __TAURI_INVOKE<void>("set_unsaved", { unsaved }),
 	watchClose: (onClose: Channel<boolean>) => __TAURI_INVOKE<void>("watch_close", { onClose }),
 	quitApp: () => __TAURI_INVOKE<void>("quit_app"),
@@ -65,6 +68,11 @@ export type AppError = AppError_Serialize | AppError_Deserialize;
 export type AppError_Deserialize = { kind: "provider"; error: ProviderError_Deserialize } | { kind: "notFound" } | { kind: "keyMissing" } | { kind: "invalidInput"; message: string } | { kind: "insecureUrl"; url: string } | { kind: "keychain"; message: string } | { kind: "storage"; message: string } | { kind: "ollama"; message: string };
 
 export type AppError_Serialize = { kind: "provider"; error: ProviderError_Serialize } | { kind: "notFound" } | { kind: "keyMissing" } | { kind: "invalidInput"; message: string } | { kind: "insecureUrl"; url: string } | { kind: "keychain"; message: string } | { kind: "storage"; message: string } | { kind: "ollama"; message: string };
+
+export type AppSettings = {
+	theme: Theme,
+	keepAlive: KeepAlive,
+};
 
 export type ChatEvent = ChatEvent_Serialize | ChatEvent_Deserialize;
 
@@ -171,6 +179,8 @@ export type FileContent = {
 	hasBom: boolean,
 	isSecret: boolean,
 };
+
+export type KeepAlive = "ollamaDefault" | "fiveMinutes" | "thirtyMinutes" | "oneHour" | "untilFreed" | "afterEachReply";
 
 export type LineEnding = "lf" | "crlf";
 
@@ -297,6 +307,8 @@ export type StoredMessage_Serialize = {
 };
 
 export type TerminalEvent = { event: "output"; data: string } | { event: "exit" };
+
+export type Theme = "dark" | "light" | "system";
 
 export type ToolAction = { tool: "listFiles"; path: string } | { tool: "readFile"; path: string } | { tool: "search"; query: string; path: string } | { tool: "editFile"; path: string; before: string; after: string } | { tool: "createFile"; path: string; text: string } | { tool: "runCommand"; command: string; folder: string } | { tool: "invalid"; name: string };
 

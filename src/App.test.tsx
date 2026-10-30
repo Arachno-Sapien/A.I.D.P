@@ -23,6 +23,10 @@ vi.mock("./lib/bindings", () => ({
       status: "ok",
       data: { state: "stopped" },
     }),
+    getSettings: vi.fn().mockResolvedValue({
+      status: "ok",
+      data: { theme: "dark", keepAlive: "ollamaDefault" },
+    }),
   },
 }));
 
@@ -207,5 +211,16 @@ describe("App", () => {
       ).toBeNull();
     });
     expect(commands.quitApp).not.toHaveBeenCalled();
+  });
+
+  it("shows Settings in the nav", () => {
+    render(<App />);
+
+    const settingsNav = screen.getByRole("button", { name: "Settings" });
+    expect(settingsNav).toBeDefined();
+
+    fireEvent.click(settingsNav);
+
+    expect(screen.getByRole("heading", { name: "Settings" })).toBeDefined();
   });
 });

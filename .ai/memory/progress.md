@@ -39,11 +39,11 @@ Carry-overs: `docs/phases/M3.md` and `docs/phases/M4.md`, "What's left → To M5
 ## In progress
 
 Claimed by Antigravity (Gemini 2.5 Pro), 2026-10-30.
-Task: M5 Task 9 - Settings (default model, theme, keep_alive).
-Next step: Step 1 - write failing tests for settings types, commands, and options.
+Task: M5 Task 10 - Light and system theme.
+Next step: Step 1 - write failing tests for theme switching and styling.
 
 ## Next 3 tasks
 
-1. M5 Task 9 (Settings: default model, theme, keep_alive).
-2. M5 Task 10 (Light and system theme).
-3. M5 Tasks 11 to 12 (Docs, user guide, live check and close).
+1. M5 Task 10 (Light and system theme).
+2. M5 Task 11 (Security check, docs, user guide).
+3. M5 Task 12 (Live check and milestone close).

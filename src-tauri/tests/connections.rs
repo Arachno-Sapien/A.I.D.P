@@ -1086,3 +1086,30 @@ async fn pull_refuses_bad_names_and_a_second_pull() {
 
     task.await.unwrap().unwrap();
 }
+
+#[tokio::test]
+async fn settings_round_trip() {
+    use aidp_lib::connections::{KeepAlive, Theme};
+
+    let store = Arc::new(MemoryStore::default());
+    let services = create_services(store);
+
+    let initial = services.get_settings().expect("read default settings");
+    assert_eq!(initial.theme, Theme::Dark);
+    assert_eq!(initial.keep_alive, KeepAlive::OllamaDefault);
+
+    services.set_theme(Theme::Light).expect("set theme");
+    services
+        .set_keep_alive(KeepAlive::OneHour)
+        .expect("set keep alive");
+
+    let updated = services.get_settings().expect("read updated settings");
+    assert_eq!(updated.theme, Theme::Light);
+    assert_eq!(updated.keep_alive, KeepAlive::OneHour);
+
+    let ollama_id = services
+        .ensure_ollama_connection()
+        .expect("ensure ollama connection");
+    let options = services.model_options(ollama_id, "any_model");
+    assert_eq!(options.keep_alive, Some(3600));
+}
