@@ -4,6 +4,7 @@ pub mod connections;
 pub mod db;
 pub mod gateway;
 pub mod history;
+pub mod ollama;
 pub mod secrets;
 pub mod tools;
 pub mod workspace;

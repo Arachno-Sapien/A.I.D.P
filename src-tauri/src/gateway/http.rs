@@ -1,4 +1,4 @@
-use crate::gateway::sse::SseLines;
+use crate::gateway::sse::{JsonLines, SseLines};
 use crate::gateway::ProviderError;
 use futures_util::StreamExt;
 use std::time::Duration;
@@ -122,6 +122,52 @@ pub async fn read_sse(
 
     if !done && let Some(tail) = sse_lines.finish() {
         done = matches!(on_data(&tail)?, Step::Done);
+    }
+
+    if !done {
+        return Err(ProviderError::Provider {
+            message: "the connection closed before the reply finished".to_string(),
+        });
+    }
+
+    Ok(())
+}
+
+pub async fn read_json_lines(
+    resp: reqwest::Response,
+    cancel: &CancellationToken,
+    mut on_line: impl FnMut(&str) -> Result<Step, ProviderError>,
+) -> Result<(), ProviderError> {
+    let mut stream = resp.bytes_stream();
+    let mut lines_buf = JsonLines::default();
+    let mut done = false;
+
+    while !done {
+        let next_chunk = match cancel.run_until_cancelled(stream.next()).await {
+            Some(Some(Ok(bytes))) => bytes,
+            Some(Some(Err(_))) => {
+                return Err(ProviderError::Provider {
+                    message: "the connection closed before the reply finished".to_string(),
+                });
+            }
+            Some(None) => break,
+            None => return Err(ProviderError::Cancelled),
+        };
+
+        let lines = lines_buf.push(&next_chunk);
+        for line in lines {
+            match on_line(&line)? {
+                Step::Done => {
+                    done = true;
+                    break;
+                }
+                Step::Continue => {}
+            }
+        }
+    }
+
+    if !done && let Some(tail) = lines_buf.finish() {
+        done = matches!(on_line(&tail)?, Step::Done);
     }
 
     if !done {

@@ -50,9 +50,63 @@ impl SseLines {
     }
 }
 
+#[derive(Default, Debug)]
+pub struct JsonLines {
+    buffer: Vec<u8>,
+}
+
+impl JsonLines {
+    pub fn push(&mut self, chunk: &[u8]) -> Vec<String> {
+        self.buffer.extend_from_slice(chunk);
+        let mut results = Vec::new();
+
+        while let Some(pos) = self.buffer.iter().position(|&b| b == b'\n') {
+            let line_bytes = self.buffer.drain(..=pos).collect::<Vec<u8>>();
+            let mut line = &line_bytes[..line_bytes.len() - 1];
+            if let Some(stripped) = line.strip_suffix(b"\r") {
+                line = stripped;
+            }
+            if !line.is_empty() {
+                results.push(String::from_utf8_lossy(line).into_owned());
+            }
+        }
+
+        results
+    }
+
+    pub fn finish(self) -> Option<String> {
+        if self.buffer.is_empty() {
+            return None;
+        }
+        let mut line = self.buffer.as_slice();
+        if let Some(stripped) = line.strip_suffix(b"\r") {
+            line = stripped;
+        }
+        if !line.is_empty() {
+            Some(String::from_utf8_lossy(line).into_owned())
+        } else {
+            None
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn json_lines_split() {
+        let mut jl = JsonLines::default();
+        // chunk split mid-line, \r\n, empty lines skipped
+        let r1 = jl.push(b"{\"a\":1}\r\n\r\n{\"b\":");
+        assert_eq!(r1, vec!["{\"a\":1}"]);
+
+        let r2 = jl.push(b"2}\n\n{\"c\":3}");
+        assert_eq!(r2, vec!["{\"b\":2}"]);
+
+        let r3 = jl.finish();
+        assert_eq!(r3, Some("{\"c\":3}".to_string()));
+    }
 
     #[test]
     fn one_chunk_two_events() {
