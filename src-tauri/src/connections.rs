@@ -4,11 +4,12 @@ use crate::db::connections::{
 };
 use crate::gateway::url::check_base_url;
 use crate::gateway::{
-    provider, ChatEvent, ChatMessage, ChatRequest, ConnectionKind, ModelInfo, ModelProvider,
-    ProviderError, Usage,
+    provider, ChatEvent, ChatMessage, ChatRequest, ConnectionKind, LocalOptions, ModelInfo,
+    ModelProvider, ProviderError, Usage,
 };
+use crate::ollama::{LocalModelView, Ollama};
 use crate::secrets::{key_hint, SecretError, SecretStore};
-use rusqlite::Connection;
+use rusqlite::{Connection, OptionalExtension};
 use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
 use specta::Type;
@@ -79,6 +80,8 @@ pub struct ChatModel {
     pub display_name: String,
     pub is_default: bool,
     pub supports_tools: Option<bool>,
+    pub is_local: bool,
+    pub context_tokens: Option<u32>,
 }
 
 #[derive(Serialize, Deserialize, Type, Clone, Debug, PartialEq)]
@@ -91,6 +94,7 @@ pub enum AppError {
     InsecureUrl { url: String },
     Keychain { message: String },
     Storage { message: String },
+    Ollama { message: String },
 }
 
 impl From<rusqlite::Error> for AppError {
@@ -118,6 +122,7 @@ pub struct Services {
     pub(crate) db: Mutex<Connection>,
     secrets: Arc<dyn SecretStore>,
     http: reqwest::Client,
+    ollama_url: String,
 }
 
 impl Services {
@@ -126,7 +131,23 @@ impl Services {
             db: Mutex::new(db),
             secrets,
             http,
+            ollama_url: crate::ollama::OLLAMA_URL.to_string(),
         }
+    }
+
+    pub fn with_ollama_url(mut self, url: String) -> Self {
+        self.ollama_url = url;
+        self
+    }
+
+    pub fn ollama(&self) -> Ollama {
+        Ollama::new(self.http.clone(), self.ollama_url.clone())
+    }
+
+    pub fn db_conn(&self) -> Result<std::sync::MutexGuard<'_, Connection>, AppError> {
+        self.db.lock().map_err(|e| AppError::Storage {
+            message: e.to_string(),
+        })
     }
 
     pub async fn add_connection(&self, input: NewConnection) -> Result<AddedConnection, AppError> {
@@ -309,15 +330,17 @@ impl Services {
     }
 
     pub fn delete_connection(&self, id: u32) -> Result<(), AppError> {
-        let exists = {
+        let row = {
             let db = self.db.lock().map_err(|e| AppError::Storage {
                 message: e.to_string(),
             })?;
-            get_connection(&db, id)?.is_some()
+            get_connection(&db, id)?.ok_or(AppError::NotFound)?
         };
 
-        if !exists {
-            return Err(AppError::NotFound);
+        if row.kind == ConnectionKind::Ollama {
+            return Err(AppError::InvalidInput {
+                message: "Ollama is managed on the Local panel.".to_string(),
+            });
         }
 
         if let Err(e) = self.secrets.delete(id) {
@@ -356,13 +379,26 @@ impl Services {
         let rows = list_chat_models(&db)?;
         Ok(rows
             .into_iter()
-            .map(|r| ChatModel {
-                connection_id: r.connection_id,
-                connection_label: r.connection_label,
-                model_id: r.model_id,
-                display_name: r.display_name,
-                is_default: r.is_default,
-                supports_tools: r.supports_tools,
+            .map(|r| {
+                let is_local = r.connection_kind == ConnectionKind::Ollama;
+                let context_tokens = if is_local {
+                    Some(
+                        r.num_ctx
+                            .unwrap_or_else(|| r.context_window.map(|cw| cw.min(8192)).unwrap_or(8192)),
+                    )
+                } else {
+                    r.context_window
+                };
+                ChatModel {
+                    connection_id: r.connection_id,
+                    connection_label: r.connection_label,
+                    model_id: r.model_id,
+                    display_name: r.display_name,
+                    is_default: r.is_default,
+                    supports_tools: r.supports_tools,
+                    is_local,
+                    context_tokens,
+                }
             })
             .collect())
     }
@@ -392,6 +428,188 @@ impl Services {
         crate::db::settings::set(&conn, key, value).map_err(AppError::from)
     }
 
+    pub fn ensure_ollama_connection(&self) -> Result<u32, AppError> {
+        let db = self.db.lock().map_err(|e| AppError::Storage {
+            message: e.to_string(),
+        })?;
+        let connections = list_connections(&db)?;
+        if let Some(c) = connections.iter().find(|c| c.kind == ConnectionKind::Ollama) {
+            return Ok(c.id);
+        }
+        let now = now_secs();
+        let id = insert_connection(
+            &db,
+            ConnectionKind::Ollama,
+            "Ollama (local)",
+            &self.ollama_url,
+            "",
+            now,
+        )?;
+        Ok(id)
+    }
+
+    pub async fn sync_local_models(&self) -> Result<(), AppError> {
+        let ollama_id = self.ensure_ollama_connection()?;
+        let ollama = self.ollama();
+        let tags = ollama.tags().await?;
+        let mut models = Vec::with_capacity(tags.len());
+        for tag in tags {
+            let details = ollama.show(&tag.name).await.ok();
+            let (supports_tools, context_window) = match details {
+                Some(d) => (Some(d.supports_tools), d.context_length),
+                None => (None, None),
+            };
+            models.push(ModelInfo {
+                id: tag.name.clone(),
+                display_name: tag.name,
+                supports_tools,
+                context_window,
+            });
+        }
+        self.set_models(ollama_id, models)?;
+        Ok(())
+    }
+
+    pub fn model_options(&self, connection_id: u32, model_id: &str) -> LocalOptions {
+        let db = match self.db.lock() {
+            Ok(d) => d,
+            Err(_) => return LocalOptions::default(),
+        };
+        let row = match get_connection(&db, connection_id) {
+            Ok(Some(r)) => r,
+            _ => return LocalOptions::default(),
+        };
+        if row.kind != ConnectionKind::Ollama {
+            return LocalOptions::default();
+        }
+        let query_res: rusqlite::Result<(Option<i64>, Option<i64>)> = db.query_row(
+            "SELECT num_ctx, context_window FROM models WHERE connection_id = ?1 AND model_id = ?2",
+            rusqlite::params![connection_id, model_id],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        );
+        let (num_ctx_val, context_window_val) = match query_res {
+            Ok((nc, cw)) => (nc.map(|v| v as u32), cw.map(|v| v as u32)),
+            Err(_) => (None, None),
+        };
+        let num_ctx = num_ctx_val.unwrap_or_else(|| {
+            context_window_val.map(|cw| cw.min(8192)).unwrap_or(8192)
+        });
+        LocalOptions {
+            num_ctx: Some(num_ctx),
+            keep_alive: None,
+        }
+    }
+
+    pub fn set_model_context(&self, model_id: &str, num_ctx: u32) -> Result<(), AppError> {
+        let db = self.db.lock().map_err(|e| AppError::Storage {
+            message: e.to_string(),
+        })?;
+        let row_opt: Option<(u32, String, Option<i64>)> = db
+            .query_row(
+                "SELECT m.connection_id, c.kind, m.context_window
+                 FROM models m
+                 JOIN connections c ON m.connection_id = c.id
+                 WHERE m.model_id = ?1",
+                rusqlite::params![model_id],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            )
+            .optional()?;
+
+        let (conn_id, kind_str, context_window) = row_opt.ok_or(AppError::NotFound)?;
+        let kind = ConnectionKind::from_db(&kind_str).unwrap_or(ConnectionKind::OpenaiCompat);
+        if kind != ConnectionKind::Ollama {
+            return Err(AppError::InvalidInput {
+                message: "Context length can only be set on local Ollama models.".to_string(),
+            });
+        }
+
+        if num_ctx < 2048 {
+            return Err(AppError::InvalidInput {
+                message: "Context must be at least 2,048 tokens.".to_string(),
+            });
+        }
+
+        if let Some(max) = context_window {
+            let max = max as u32;
+            if num_ctx > max {
+                return Err(AppError::InvalidInput {
+                    message: format!("Context cannot exceed the model's maximum of {} tokens.", max),
+                });
+            }
+        }
+
+        db.execute(
+            "UPDATE models SET num_ctx = ?1 WHERE connection_id = ?2 AND model_id = ?3",
+            rusqlite::params![num_ctx as i64, conn_id, model_id],
+        )?;
+
+        Ok(())
+    }
+
+    pub async fn local_models(&self) -> Result<Vec<LocalModelView>, AppError> {
+        let ollama = self.ollama();
+        let tags = ollama.tags().await?;
+        let loaded = ollama.loaded().await.unwrap_or_default();
+        let ollama_id = self.ensure_ollama_connection()?;
+
+        struct DbModelInfo {
+            model_id: String,
+            supports_tools: Option<bool>,
+            context_window: Option<u32>,
+            num_ctx: Option<u32>,
+        }
+
+        let rows: Vec<DbModelInfo> = {
+            let db = self.db.lock().map_err(|e| AppError::Storage {
+                message: e.to_string(),
+            })?;
+            let mut stmt = db.prepare(
+                "SELECT model_id, supports_tools, context_window, num_ctx FROM models WHERE connection_id = ?1",
+            )?;
+            let mapped = stmt.query_map(rusqlite::params![ollama_id], |r| {
+                let model_id: String = r.get(0)?;
+                let st: Option<i64> = r.get(1)?;
+                let cw: Option<i64> = r.get(2)?;
+                let nc: Option<i64> = r.get(3)?;
+                Ok(DbModelInfo {
+                    model_id,
+                    supports_tools: st.map(|v| v != 0),
+                    context_window: cw.map(|v| v as u32),
+                    num_ctx: nc.map(|v| v as u32),
+                })
+            })?;
+            mapped.collect::<Result<Vec<_>, _>>()?
+        };
+
+        let mut result = Vec::with_capacity(tags.len());
+        for tag in tags {
+            let loaded_entry = loaded.iter().find(|l| l.name == tag.name).cloned();
+            let db_info = rows.iter().find(|r| r.model_id == tag.name);
+            let (supports_tools, context_length, num_ctx) = match db_info {
+                Some(r) => {
+                    let resolved_num_ctx = r
+                        .num_ctx
+                        .unwrap_or_else(|| r.context_window.map(|w| w.min(8192)).unwrap_or(8192));
+                    (r.supports_tools, r.context_window, resolved_num_ctx)
+                }
+                None => (None, None, 8192),
+            };
+
+            result.push(LocalModelView {
+                name: tag.name,
+                size_mb: tag.size_mb,
+                parameter_size: tag.parameter_size,
+                quantization: tag.quantization,
+                loaded: loaded_entry,
+                supports_tools,
+                context_length,
+                num_ctx,
+            });
+        }
+
+        Ok(result)
+    }
+
     pub fn provider_for(&self, connection_id: u32) -> Result<Box<dyn ModelProvider>, AppError> {
         let row = {
             let db = self.db.lock().map_err(|e| AppError::Storage {
@@ -400,10 +618,14 @@ impl Services {
             get_connection(&db, connection_id)?.ok_or(AppError::NotFound)?
         };
 
-        let key = match self.secrets.get(connection_id) {
-            Ok(k) => k,
-            Err(SecretError::NotFound) => return Err(AppError::KeyMissing),
-            Err(SecretError::Unavailable(m)) => return Err(AppError::Keychain { message: m }),
+        let key = if row.kind == ConnectionKind::Ollama {
+            SecretString::from(String::new())
+        } else {
+            match self.secrets.get(connection_id) {
+                Ok(k) => k,
+                Err(SecretError::NotFound) => return Err(AppError::KeyMissing),
+                Err(SecretError::Unavailable(m)) => return Err(AppError::Keychain { message: m }),
+            }
         };
 
         Ok(provider(row.kind, self.http.clone(), row.base_url, key))
@@ -418,6 +640,7 @@ impl Services {
         cancel: CancellationToken,
     ) -> Result<Usage, AppError> {
         let prov = self.provider_for(connection_id)?;
+        let local = self.model_options(connection_id, &model_id);
         let reply = prov
             .stream_chat(
                 ChatRequest {
@@ -425,7 +648,7 @@ impl Services {
                     messages,
                     tools: vec![],
                     rounds: vec![],
-                    local: Default::default(),
+                    local,
                 },
                 out,
                 cancel,

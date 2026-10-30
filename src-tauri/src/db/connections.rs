@@ -20,6 +20,9 @@ pub struct ChatModelRow {
     pub display_name: String,
     pub is_default: bool,
     pub supports_tools: Option<bool>,
+    pub connection_kind: ConnectionKind,
+    pub context_window: Option<u32>,
+    pub num_ctx: Option<u32>,
 }
 
 fn parse_connection_row(row: &rusqlite::Row) -> rusqlite::Result<ConnectionRow> {
@@ -199,7 +202,7 @@ pub fn set_models(
 
 pub fn list_chat_models(conn: &Connection) -> rusqlite::Result<Vec<ChatModelRow>> {
     let mut stmt = conn.prepare(
-        "SELECT m.connection_id, c.label, m.model_id, m.display_name, m.is_default, m.supports_tools
+        "SELECT m.connection_id, c.label, m.model_id, m.display_name, m.is_default, m.supports_tools, c.kind, m.context_window, m.num_ctx
          FROM models m
          JOIN connections c ON m.connection_id = c.id
          ORDER BY m.is_default DESC, m.connection_id ASC, m.display_name ASC",
@@ -216,6 +219,13 @@ pub fn list_chat_models(conn: &Connection) -> rusqlite::Result<Vec<ChatModelRow>
         let is_default = is_default_int != 0;
         let supports_tools_int: Option<i64> = row.get(5)?;
         let supports_tools = supports_tools_int.map(|v| v != 0);
+        let kind_str: String = row.get(6)?;
+        let connection_kind =
+            ConnectionKind::from_db(&kind_str).unwrap_or(ConnectionKind::OpenaiCompat);
+        let context_window_i64: Option<i64> = row.get(7)?;
+        let context_window = context_window_i64.map(|v| v as u32);
+        let num_ctx_i64: Option<i64> = row.get(8)?;
+        let num_ctx = num_ctx_i64.map(|v| v as u32);
 
         Ok(ChatModelRow {
             connection_id,
@@ -224,6 +234,9 @@ pub fn list_chat_models(conn: &Connection) -> rusqlite::Result<Vec<ChatModelRow>
             display_name,
             is_default,
             supports_tools,
+            connection_kind,
+            context_window,
+            num_ctx,
         })
     })?;
 

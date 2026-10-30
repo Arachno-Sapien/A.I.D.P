@@ -8,7 +8,7 @@ use aidp_lib::gateway::{
     ChatMessage, ConnectionKind, ModelInfo, ProviderError, Role, Usage,
 };
 use aidp_lib::secrets::{MemoryStore, SecretStore};
-use common::{capture, deltas, events, sse};
+use common::{capture, capture_pull, deltas, events, sse};
 use secrecy::ExposeSecret;
 use serde_json::json;
 use std::sync::Arc;
@@ -691,4 +691,339 @@ async fn anthropic_connections_use_the_anthropic_adapter() {
 
     assert_eq!(deltas(&events_log), vec!["Claude reply"]);
     assert_eq!(usage.tokens_in, Some(5));
+}
+
+#[tokio::test]
+async fn ollama_connection_is_created_once() {
+    let store = Arc::new(MemoryStore::default());
+    let services = create_services(store.clone());
+    let id1 = services.ensure_ollama_connection().unwrap();
+    let id2 = services.ensure_ollama_connection().unwrap();
+    assert_eq!(id1, id2);
+
+    let conns = services.list_connections().unwrap();
+    assert_eq!(conns.len(), 1);
+    assert_eq!(conns[0].id, id1);
+    assert_eq!(conns[0].kind, ConnectionKind::Ollama);
+    assert_eq!(conns[0].key_hint, "");
+    assert_eq!(store.len(), 0);
+}
+
+#[tokio::test]
+async fn sync_reads_tools_and_context() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/api/tags"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "models": [
+                {"name": "a:1b", "size": 1_000_000, "details": {"parameter_size": "1B", "quantization_level": "Q4"}},
+                {"name": "b:2b", "size": 2_000_000, "details": {"parameter_size": "2B", "quantization_level": "Q4"}}
+            ]
+        })))
+        .mount(&server)
+        .await;
+
+    Mock::given(method("POST"))
+        .and(path("/api/show"))
+        .and(wiremock::matchers::body_json(json!({"model": "a:1b"})))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "capabilities": ["tools"],
+            "model_info": {"qwen2.context_length": 32768}
+        })))
+        .mount(&server)
+        .await;
+
+    Mock::given(method("POST"))
+        .and(path("/api/show"))
+        .and(wiremock::matchers::body_json(json!({"model": "b:2b"})))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "capabilities": [],
+            "model_info": {}
+        })))
+        .mount(&server)
+        .await;
+
+    let store = Arc::new(MemoryStore::default());
+    let services = create_services(store).with_ollama_url(server.uri());
+    services.sync_local_models().await.unwrap();
+
+    let models = services.chat_models().unwrap();
+    assert_eq!(models.len(), 2);
+
+    let model_a = models.iter().find(|m| m.model_id == "a:1b").unwrap();
+    assert_eq!(model_a.supports_tools, Some(true));
+    assert!(model_a.is_local);
+    assert_eq!(model_a.context_tokens, Some(8192));
+
+    let model_b = models.iter().find(|m| m.model_id == "b:2b").unwrap();
+    assert_eq!(model_b.supports_tools, Some(false));
+    assert!(model_b.is_local);
+    assert_eq!(model_b.context_tokens, Some(8192));
+}
+
+#[tokio::test]
+async fn sync_keeps_default_and_num_ctx() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/api/tags"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "models": [
+                {"name": "a:1b", "size": 1_000_000, "details": {}},
+                {"name": "b:2b", "size": 2_000_000, "details": {}}
+            ]
+        })))
+        .mount(&server)
+        .await;
+
+    Mock::given(method("POST"))
+        .and(path("/api/show"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "capabilities": ["tools"],
+            "model_info": {"context_length": 32768}
+        })))
+        .mount(&server)
+        .await;
+
+    let store = Arc::new(MemoryStore::default());
+    let services = create_services(store).with_ollama_url(server.uri());
+    services.sync_local_models().await.unwrap();
+
+    let conn_id = services.ensure_ollama_connection().unwrap();
+    services.set_default_model(conn_id, "a:1b".to_string()).unwrap();
+    services.set_model_context("a:1b", 4096).unwrap();
+
+    server.reset().await;
+    Mock::given(method("GET"))
+        .and(path("/api/tags"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "models": [
+                {"name": "a:1b", "size": 1_000_000, "details": {}},
+                {"name": "c:3b", "size": 3_000_000, "details": {}}
+            ]
+        })))
+        .mount(&server)
+        .await;
+
+    Mock::given(method("POST"))
+        .and(path("/api/show"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "capabilities": ["tools"],
+            "model_info": {"context_length": 32768}
+        })))
+        .mount(&server)
+        .await;
+
+    services.sync_local_models().await.unwrap();
+
+    let models = services.chat_models().unwrap();
+    assert_eq!(models.len(), 2);
+    let model_a = models.iter().find(|m| m.model_id == "a:1b").unwrap();
+    assert!(model_a.is_default);
+    assert_eq!(model_a.context_tokens, Some(4096));
+
+    assert!(models.iter().all(|m| m.model_id != "b:2b"));
+    assert!(models.iter().any(|m| m.model_id == "c:3b"));
+}
+
+#[tokio::test]
+async fn provider_for_ollama_needs_no_key() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/api/chat"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_string("{\"message\":{\"role\":\"assistant\",\"content\":\"Local hi\"}}\n{\"done\":true}\n"),
+        )
+        .mount(&server)
+        .await;
+
+    let store = Arc::new(MemoryStore::default());
+    let services = create_services(store.clone()).with_ollama_url(server.uri());
+    let id = services.ensure_ollama_connection().unwrap();
+
+    let (channel, events_log) = capture();
+    let cancel = CancellationToken::new();
+
+    let _ = services
+        .stream(
+            id,
+            "llama3:8b".to_string(),
+            vec![ChatMessage {
+                role: Role::User,
+                content: "Hi".to_string(),
+            }],
+            channel,
+            cancel,
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(deltas(&events_log), vec!["Local hi"]);
+    assert_eq!(store.len(), 0);
+}
+
+#[tokio::test]
+async fn model_options_defaults() {
+    let server = MockServer::start().await;
+    let store = Arc::new(MemoryStore::default());
+    let services = create_services(store).with_ollama_url(server.uri());
+    let conn_id = services.ensure_ollama_connection().unwrap();
+
+    services
+        .set_models(
+            conn_id,
+            vec![
+                ModelInfo {
+                    id: "large:32k".to_string(),
+                    display_name: "large:32k".to_string(),
+                    supports_tools: Some(true),
+                    context_window: Some(32768),
+                },
+                ModelInfo {
+                    id: "small:4k".to_string(),
+                    display_name: "small:4k".to_string(),
+                    supports_tools: Some(true),
+                    context_window: Some(4096),
+                },
+            ],
+        )
+        .unwrap();
+
+    let opts = services.model_options(conn_id, "large:32k");
+    assert_eq!(opts.num_ctx, Some(8192));
+
+    let opts = services.model_options(conn_id, "small:4k");
+    assert_eq!(opts.num_ctx, Some(4096));
+
+    services.set_model_context("large:32k", 16384).unwrap();
+    let opts = services.model_options(conn_id, "large:32k");
+    assert_eq!(opts.num_ctx, Some(16384));
+
+    let cloud_id = {
+        let db = services.db_conn().unwrap();
+        db::connections::insert_connection(
+            &db,
+            ConnectionKind::OpenaiCompat,
+            "Cloud",
+            "https://api.openai.com/v1",
+            "1234",
+            1,
+        )
+        .unwrap()
+    };
+    let opts = services.model_options(cloud_id, "gpt-4o");
+    assert_eq!(opts.num_ctx, None);
+}
+
+#[tokio::test]
+async fn set_model_context_bounds() {
+    let server = MockServer::start().await;
+    let store = Arc::new(MemoryStore::default());
+    let services = create_services(store).with_ollama_url(server.uri());
+    let conn_id = services.ensure_ollama_connection().unwrap();
+
+    services
+        .set_models(
+            conn_id,
+            vec![ModelInfo {
+                id: "local:16k".to_string(),
+                display_name: "local:16k".to_string(),
+                supports_tools: Some(true),
+                context_window: Some(16384),
+            }],
+        )
+        .unwrap();
+
+    let err = services.set_model_context("local:16k", 1024).unwrap_err();
+    assert!(matches!(err, AppError::InvalidInput { .. }));
+
+    let err = services.set_model_context("local:16k", 32768).unwrap_err();
+    assert!(matches!(err, AppError::InvalidInput { .. }));
+
+    let cloud_id = {
+        let db = services.db_conn().unwrap();
+        db::connections::insert_connection(
+            &db,
+            ConnectionKind::OpenaiCompat,
+            "Cloud",
+            "https://api.openai.com/v1",
+            "1234",
+            1,
+        )
+        .unwrap()
+    };
+    services
+        .set_models(
+            cloud_id,
+            vec![ModelInfo {
+                id: "gpt-4o".to_string(),
+                display_name: "gpt-4o".to_string(),
+                supports_tools: Some(true),
+                context_window: Some(128_000),
+            }],
+        )
+        .unwrap();
+    let err = services.set_model_context("gpt-4o", 8192).unwrap_err();
+    assert!(matches!(err, AppError::InvalidInput { .. }));
+}
+
+#[tokio::test]
+async fn ollama_row_cannot_be_deleted() {
+    let store = Arc::new(MemoryStore::default());
+    let services = create_services(store);
+    let conn_id = services.ensure_ollama_connection().unwrap();
+
+    let err = services.delete_connection(conn_id).unwrap_err();
+    assert_eq!(
+        err,
+        AppError::InvalidInput {
+            message: "Ollama is managed on the Local panel.".to_string(),
+        }
+    );
+}
+
+#[tokio::test]
+async fn pull_refuses_bad_names_and_a_second_pull() {
+    use aidp_lib::commands::ollama::{self, OllamaState};
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/api/pull"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_delay(std::time::Duration::from_millis(300))
+                .set_body_string("{\"status\":\"success\"}\n"),
+        )
+        .mount(&server)
+        .await;
+
+    let store = Arc::new(MemoryStore::default());
+    let services = Arc::new(create_services(store).with_ollama_url(server.uri()));
+    let state = Arc::new(OllamaState::default());
+
+    let (ch1, _) = capture_pull();
+    let err = ollama::ollama_pull_impl(&services, &state, "a b".to_string(), ch1)
+        .await
+        .unwrap_err();
+    assert!(matches!(err, AppError::InvalidInput { .. }));
+
+    let (ch2, _) = capture_pull();
+    let s_clone = services.clone();
+    let st_clone = state.clone();
+    let task = tokio::spawn(async move {
+        ollama::ollama_pull_impl(&s_clone, &st_clone, "m1:latest".to_string(), ch2).await
+    });
+
+    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    let (ch3, _) = capture_pull();
+    let err2 = ollama::ollama_pull_impl(&services, &state, "m2:latest".to_string(), ch3)
+        .await
+        .unwrap_err();
+    assert_eq!(
+        err2,
+        AppError::InvalidInput {
+            message: "A download is already running.".to_string(),
+        }
+    );
+
+    task.await.unwrap().unwrap();
 }

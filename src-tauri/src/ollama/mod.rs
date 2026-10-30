@@ -27,6 +27,27 @@ pub fn valid_model_name(name: &str) -> bool {
 }
 
 #[derive(Serialize, Deserialize, Type, Clone, Debug, PartialEq)]
+#[serde(tag = "state", rename_all = "camelCase")]
+pub enum OllamaStatus {
+    NotInstalled,
+    Stopped,
+    Running { version: String },
+}
+
+#[derive(Serialize, Deserialize, Type, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct LocalModelView {
+    pub name: String,
+    pub size_mb: u32,
+    pub parameter_size: String,
+    pub quantization: String,
+    pub loaded: Option<LoadedModel>,
+    pub supports_tools: Option<bool>,
+    pub context_length: Option<u32>,
+    pub num_ctx: u32,
+}
+
+#[derive(Serialize, Deserialize, Type, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct LocalModel {
     pub name: String,

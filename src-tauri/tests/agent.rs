@@ -138,6 +138,7 @@ async fn outside_path_is_refused_and_never_sent() {
         out: channel,
         cancel,
         command_timeout: Duration::from_secs(5),
+        local: Default::default(),
     })
     .await;
 
@@ -224,6 +225,7 @@ async fn denied_command_never_runs() {
             out: channel,
             cancel,
             command_timeout: Duration::from_secs(5),
+        local: Default::default(),
         })
         .await
     });
@@ -306,6 +308,7 @@ async fn approved_command_runs() {
             out: channel,
             cancel,
             command_timeout: Duration::from_secs(5),
+        local: Default::default(),
         })
         .await
     });
@@ -381,6 +384,7 @@ async fn secret_file_is_never_sent() {
         out: channel,
         cancel,
         command_timeout: Duration::from_secs(5),
+        local: Default::default(),
     })
     .await;
 
@@ -440,6 +444,7 @@ async fn instructions_in_files_never_skip_approval() {
             out: channel,
             cancel,
             command_timeout: Duration::from_secs(5),
+        local: Default::default(),
         })
         .await
     });
@@ -514,6 +519,7 @@ async fn edit_waits_for_accept() {
             out: channel,
             cancel,
             command_timeout: Duration::from_secs(5),
+        local: Default::default(),
         })
         .await
     });
@@ -589,6 +595,7 @@ async fn edit_waits_for_accept() {
             out: channel2,
             cancel: cancel2,
             command_timeout: Duration::from_secs(5),
+        local: Default::default(),
         })
         .await
     });
@@ -664,6 +671,7 @@ async fn stop_while_waiting() {
             out: channel,
             cancel: cancel_clone,
             command_timeout: Duration::from_secs(5),
+        local: Default::default(),
         })
         .await
     });
@@ -736,6 +744,7 @@ async fn every_call_gets_one_result() {
         out: channel,
         cancel,
         command_timeout: Duration::from_secs(5),
+        local: Default::default(),
     })
     .await;
 
@@ -805,6 +814,7 @@ async fn step_limit() {
         out: channel,
         cancel,
         command_timeout: Duration::from_secs(5),
+        local: Default::default(),
     })
     .await;
 

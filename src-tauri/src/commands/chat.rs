@@ -100,6 +100,7 @@ pub async fn run_agent(
     };
 
     let provider = services.provider_for(connection_id)?;
+    let local = services.model_options(connection_id, &model_id);
     let cancel = chat.begin(ChatSurface::Workspace);
 
     let result = crate::tools::agent::run(crate::tools::agent::AgentRun {
@@ -111,6 +112,7 @@ pub async fn run_agent(
         out: on_event.clone(),
         cancel,
         command_timeout: crate::tools::COMMAND_TIMEOUT,
+        local,
     })
     .await;
 

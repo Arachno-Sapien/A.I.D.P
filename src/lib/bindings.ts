@@ -33,6 +33,15 @@ export const commands = {
 	deleteConversation: (id: number) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("delete_conversation", { id })),
 	loadMessages: (conversationId: number) => typedError<StoredMessage_Serialize[], AppError_Serialize>(__TAURI_INVOKE("load_messages", { conversationId })),
 	appendMessage: (conversationId: number, message: NewMessage_Deserialize) => typedError<number, AppError_Serialize>(__TAURI_INVOKE("append_message", { conversationId, message })),
+	ollamaStatus: () => typedError<OllamaStatus, AppError_Serialize>(__TAURI_INVOKE("ollama_status")),
+	ollamaStart: () => typedError<OllamaStatus, AppError_Serialize>(__TAURI_INVOKE("ollama_start")),
+	ollamaOpenDownload: () => typedError<null, AppError_Serialize>(__TAURI_INVOKE("ollama_open_download")),
+	ollamaModels: () => typedError<LocalModelView_Serialize[], AppError_Serialize>(__TAURI_INVOKE("ollama_models")),
+	ollamaPull: (name: string, onEvent: Channel<PullEvent>) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("ollama_pull", { name, onEvent })),
+	ollamaCancelPull: () => __TAURI_INVOKE<void>("ollama_cancel_pull"),
+	ollamaDelete: (name: string) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("ollama_delete", { name })),
+	ollamaUnload: (name: string) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("ollama_unload", { name })),
+	setModelContext: (modelId: string, numCtx: number) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("set_model_context", { modelId, numCtx })),
 	setUnsaved: (unsaved: boolean) => __TAURI_INVOKE<void>("set_unsaved", { unsaved }),
 	watchClose: (onClose: Channel<boolean>) => __TAURI_INVOKE<void>("watch_close", { onClose }),
 	quitApp: () => __TAURI_INVOKE<void>("quit_app"),
@@ -53,9 +62,9 @@ export type AddedConnection_Serialize = {
 
 export type AppError = AppError_Serialize | AppError_Deserialize;
 
-export type AppError_Deserialize = { kind: "provider"; error: ProviderError_Deserialize } | { kind: "notFound" } | { kind: "keyMissing" } | { kind: "invalidInput"; message: string } | { kind: "insecureUrl"; url: string } | { kind: "keychain"; message: string } | { kind: "storage"; message: string };
+export type AppError_Deserialize = { kind: "provider"; error: ProviderError_Deserialize } | { kind: "notFound" } | { kind: "keyMissing" } | { kind: "invalidInput"; message: string } | { kind: "insecureUrl"; url: string } | { kind: "keychain"; message: string } | { kind: "storage"; message: string } | { kind: "ollama"; message: string };
 
-export type AppError_Serialize = { kind: "provider"; error: ProviderError_Serialize } | { kind: "notFound" } | { kind: "keyMissing" } | { kind: "invalidInput"; message: string } | { kind: "insecureUrl"; url: string } | { kind: "keychain"; message: string } | { kind: "storage"; message: string };
+export type AppError_Serialize = { kind: "provider"; error: ProviderError_Serialize } | { kind: "notFound" } | { kind: "keyMissing" } | { kind: "invalidInput"; message: string } | { kind: "insecureUrl"; url: string } | { kind: "keychain"; message: string } | { kind: "storage"; message: string } | { kind: "ollama"; message: string };
 
 export type ChatEvent = ChatEvent_Serialize | ChatEvent_Deserialize;
 
@@ -91,6 +100,8 @@ export type ChatModel_Deserialize = {
 	displayName: string,
 	isDefault: boolean,
 	supportsTools?: boolean | null,
+	isLocal: boolean,
+	contextTokens?: number | null,
 };
 
 export type ChatModel_Serialize = {
@@ -100,6 +111,8 @@ export type ChatModel_Serialize = {
 	displayName: string,
 	isDefault: boolean,
 	supportsTools: boolean | null,
+	isLocal: boolean,
+	contextTokens: number | null,
 };
 
 export type ChatSurface = "chat" | "workspace";
@@ -161,6 +174,37 @@ export type FileContent = {
 
 export type LineEnding = "lf" | "crlf";
 
+export type LoadedModel = {
+	name: string,
+	sizeMb: number,
+	vramMb: number,
+	expiresAt: string,
+};
+
+export type LocalModelView = LocalModelView_Serialize | LocalModelView_Deserialize;
+
+export type LocalModelView_Deserialize = {
+	name: string,
+	sizeMb: number,
+	parameterSize: string,
+	quantization: string,
+	loaded?: LoadedModel | null,
+	supportsTools?: boolean | null,
+	contextLength?: number | null,
+	numCtx: number,
+};
+
+export type LocalModelView_Serialize = {
+	name: string,
+	sizeMb: number,
+	parameterSize: string,
+	quantization: string,
+	loaded: LoadedModel | null,
+	supportsTools: boolean | null,
+	contextLength: number | null,
+	numCtx: number,
+};
+
 export type ModelInfo = ModelInfo_Serialize | ModelInfo_Deserialize;
 
 export type ModelInfo_Deserialize = {
@@ -208,11 +252,19 @@ export type NewMessage_Serialize = {
 	tokensOut: number | null,
 };
 
+export type OllamaStatus = { state: "notInstalled" } | { state: "stopped" } | { state: "running"; version: string };
+
 export type ProviderError = ProviderError_Serialize | ProviderError_Deserialize;
 
 export type ProviderError_Deserialize = { kind: "invalidKey" } | { kind: "rateLimited"; retryAfterSecs?: number | null } | { kind: "modelNotFound" } | { kind: "contextTooLong" } | { kind: "offline" } | { kind: "provider"; message: string } | { kind: "cancelled" };
 
 export type ProviderError_Serialize = { kind: "invalidKey" } | { kind: "rateLimited"; retryAfterSecs: number | null } | { kind: "modelNotFound" } | { kind: "contextTooLong" } | { kind: "offline" } | { kind: "provider"; message: string } | { kind: "cancelled" };
+
+export type PullEvent = { event: "progress"; data: {
+	status: string,
+	completedMb: number,
+	totalMb: number,
+} };
 
 export type Role = "system" | "user" | "assistant";
 

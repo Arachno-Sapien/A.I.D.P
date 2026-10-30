@@ -55,6 +55,12 @@ describe("appErrorText", () => {
     ).toBe("Couldn't read or write the local database: disk full");
   });
 
+  it("formats ollama with message", () => {
+    expect(
+      appErrorText({ kind: "ollama", message: "Ollama isn't installed." }),
+    ).toBe("Ollama isn't installed.");
+  });
+
   it("every error kind has text", () => {
     const providerErrors: ProviderError[] = [
       { kind: "invalidKey" },
@@ -77,6 +83,7 @@ describe("appErrorText", () => {
       { kind: "insecureUrl", url: "url" },
       { kind: "keychain", message: "msg" },
       { kind: "storage", message: "msg" },
+      { kind: "ollama", message: "msg" },
     ];
 
     for (const err of appErrors) {

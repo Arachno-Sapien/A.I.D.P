@@ -21,6 +21,7 @@ pub struct AgentRun<'a> {
     pub out: Channel<ChatEvent>,
     pub cancel: CancellationToken,
     pub command_timeout: Duration,
+    pub local: crate::gateway::LocalOptions,
 }
 
 pub async fn run(args: AgentRun<'_>) -> Result<Usage, ProviderError> {
@@ -40,7 +41,7 @@ pub async fn run(args: AgentRun<'_>) -> Result<Usage, ProviderError> {
             messages: full_messages.clone(),
             tools: specs_list.clone(),
             rounds: rounds.clone(),
-            local: Default::default(),
+            local: args.local.clone(),
         };
 
         let reply = args

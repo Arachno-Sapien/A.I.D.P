@@ -72,6 +72,8 @@ describe("ChatScreen", () => {
           modelId: "m1",
           displayName: "Model 1",
           isDefault: true,
+          isLocal: false,
+          contextTokens: null,
         },
         {
           connectionId: 1,
@@ -79,6 +81,8 @@ describe("ChatScreen", () => {
           modelId: "m2",
           displayName: "Model 2",
           isDefault: false,
+          isLocal: false,
+          contextTokens: null,
         },
       ],
       selected: { connectionId: 1, modelId: "m1" },

@@ -64,6 +64,15 @@ fn specta_builder() -> Builder<tauri::Wry> {
         commands::history::delete_conversation,
         commands::history::load_messages,
         commands::history::append_message,
+        commands::ollama::ollama_status,
+        commands::ollama::ollama_start,
+        commands::ollama::ollama_open_download,
+        commands::ollama::ollama_models,
+        commands::ollama::ollama_pull,
+        commands::ollama::ollama_cancel_pull,
+        commands::ollama::ollama_delete,
+        commands::ollama::ollama_unload,
+        commands::ollama::set_model_context,
         close_guard::set_unsaved,
         close_guard::watch_close,
         close_guard::quit_app,
@@ -98,6 +107,7 @@ pub fn run() -> tauri::Result<()> {
         .manage(workspace::WorkspaceState::default())
         .manage(tools::approvals::Approvals::default())
         .manage(tools::pty::TerminalState::default())
+        .manage(commands::ollama::OllamaState::default())
         .manage(close_guard::CloseGuard::default())
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {

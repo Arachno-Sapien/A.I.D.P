@@ -47,6 +47,8 @@ describe("useModelsStore", () => {
           displayName: "Model 1",
           isDefault: false,
           supportsTools: null,
+          isLocal: false,
+          contextTokens: null,
         },
         {
           connectionId: 1,
@@ -55,6 +57,8 @@ describe("useModelsStore", () => {
           displayName: "Model 2",
           isDefault: true,
           supportsTools: null,
+          isLocal: false,
+          contextTokens: null,
         },
       ],
     });
@@ -83,6 +87,8 @@ describe("useModelsStore", () => {
           displayName: "Model 1",
           isDefault: false,
           supportsTools: null,
+          isLocal: false,
+          contextTokens: null,
         },
         {
           connectionId: 1,
@@ -91,6 +97,8 @@ describe("useModelsStore", () => {
           displayName: "Model 2",
           isDefault: false,
           supportsTools: null,
+          isLocal: false,
+          contextTokens: null,
         },
       ],
     });

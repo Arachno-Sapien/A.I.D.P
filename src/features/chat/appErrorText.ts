@@ -17,5 +17,7 @@ export function appErrorText(e: AppError): string {
       return `Couldn't use the system keychain: ${e.message}. On Linux this needs GNOME Keyring or KWallet.`;
     case "storage":
       return `Couldn't read or write the local database: ${e.message}`;
+    case "ollama":
+      return e.message;
   }
 }
