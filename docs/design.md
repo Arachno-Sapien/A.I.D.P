@@ -464,7 +464,7 @@ The biggest risk is an agent-built Rust core you can't debug; the plan answers i
 | Can't debug agent-written Rust | Progress stalls on one error for days | Rust basics in week 1, small tasks, tests with every change |
 | Key leaks through logs or IPC | User's paid key exposed | Secret type, no command returns keys, review checklist |
 | Exams and coursework | Milestones slip | Two buffer weeks; each milestone ends in a working app |
-| Linux keyring missing | Keys can't be saved | Clear error; Linux ships after Windows |
+| Linux keyring missing | Keys can't be saved | Clear error naming GNOME Keyring or KWallet; never a plain-text fallback |
 | WebView differences across OSes | UI looks or behaves differently | Windows first; macOS and Linux tested before v0.1 ships |
 | Unsigned installer | Windows shows an "unknown publisher" warning | Document how to proceed; sign once the app has users |
 | Provider API changes | An adapter breaks | Fake-server tests catch it; adapters are isolated files |

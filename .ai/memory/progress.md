@@ -4,7 +4,7 @@ Updated: 2026-10-30 by Claude Code (Opus 5.5)
 
 ## Current milestone: M6 v0.1 release
 
-Not started. No plan yet. Phase doc and plan come first (`docs/phases/M6.md`, `docs/superpowers/plans/`).
+Planned 2026-10-30: phase doc `docs/phases/M6.md`, plan `docs/superpowers/plans/2026-10-30-m6-release.md`. Waiting for the human's review and answers to D1 to D6. Before Task 5 the human also creates the update signing key (D4).
 
 - [ ] Idle RAM (no folder open) under 150 MB; workspace RAM within the budget set in M3 and M4
 - [ ] Installers for Windows, macOS and Linux built by CI and published as a GitHub release
@@ -38,11 +38,11 @@ Carry-overs: `docs/phases/M4.md` and `docs/phases/M5.md`, "What's left → To M6
 
 ## In progress
 
-Nothing claimed. M5 was closed by Claude Code (Opus 5.5) at the human's request, taking over Antigravity's Task 12 claim.
-Next step: Claude Code writes the M6 plan (decision 0016 lists the macOS and Linux points to put to the human).
+Nothing claimed. Claude Code (Opus 5.5) wrote the M6 plan on 2026-10-30.
+Next step: the human reviews the M6 plan and answers D1 to D6; then an agent starts Task 1 (the gate on three OSes in `.github/workflows/ci.yml`).
 
 ## Next 3 tasks
 
-1. M6 plan (Claude Code): phase doc, plan, and the open questions put to the human with defaults.
-2. M6 tasks: release RAM, CI installer, auto-update, the 8 GB machine.
-3. v0.1 release.
+1. The human approves the M6 plan (D1 to D6) and creates the update signing key.
+2. M6 Tasks 1 to 4: the gate on three OSes, macOS and Linux fixes, the carry-overs; then a review.
+3. M6 Tasks 5 to 8: updates, the Release workflow, docs, release candidates and v0.1.0.
