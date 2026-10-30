@@ -145,25 +145,38 @@ fn command_with_hidden_characters_is_refused() {
     assert!(parse("run_command", &json!({ "command": "echo héllo 日本 > ñ.txt" })).is_ok());
 }
 
+fn assert_lookalike_refused(command: &str, code: &str) {
+    let Err(err) = parse("run_command", &json!({ "command": command })) else {
+        panic!("{command:?} was allowed");
+    };
+    assert!(
+        err.starts_with("Invalid arguments for run_command: the command contains a character (")
+            && err.contains(code)
+            && err.contains("turn into the ASCII character it looks like"),
+        "{command:?}: {err}"
+    );
+}
+
 #[test]
-fn command_with_full_width_characters_is_refused() {
+fn command_with_ascii_lookalikes_is_refused() {
     // Some Windows programs turn a full-width character into the ASCII one it
-    // looks like, so `＂` on the card could run as `"`.
+    // looks like, so `＂` on the card could run as `"`. Refused on every OS.
     for (command, code) in [
         ("echo ＂hi＂", "U+FF02"),
         ("dir ｜ more", "U+FF5C"),
         ("echo ａ", "U+FF41"),
         ("echo ～", "U+FF5E"),
     ] {
-        let err = parse("run_command", &json!({ "command": command })).unwrap_err();
-        assert!(
-            err.starts_with("Invalid arguments for run_command: the command contains a full-width character")
-                && err.contains(code),
-            "{command:?}: {err}"
-        );
+        assert_lookalike_refused(command, code);
     }
-    // The ideographic space and half-width katakana are outside the range.
-    assert!(parse("run_command", &json!({ "command": "echo \"hi\"\u{3000}ｱ" })).is_ok());
+    // On Windows the ANSI and OEM code pages' best fit does the same to more
+    // characters (WorstFit): a division slash becomes `/`, an en space a space.
+    if cfg!(windows) {
+        assert_lookalike_refused("type a\u{2215}b", "U+2215");
+        assert_lookalike_refused("echo a\u{2002}b", "U+2002");
+    }
+    // Half-width katakana, and a letter that at most loses its accent, stay allowed.
+    assert!(parse("run_command", &json!({ "command": "echo \"hi\" ｱ ł" })).is_ok());
 }
 
 #[test]

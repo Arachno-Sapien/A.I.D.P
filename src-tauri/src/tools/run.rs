@@ -132,10 +132,9 @@ pub fn parse(name: &str, input: &serde_json::Value) -> Result<ToolInput, String>
                     c as u32
                 ));
             }
-            let full_width = args.command.chars().find(|c| ('\u{FF01}'..='\u{FF5E}').contains(c));
-            if let Some(c) = full_width {
+            if let Some(c) = args.command.chars().find(|&c| turns_into_ascii(c)) {
                 return Err(format!(
-                    "Invalid arguments for {name}: the command contains a full-width character (U+{:04X}), which some programs turn into the ASCII character it looks like. Use plain ASCII.",
+                    "Invalid arguments for {name}: the command contains a character (U+{:04X}) that some programs turn into the ASCII character it looks like. Use plain ASCII.",
                     c as u32
                 ));
             }
@@ -180,6 +179,53 @@ fn is_hidden(c: char) -> bool {
                 | '\u{E0000}'..='\u{E0FFF}'
                 | '\u{F0000}'..='\u{10FFFF}'
         )
+}
+
+/// Characters some programs turn into the ASCII punctuation or space they look
+/// like, so the card would read differently from what runs: the full-width
+/// forms (U+FF01 to U+FF5E) on every OS, and on Windows anything the ANSI code
+/// page's best fit maps to one ASCII byte that is not a letter or digit (the
+/// WorstFit attacks, such as `∕` to `/`). A program that reads its command line
+/// through the ANSI API gets it converted that way. The OEM code page is left
+/// out: it converts console text, not command lines, and would also refuse
+/// curly quotes and dashes.
+fn turns_into_ascii(c: char) -> bool {
+    ('\u{FF01}'..='\u{FF5E}').contains(&c) || best_fits_to_ascii(c)
+}
+
+#[cfg(windows)]
+fn best_fits_to_ascii(c: char) -> bool {
+    use windows_sys::Win32::Globalization::{GetACP, WideCharToMultiByte};
+    const CP_UTF8: u32 = 65001;
+    // SAFETY: takes no arguments.
+    let cp = unsafe { GetACP() };
+    // UTF-8 has no best fit, and it rejects the `used_default` argument.
+    if c.is_ascii() || cp == CP_UTF8 {
+        return false;
+    }
+    let mut buf = [0u16; 2];
+    let wide = c.encode_utf16(&mut buf);
+    let mut out = [0u8; 4];
+    let mut used_default = 0;
+    // SAFETY: both buffers outlive the call and their lengths are passed.
+    let n = unsafe {
+        WideCharToMultiByte(
+            cp,
+            0,
+            wide.as_ptr(),
+            wide.len() as i32,
+            out.as_mut_ptr(),
+            out.len() as i32,
+            std::ptr::null(),
+            &mut used_default,
+        )
+    };
+    n == 1 && used_default == 0 && out[0].is_ascii() && !out[0].is_ascii_alphanumeric()
+}
+
+#[cfg(not(windows))]
+fn best_fits_to_ascii(_c: char) -> bool {
+    false
 }
 
 #[derive(Debug, Clone, PartialEq)]
