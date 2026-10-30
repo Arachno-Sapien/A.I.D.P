@@ -63,6 +63,11 @@ export function MessageList({
               </div>
             ) : (
               <>
+                {msg.modelName && (
+                  <div className="text-[10px] text-neutral-400 font-mono mb-1 select-none">
+                    {msg.modelName}
+                  </div>
+                )}
                 {msg.parts && msg.parts.length > 0 ? (
                   msg.parts.map((part, idx) =>
                     part.kind === "text" ? (

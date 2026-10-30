@@ -18,6 +18,14 @@ vi.mock("../../lib/bindings", () => ({
     listChatModels: vi.fn(),
     runAgent: vi.fn().mockResolvedValue({ status: "ok", data: null }),
     answerTool: vi.fn().mockResolvedValue(true),
+    listConversations: vi.fn().mockResolvedValue({ status: "ok", data: [] }),
+    createConversation: vi.fn().mockResolvedValue({
+      status: "ok",
+      data: { id: 1, title: "test", workspacePath: null, updatedAt: 100 },
+    }),
+    deleteConversation: vi.fn().mockResolvedValue({ status: "ok", data: null }),
+    loadMessages: vi.fn().mockResolvedValue({ status: "ok", data: [] }),
+    appendMessage: vi.fn().mockResolvedValue({ status: "ok", data: 1 }),
   },
 }));
 
@@ -27,9 +35,11 @@ vi.mock("@tauri-apps/api/core", () => ({
   },
 }));
 
-vi.mock("../models/store", () => ({
-  useModelsStore: vi.fn(),
-}));
+vi.mock("../models/store", () => {
+  const fn = vi.fn();
+  (fn as any).getState = () => fn();
+  return { useModelsStore: fn };
+});
 
 afterEach(() => {
   cleanup();
@@ -38,7 +48,14 @@ afterEach(() => {
 describe("AiPanel", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useWorkspaceChatStore.getState().clear();
+    useWorkspaceChatStore.setState({
+      messages: [],
+      streaming: false,
+      conversationId: null,
+      place: "/workspace",
+      conversations: [],
+      saveError: null,
+    });
 
     vi.mocked(commands.sendMessage).mockResolvedValue({
       status: "ok",
@@ -92,19 +109,21 @@ describe("AiPanel", () => {
     const sendBtn = screen.getByRole("button", { name: /send/i });
     fireEvent.click(sendBtn);
 
-    expect(commands.sendMessage).toHaveBeenCalledWith(
-      "workspace",
-      1,
-      "test-model",
-      expect.arrayContaining([
-        { role: "system", content: WORKSPACE_SYSTEM },
-        expect.objectContaining({
-          role: "user",
-          content: expect.stringContaining("File src/a.ts:"),
-        }),
-      ]),
-      expect.anything(),
-    );
+    await vi.waitFor(() => {
+      expect(commands.sendMessage).toHaveBeenCalledWith(
+        "workspace",
+        1,
+        "test-model",
+        expect.arrayContaining([
+          { role: "system", content: WORKSPACE_SYSTEM },
+          expect.objectContaining({
+            role: "user",
+            content: expect.stringContaining("File src/a.ts:"),
+          }),
+        ]),
+        expect.anything(),
+      );
+    });
 
     const callArgs = vi.mocked(commands.sendMessage).mock.calls[0];
     const userMsg = callArgs[3].find((m) => m.role === "user");
@@ -126,16 +145,18 @@ describe("AiPanel", () => {
     const sendBtn = screen.getByRole("button", { name: /send/i });
     fireEvent.click(sendBtn);
 
-    expect(commands.sendMessage).toHaveBeenCalledWith(
-      "workspace",
-      1,
-      "test-model",
-      [
-        { role: "system", content: WORKSPACE_SYSTEM },
-        { role: "user", content: "Hello without file" },
-      ],
-      expect.anything(),
-    );
+    await vi.waitFor(() => {
+      expect(commands.sendMessage).toHaveBeenCalledWith(
+        "workspace",
+        1,
+        "test-model",
+        [
+          { role: "system", content: WORKSPACE_SYSTEM },
+          { role: "user", content: "Hello without file" },
+        ],
+        expect.anything(),
+      );
+    });
   });
 
   it("a selection can be sent from a file too large to attach", async () => {
@@ -155,11 +176,13 @@ describe("AiPanel", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: /send/i }));
 
-    const userMsg = vi
-      .mocked(commands.sendMessage)
-      .mock.calls[0]?.[3].find((m) => m.role === "user");
-    expect(userMsg?.content).toContain("Selected lines 1-1 of src/a.ts:");
-    expect(userMsg?.content).not.toContain("File src/a.ts:");
+    await vi.waitFor(() => {
+      const userMsg = vi
+        .mocked(commands.sendMessage)
+        .mock.calls[0]?.[3].find((m) => m.role === "user");
+      expect(userMsg?.content).toContain("Selected lines 1-1 of src/a.ts:");
+      expect(userMsg?.content).not.toContain("File src/a.ts:");
+    });
   });
 
   it("Stop stops only the workspace reply", async () => {
@@ -202,7 +225,9 @@ describe("AiPanel", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: /send/i }));
 
-    expect(commands.runAgent).toHaveBeenCalled();
+    await vi.waitFor(() => {
+      expect(commands.runAgent).toHaveBeenCalled();
+    });
     const runAgentMsgs = vi.mocked(commands.runAgent).mock.calls[0][2];
     expect(runAgentMsgs.some((m) => m.role === "system")).toBe(false);
     expect(commands.sendMessage).not.toHaveBeenCalled();
@@ -237,15 +262,17 @@ describe("AiPanel", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: /send/i }));
 
-    expect(commands.sendMessage).toHaveBeenCalledWith(
-      "workspace",
-      1,
-      "unknown-model",
-      expect.arrayContaining([
-        { role: "system", content: WORKSPACE_SYSTEM },
-      ]),
-      expect.anything(),
-    );
+    await vi.waitFor(() => {
+      expect(commands.sendMessage).toHaveBeenCalledWith(
+        "workspace",
+        1,
+        "unknown-model",
+        expect.arrayContaining([
+          { role: "system", content: WORKSPACE_SYSTEM },
+        ]),
+        expect.anything(),
+      );
+    });
 
     // 3. Model with supportsTools: false -> agent switch is disabled with title
     cleanup();
@@ -273,5 +300,84 @@ describe("AiPanel", () => {
       disabledCheckbox.getAttribute("title") ||
         disabledCheckbox.parentElement?.getAttribute("title"),
     ).toBe("This model can't use tools");
+  });
+
+  it("caps attachments to the model's context", async () => {
+    vi.mocked(useModelsStore).mockReturnValue({
+      chatModels: [
+        {
+          connectionId: 1,
+          modelId: "small-ctx-model",
+          displayName: "Small Ctx Model",
+          connectionLabel: "Provider",
+          contextTokens: 8192,
+        },
+      ],
+      selected: { connectionId: 1, modelId: "small-ctx-model" },
+      loaded: true,
+      select: vi.fn(),
+      load: vi.fn(),
+    } as any);
+
+    const longText = "a".repeat(50_000);
+    buffers.open("src/a.ts", createState(longText, "a.ts"));
+
+    render(<AiPanel />);
+
+    expect(
+      screen.getByText(/\(cut to fit the model's context\)/i),
+    ).toBeDefined();
+
+    fireEvent.change(screen.getByRole("textbox"), {
+      target: { value: "Review this file" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /send/i }));
+
+    await vi.waitFor(() => {
+      expect(commands.sendMessage).toHaveBeenCalled();
+    });
+    const msgs = vi.mocked(commands.sendMessage).mock.calls[0][3];
+    const userMsg = msgs.find((m) => m.role === "user");
+    expect(userMsg?.content).toContain("a".repeat(16_384));
+    expect(userMsg?.content).not.toContain("a".repeat(16_385));
+  });
+
+  it("Clear button asks confirmation and removes the conversation", async () => {
+    useWorkspaceChatStore.setState({
+      conversationId: 55,
+      place: "/workspace",
+      conversations: [
+        { id: 55, title: "Chat", workspacePath: "/workspace", updatedAt: 100 },
+      ],
+      messages: [
+        { id: "u1", role: "user", text: "hi", status: "complete" },
+        { id: "a1", role: "assistant", text: "hello", status: "complete" },
+      ],
+    });
+
+    render(<AiPanel />);
+
+    const clearBtn = screen.getByRole("button", { name: /^clear$/i });
+    fireEvent.click(clearBtn);
+
+    expect(screen.getByText(/clear this chat\?/i)).toBeDefined();
+
+    // Cancel
+    const cancelBtn = screen.getByRole("button", { name: /cancel/i });
+    fireEvent.click(cancelBtn);
+    expect(screen.queryByText(/clear this chat\?/i)).toBeNull();
+    expect(commands.deleteConversation).not.toHaveBeenCalled();
+
+    // Confirm
+    const clearBtnAgain = screen.getByRole("button", { name: /^clear$/i });
+    fireEvent.click(clearBtnAgain);
+    const confirmBtn = screen.getByRole("button", { name: /^clear$/i });
+    fireEvent.click(confirmBtn);
+
+    await vi.waitFor(() => {
+      expect(commands.deleteConversation).toHaveBeenCalledWith(55);
+      expect(useWorkspaceChatStore.getState().messages.length).toBe(0);
+      expect(useWorkspaceChatStore.getState().conversationId).toBeNull();
+    });
   });
 });

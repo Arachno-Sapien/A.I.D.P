@@ -6,6 +6,14 @@ vi.mock("../../lib/bindings", () => ({
     runAgent: vi.fn().mockResolvedValue({ status: "ok", data: null }),
     answerTool: vi.fn().mockResolvedValue(true),
     stopReply: vi.fn(),
+    listConversations: vi.fn().mockResolvedValue({ status: "ok", data: [] }),
+    createConversation: vi.fn().mockResolvedValue({
+      status: "ok",
+      data: { id: 1, title: "test", workspacePath: null, updatedAt: 100 },
+    }),
+    deleteConversation: vi.fn().mockResolvedValue({ status: "ok", data: null }),
+    loadMessages: vi.fn().mockResolvedValue({ status: "ok", data: [] }),
+    appendMessage: vi.fn().mockResolvedValue({ status: "ok", data: 1 }),
   },
 }));
 
@@ -16,6 +24,7 @@ vi.mock("@tauri-apps/api/core", () => ({
 }));
 
 import { commands } from "../../lib/bindings";
+import { useModelsStore } from "../models/store";
 import { createChatStore, useChatStore } from "./store";
 
 describe("useChatStore", () => {
@@ -24,6 +33,10 @@ describe("useChatStore", () => {
     useChatStore.setState({
       messages: [],
       streaming: false,
+      conversationId: null,
+      place: null,
+      conversations: [],
+      saveError: null,
     });
   });
 
@@ -353,5 +366,153 @@ describe("useChatStore", () => {
     expect(commands.answerTool).toHaveBeenCalledWith(3, true);
     const step = (useChatStore.getState().messages[0].parts?.[0] as any)?.step;
     expect(step.answered).toBe(true);
+  });
+
+  it("saves the user message then the reply", async () => {
+    vi.mocked(commands.createConversation).mockResolvedValueOnce({
+      status: "ok",
+      data: { id: 123, title: "hello", workspacePath: null, updatedAt: 1000 },
+    });
+    vi.mocked(commands.appendMessage).mockResolvedValue({
+      status: "ok",
+      data: 1,
+    });
+
+    useModelsStore.setState({
+      chatModels: [
+        {
+          connectionId: 1,
+          modelId: "m1",
+          displayName: "Model One",
+          connectionLabel: "Provider",
+          isDefault: true,
+          supportsTools: true,
+          isLocal: false,
+          contextTokens: null,
+        },
+      ],
+    });
+
+    await useChatStore
+      .getState()
+      .send("hello", { connectionId: 1, modelId: "m1" });
+
+    expect(commands.createConversation).toHaveBeenCalledWith("hello", null);
+    expect(useChatStore.getState().conversationId).toBe(123);
+
+    expect(commands.appendMessage).toHaveBeenCalledWith(
+      123,
+      expect.objectContaining({
+        role: "user",
+        status: "complete",
+      }),
+    );
+
+    const assistantId = useChatStore.getState().messages[1].id;
+    useChatStore.getState().applyEvent(assistantId, {
+      event: "done",
+      data: { tokensIn: 10, tokensOut: 20 },
+    });
+
+    expect(commands.appendMessage).toHaveBeenCalledWith(
+      123,
+      expect.objectContaining({
+        role: "assistant",
+        status: "complete",
+        modelName: "Model One",
+        tokensIn: 10,
+        tokensOut: 20,
+      }),
+    );
+  });
+
+  it("saves stopped and failed replies with their status", async () => {
+    useChatStore.setState({ conversationId: 123 });
+    vi.mocked(commands.appendMessage).mockResolvedValue({
+      status: "ok",
+      data: 2,
+    });
+
+    useChatStore.setState({
+      messages: [
+        {
+          id: "a1",
+          role: "assistant",
+          text: "part",
+          status: "streaming",
+          modelName: "Model One",
+        },
+      ],
+    });
+    useChatStore.getState().applyEvent("a1", {
+      event: "error",
+      data: { kind: "cancelled" },
+    });
+    expect(commands.appendMessage).toHaveBeenCalledWith(
+      123,
+      expect.objectContaining({
+        role: "assistant",
+        status: "stopped",
+        errorKind: null,
+      }),
+    );
+
+    useChatStore.setState({
+      messages: [
+        {
+          id: "a2",
+          role: "assistant",
+          text: "",
+          status: "streaming",
+          modelName: "Model One",
+        },
+      ],
+    });
+    useChatStore.getState().applyEvent("a2", {
+      event: "error",
+      data: { kind: "offline" },
+    });
+    expect(commands.appendMessage).toHaveBeenCalledWith(
+      123,
+      expect.objectContaining({
+        role: "assistant",
+        status: "error",
+        errorKind: "offline",
+      }),
+    );
+  });
+
+  it("opens the newest chat and restores model names", async () => {
+    vi.mocked(commands.listConversations).mockResolvedValueOnce({
+      status: "ok",
+      data: [
+        { id: 10, title: "Chat Ten", workspacePath: null, updatedAt: 200 },
+        { id: 9, title: "Chat Nine", workspacePath: null, updatedAt: 100 },
+      ],
+    });
+    vi.mocked(commands.loadMessages).mockResolvedValueOnce({
+      status: "ok",
+      data: [
+        {
+          id: 1,
+          role: "assistant",
+          contentParts: JSON.stringify({ v: 1, text: "hi" }),
+          modelRef: "1:m1",
+          modelName: "Model One",
+          status: "complete",
+          errorKind: null,
+          tokensIn: null,
+          tokensOut: null,
+          createdAt: 100,
+        },
+      ],
+    });
+
+    await useChatStore.getState().openPlace(null);
+
+    expect(commands.listConversations).toHaveBeenCalledWith(null);
+    expect(commands.loadMessages).toHaveBeenCalledWith(10);
+    expect(useChatStore.getState().conversationId).toBe(10);
+    expect(useChatStore.getState().messages[0].modelName).toBe("Model One");
   });
 });

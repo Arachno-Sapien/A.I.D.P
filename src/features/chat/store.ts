@@ -7,10 +7,13 @@ import {
   type ChatEvent_Deserialize,
   type ChatMessage,
   type ChatSurface,
+  type Conversation,
   type ProviderError,
   type ToolAction,
   type ToolOutcome,
 } from "../../lib/bindings";
+import { useModelsStore } from "../models/store";
+import { fromStored, toStored } from "./persist";
 
 export type MessageStatus = "streaming" | "complete" | "stopped" | "error";
 
@@ -48,6 +51,8 @@ export interface UiMessage {
   target?: ApplyTarget;
   parts?: MessagePart[];
   status: MessageStatus;
+  modelRef?: string;
+  modelName?: string;
   error?: ProviderError;
   commandError?: AppError;
 }
@@ -60,6 +65,16 @@ export interface ChatHooks {
 export interface ChatStore {
   messages: UiMessage[];
   streaming: boolean;
+  conversationId: number | null;
+  place: string | null;
+  conversations: Conversation[];
+  saveError: string | null;
+
+  openPlace(place: string | null): Promise<void>;
+  load(id: number): Promise<void>;
+  startNew(): void;
+  remove(id: number): Promise<void>;
+
   send(
     text: string,
     model: { connectionId: number; modelId: string },
@@ -75,6 +90,58 @@ export const createChatStore = (surface: ChatSurface, hooks?: ChatHooks) =>
   create<ChatStore>((set, get) => ({
     messages: [],
     streaming: false,
+    conversationId: null,
+    place: null,
+    conversations: [],
+    saveError: null,
+
+    openPlace: async (place: string | null) => {
+      set({ place });
+      const res = await commands.listConversations(place);
+      if (res.status === "ok") {
+        const conversations = res.data;
+        set({ conversations });
+        if (conversations.length > 0) {
+          await get().load(conversations[0].id);
+        } else {
+          get().startNew();
+        }
+      }
+    },
+
+    load: async (id: number) => {
+      const res = await commands.loadMessages(id);
+      if (res.status === "ok") {
+        set({
+          conversationId: id,
+          messages: res.data.map(fromStored),
+          streaming: false,
+          saveError: null,
+        });
+      }
+    },
+
+    startNew: () => {
+      set({
+        conversationId: null,
+        messages: [],
+        streaming: false,
+        saveError: null,
+      });
+    },
+
+    remove: async (id: number) => {
+      await commands.deleteConversation(id);
+      const remaining = get().conversations.filter((c) => c.id !== id);
+      set({ conversations: remaining });
+      if (get().conversationId === id) {
+        if (remaining.length > 0 && get().place === null) {
+          await get().load(remaining[0].id);
+        } else {
+          get().startNew();
+        }
+      }
+    },
 
     send: async (
       text: string,
@@ -88,6 +155,31 @@ export const createChatStore = (surface: ChatSurface, hooks?: ChatHooks) =>
 
       const isAgent = Boolean(extra?.agent);
 
+      let activeConvId = get().conversationId;
+      if (activeConvId === null) {
+        const createRes = await commands.createConversation(trimmed, get().place);
+        if (createRes.status === "ok") {
+          activeConvId = createRes.data.id;
+          set((state) => ({
+            conversationId: activeConvId,
+            conversations: [createRes.data, ...state.conversations],
+          }));
+        } else {
+          set({ saveError: "Couldn't save this message." });
+        }
+      }
+
+      const modelRef = `${model.connectionId}:${model.modelId}`;
+      const knownModel = useModelsStore
+        .getState()
+        .chatModels.find(
+          (m) =>
+            m.connectionId === model.connectionId &&
+            m.modelId === model.modelId,
+        );
+      const modelName =
+        knownModel?.displayName || knownModel?.modelId || model.modelId;
+
       const userMessage: UiMessage = {
         id: crypto.randomUUID(),
         role: "user",
@@ -97,6 +189,22 @@ export const createChatStore = (surface: ChatSurface, hooks?: ChatHooks) =>
         status: "complete",
       };
 
+      if (activeConvId !== null) {
+        const appendRes = await commands.appendMessage(activeConvId, {
+          role: "user",
+          contentParts: toStored(userMessage),
+          modelRef: null,
+          modelName: null,
+          status: "complete",
+          errorKind: null,
+          tokensIn: null,
+          tokensOut: null,
+        });
+        if (appendRes.status === "error") {
+          set({ saveError: "Couldn't save this message." });
+        }
+      }
+
       const assistantId = crypto.randomUUID();
       const assistantPlaceholder: UiMessage = {
         id: assistantId,
@@ -105,6 +213,8 @@ export const createChatStore = (surface: ChatSurface, hooks?: ChatHooks) =>
         target: extra?.target,
         parts: isAgent ? [] : undefined,
         status: "streaming",
+        modelRef,
+        modelName,
       };
 
       const history: ChatMessage[] = [];
@@ -217,6 +327,7 @@ export const createChatStore = (surface: ChatSurface, hooks?: ChatHooks) =>
           hooks?.onToolResult?.(updatedStep);
         }
       } else if (ev.event === "done") {
+        let completedMsg: UiMessage | undefined;
         set((state) => ({
           messages: state.messages.map((m) => {
             if (m.id !== id) return m;
@@ -229,12 +340,39 @@ export const createChatStore = (surface: ChatSurface, hooks?: ChatHooks) =>
               }
               return p;
             });
-            return { ...m, status: "complete", parts };
+            completedMsg = { ...m, status: "complete", parts };
+            return completedMsg;
           }),
           streaming: false,
         }));
+
+        const activeConvId = get().conversationId;
+        if (activeConvId !== null && completedMsg) {
+          const usage = (ev.data as any)?.usage ?? ev.data;
+          const msgToSave = completedMsg;
+          void commands
+            .appendMessage(activeConvId, {
+              role: "assistant",
+              contentParts: toStored(msgToSave),
+              modelRef: msgToSave.modelRef ?? null,
+              modelName: msgToSave.modelName ?? null,
+              status: "complete",
+              errorKind: null,
+              tokensIn: usage?.tokensIn ?? null,
+              tokensOut: usage?.tokensOut ?? null,
+            })
+            .then((res) => {
+              if (res.status === "error") {
+                set({ saveError: "Couldn't save this message." });
+              }
+            });
+        }
       } else if (ev.event === "error") {
         const isCancelled = ev.data.kind === "cancelled";
+        const status: MessageStatus = isCancelled ? "stopped" : "error";
+        const errorKind = isCancelled ? null : ev.data.kind;
+
+        let endedMsg: UiMessage | undefined;
         set((state) => ({
           messages: state.messages.map((m) => {
             if (m.id !== id) return m;
@@ -247,15 +385,37 @@ export const createChatStore = (surface: ChatSurface, hooks?: ChatHooks) =>
               }
               return p;
             });
-            return {
+            endedMsg = {
               ...m,
-              status: isCancelled ? "stopped" : "error",
+              status,
               error: isCancelled ? undefined : ev.data,
               parts,
             };
+            return endedMsg;
           }),
           streaming: false,
         }));
+
+        const activeConvId = get().conversationId;
+        if (activeConvId !== null && endedMsg) {
+          const msgToSave = endedMsg;
+          void commands
+            .appendMessage(activeConvId, {
+              role: "assistant",
+              contentParts: toStored(msgToSave),
+              modelRef: msgToSave.modelRef ?? null,
+              modelName: msgToSave.modelName ?? null,
+              status,
+              errorKind,
+              tokensIn: null,
+              tokensOut: null,
+            })
+            .then((res) => {
+              if (res.status === "error") {
+                set({ saveError: "Couldn't save this message." });
+              }
+            });
+        }
       }
     },
 

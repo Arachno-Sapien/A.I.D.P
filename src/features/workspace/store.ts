@@ -8,6 +8,7 @@ import {
 } from "../../lib/bindings";
 import { applyProposal } from "./applyProposal";
 import { buffers, type SelectionInfo } from "./buffers";
+import { useWorkspaceChatStore } from "./chatStore";
 import { createState } from "./cm";
 import { workspaceErrorText } from "./workspaceErrorText";
 
@@ -181,6 +182,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
         set({ children: { "": listRes.data } });
       }
       void get().loadRecent();
+      await useWorkspaceChatStore.getState().openPlace(res.data.path);
     } else {
       set({ error: workspaceErrorText(res.error) });
     }
@@ -206,6 +208,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
         set({ children: { "": listRes.data } });
       }
       void get().loadRecent();
+      await useWorkspaceChatStore.getState().openPlace(res.data.path);
     } else {
       set({ error: workspaceErrorText(res.error) });
       void get().loadRecent();
@@ -227,6 +230,8 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
     set({ info: null, ...folderReset });
     syncUnsaved([]);
     void get().loadRecent();
+    useWorkspaceChatStore.getState().startNew();
+    useWorkspaceChatStore.setState({ place: null });
   },
 
   toggleDir: async (path: string) => {

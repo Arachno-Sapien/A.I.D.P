@@ -21,11 +21,28 @@ export interface AiPanelProps {
   onApply?: (code: string, language: string, message: UiMessage) => void;
 }
 
+export function textBudget(contextTokens?: number | null): number {
+  if (contextTokens === undefined || contextTokens === null) {
+    return 100_000;
+  }
+  return Math.min(100_000, 2 * contextTokens);
+}
+
 export function AiPanel({ onApply }: AiPanelProps) {
   const { tabs, active, selection, propose } = useWorkspaceStore();
-  const { messages, streaming, send, stop, answer } = useWorkspaceChatStore();
+  const {
+    messages,
+    streaming,
+    send,
+    stop,
+    answer,
+    conversationId,
+    remove,
+    startNew,
+  } = useWorkspaceChatStore();
   const { chatModels, selected } = useModelsStore();
 
+  const [confirmClear, setConfirmClear] = useState(false);
   const [fileRemoved, setFileRemoved] = useState<Record<string, boolean>>({});
   const [fileAdded, setFileAdded] = useState<Record<string, boolean>>({});
   const [selectionRemoved, setSelectionRemoved] = useState<
@@ -40,6 +57,7 @@ export function AiPanel({ onApply }: AiPanelProps) {
       )
     : null;
   const supportsTools = currentModel?.supportsTools ?? null;
+  const budget = textBudget(currentModel?.contextTokens);
 
   const modelKey = selected ? `${selected.connectionId}:${selected.modelId}` : "";
   const [lastModelKey, setLastModelKey] = useState(modelKey);
@@ -73,6 +91,13 @@ export function AiPanel({ onApply }: AiPanelProps) {
       : !isManuallyRemoved && !isTooLarge
     : false;
 
+  const activeDocText = activeTab ? buffers.text(activeTab.path) : undefined;
+  const isCut = Boolean(
+    fileEnabled &&
+      activeDocText !== undefined &&
+      activeDocText.length > budget,
+  );
+
   const selInfo =
     activeTab && selection?.path === activeTab.path ? selection.info : null;
   // A selection needs no file chip (that is how a too-large file is asked about),
@@ -99,9 +124,10 @@ export function AiPanel({ onApply }: AiPanelProps) {
       fresh !== undefined &&
       fresh.length <= FILE_CHAR_LIMIT
     ) {
+      const fileText = fresh.length > budget ? fresh.slice(0, budget) : fresh;
       fileContext = {
         path: activeTab.path,
-        text: fresh,
+        text: fileText,
       };
     }
 
@@ -164,25 +190,63 @@ export function AiPanel({ onApply }: AiPanelProps) {
   return (
     <div className="flex flex-col h-full bg-neutral-900/30 border-l border-neutral-800 text-neutral-100">
       <ModelPicker>
-        <label
-          className={`flex items-center gap-1.5 text-xs select-none ${
-            isAgentDisabled
-              ? "text-neutral-500 cursor-not-allowed"
-              : "text-neutral-300 cursor-pointer"
-          }`}
-          title={isAgentDisabled ? "This model can't use tools" : undefined}
-        >
-          <input
-            type="checkbox"
-            aria-label="Agent"
-            checked={isAgent}
-            disabled={isAgentDisabled}
+        <div className="flex items-center gap-3">
+          <label
+            className={`flex items-center gap-1.5 text-xs select-none ${
+              isAgentDisabled
+                ? "text-neutral-500 cursor-not-allowed"
+                : "text-neutral-300 cursor-pointer"
+            }`}
             title={isAgentDisabled ? "This model can't use tools" : undefined}
-            onChange={(e) => setUserAgentOn(e.target.checked)}
-            className="rounded bg-neutral-800 border-neutral-700 text-neutral-100 focus:ring-0 focus:ring-offset-0 cursor-pointer disabled:cursor-not-allowed"
-          />
-          <span className="font-medium">Agent</span>
-        </label>
+          >
+            <input
+              type="checkbox"
+              aria-label="Agent"
+              checked={isAgent}
+              disabled={isAgentDisabled}
+              title={isAgentDisabled ? "This model can't use tools" : undefined}
+              onChange={(e) => setUserAgentOn(e.target.checked)}
+              className="rounded bg-neutral-800 border-neutral-700 text-neutral-100 focus:ring-0 focus:ring-offset-0 cursor-pointer disabled:cursor-not-allowed"
+            />
+            <span className="font-medium">Agent</span>
+          </label>
+
+          {messages.length > 0 &&
+            (confirmClear ? (
+              <span className="flex items-center gap-1.5 text-xs text-neutral-300">
+                <span>Clear this chat?</span>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setConfirmClear(false);
+                    if (conversationId) {
+                      await remove(conversationId);
+                    } else {
+                      startNew();
+                    }
+                  }}
+                  className="px-1.5 py-0.5 bg-red-900/60 hover:bg-red-800 text-red-200 rounded text-[11px] cursor-pointer"
+                >
+                  Clear
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmClear(false)}
+                  className="px-1.5 py-0.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-neutral-200 rounded text-[11px] cursor-pointer"
+                >
+                  Cancel
+                </button>
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setConfirmClear(true)}
+                className="text-xs text-neutral-400 hover:text-neutral-200 transition-colors cursor-pointer"
+              >
+                Clear
+              </button>
+            ))}
+        </div>
       </ModelPicker>
 
       {/* Chips row */}
@@ -191,6 +255,11 @@ export function AiPanel({ onApply }: AiPanelProps) {
           {fileEnabled && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-neutral-800 border border-neutral-700/60 font-mono text-neutral-200">
               <span>{activeTab.name}</span>
+              {isCut && (
+                <span className="text-neutral-400 font-sans text-[10px] ml-0.5">
+                  (cut to fit the model's context)
+                </span>
+              )}
               <button
                 type="button"
                 aria-label={`Remove ${activeTab.name}`}

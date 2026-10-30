@@ -12,11 +12,20 @@ vi.mock("../../lib/bindings", () => ({
     setUnsaved: vi.fn().mockResolvedValue(undefined),
     answerTool: vi.fn().mockResolvedValue(true),
     stopReply: vi.fn().mockResolvedValue(undefined),
+    listConversations: vi.fn().mockResolvedValue({ status: "ok", data: [] }),
+    loadMessages: vi.fn().mockResolvedValue({ status: "ok", data: [] }),
+    createConversation: vi.fn().mockResolvedValue({
+      status: "ok",
+      data: { id: 1, title: "test", workspacePath: null, updatedAt: 100 },
+    }),
+    deleteConversation: vi.fn().mockResolvedValue({ status: "ok", data: null }),
+    appendMessage: vi.fn().mockResolvedValue({ status: "ok", data: 1 }),
   },
 }));
 
 import { commands } from "../../lib/bindings";
 import { buffers } from "./buffers";
+import { useWorkspaceChatStore } from "./chatStore";
 import { createState } from "./cm";
 import { useWorkspaceStore } from "./store";
 
@@ -639,6 +648,31 @@ describe("useWorkspaceStore", () => {
     await useWorkspaceStore.getState().forceOpenFolder();
 
     expect(commands.stopReply).toHaveBeenCalledWith("workspace");
+  });
+
+  it("a folder restores its own conversation", async () => {
+    vi.mocked(commands.openFolder).mockResolvedValueOnce({
+      status: "ok",
+      data: { name: "my-project", path: "/path/to/my-project", isGit: true },
+    });
+    vi.mocked(commands.listConversations).mockResolvedValueOnce({
+      status: "ok",
+      data: [
+        {
+          id: 42,
+          title: "Project chat",
+          workspacePath: "/path/to/my-project",
+          updatedAt: 500,
+        },
+      ],
+    });
+
+    await useWorkspaceStore.getState().forceOpenFolder();
+
+    expect(commands.listConversations).toHaveBeenCalledWith(
+      "/path/to/my-project",
+    );
+    expect(useWorkspaceChatStore.getState().place).toBe("/path/to/my-project");
   });
 });
 

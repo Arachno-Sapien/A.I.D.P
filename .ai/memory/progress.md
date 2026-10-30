@@ -38,13 +38,12 @@ Carry-overs: `docs/phases/M3.md` and `docs/phases/M4.md`, "What's left → To M5
 
 ## In progress
 
-Tasks 1 to 5 (Backend) completed; waiting for review before starting UI (Tasks 6 to 12).
 Claimed by Antigravity (Gemini 2.5 Pro), 2026-10-30.
-Task: M5 Tasks 1 to 5 review stop.
-Next step: Task 6 - Chat history in the UI (`persist.ts`, `store.ts`, `ConversationList.tsx`, etc.).
+Task: M5 Task 7 - The Local panel (Ollama status, downloads, memory).
+Next step: Step 1 - write failing tests in LocalPanel.test.tsx.
 
 ## Next 3 tasks
 
-1. M5 Tasks 1 to 5 (history storage, Ollama client, Ollama adapter, Ollama in the app, text budget).
-2. Claude Code's review of Tasks 1 to 5 before any UI.
-3. M5 Tasks 6 to 12 (UI, docs, live check and close).
+1. M5 Task 7 (The Local panel: Ollama status, downloads, memory).
+2. M5 Task 8 (Picker, start-up and empty states).
+3. M5 Tasks 9 to 12 (Settings, app icon, security & docs, live check and close).

@@ -11,6 +11,14 @@ vi.mock("./lib/bindings", () => ({
     watchClose: vi.fn().mockResolvedValue(undefined),
     quitApp: vi.fn().mockResolvedValue(undefined),
     setUnsaved: vi.fn().mockResolvedValue(undefined),
+    listConversations: vi.fn().mockResolvedValue({ status: "ok", data: [] }),
+    loadMessages: vi.fn().mockResolvedValue({ status: "ok", data: [] }),
+    createConversation: vi.fn().mockResolvedValue({
+      status: "ok",
+      data: { id: 1, title: "test", workspacePath: null, updatedAt: 100 },
+    }),
+    deleteConversation: vi.fn().mockResolvedValue({ status: "ok", data: null }),
+    appendMessage: vi.fn().mockResolvedValue({ status: "ok", data: 1 }),
   },
 }));
 
