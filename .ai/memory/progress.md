@@ -4,7 +4,7 @@ Updated: 2026-10-30 by Claude Code (Opus 5.5)
 
 ## Current milestone: M5 Ollama, history and settings
 
-Plan written 2026-10-30, waiting for the human's review and answers to D1 to D5: `docs/superpowers/plans/2026-10-30-m5-ollama-history-settings.md` (12 tasks; stop for review after Task 5). Phase doc: `docs/phases/M5.md`. No code yet.
+Plan approved 2026-10-30 with the defaults for D1 to D5: `docs/superpowers/plans/2026-10-30-m5-ollama-history-settings.md` (12 tasks; stop for review after Task 5). Phase doc: `docs/phases/M5.md`. No code yet.
 
 - [ ] App detects Ollama and starts it if stopped
 - [ ] Downloaded models appear in the picker and work in Chat and the workspace
@@ -38,11 +38,11 @@ Carry-overs: `docs/phases/M3.md` and `docs/phases/M4.md`, "What's left → To M5
 
 ## In progress
 
-Nothing claimed. The M5 plan is written (Claude Code, Opus 5.5, 2026-10-30) and waits for the human.
-Next step: the human reviews the plan and answers D1 to D5; then M5 Task 1, migration 4 (`conversations`, `messages`, `models.num_ctx`) in `src-tauri/src/db/mod.rs` with `db/conversations.rs` and `history.rs`.
+Nothing claimed. The M5 plan is approved (defaults for D1 to D5) and not started.
+Next step: M5 Task 1, migration 4 (`conversations`, `messages`, `models.num_ctx`) in `src-tauri/src/db/mod.rs` with `db/conversations.rs`, `history.rs` and `commands/history.rs`.
 
 ## Next 3 tasks
 
-1. The human reviews the M5 plan and answers D1 to D5.
-2. M5 Tasks 1 to 5 (Antigravity), then Claude Code's review before any UI.
+1. M5 Tasks 1 to 5 (history storage, Ollama client, Ollama adapter, Ollama in the app, text budget).
+2. Claude Code's review of Tasks 1 to 5 before any UI.
 3. M5 Tasks 6 to 12 (UI, docs, live check and close).

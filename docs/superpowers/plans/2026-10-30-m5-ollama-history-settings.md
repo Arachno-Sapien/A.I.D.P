@@ -1,6 +1,6 @@
 # M5 Ollama, History and Settings Implementation Plan
 
-> **Status: waiting for the human's review and answers to D1 to D5.** Do not start Task 1 until the human approves. After Task 5, stop for a review before starting Task 6.
+> **Status: approved by the human on 2026-10-30 with the defaults for D1 to D5.** Execute from Task 1. After Task 5, stop for a review before starting Task 6.
 
 > **For agentic workers:** execute task by task, in order, inline in one session (the tasks share files). In Claude Code, `superpowers:executing-plans` fits; in other tools, follow the steps directly. Steps use checkbox (`- [ ]`) syntax. **Do not tick any milestone box, in any file, until the human confirms the live check in Task 12. Do not push; the human decides.** If another agent works in the same checkout, use a git worktree (known-issues, 2026-10-30).
 
