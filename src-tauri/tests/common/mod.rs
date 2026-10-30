@@ -37,6 +37,8 @@ pub fn req() -> ChatRequest {
             role: Role::User,
             content: "hi".to_string(),
         }],
+        tools: vec![],
+        rounds: vec![],
     }
 }
 

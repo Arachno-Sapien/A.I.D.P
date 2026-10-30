@@ -99,13 +99,15 @@ async fn streams_text_deltas_and_usage() {
                 content: "hi".to_string(),
             },
         ],
+        tools: vec![],
+        rounds: vec![],
     };
 
-    let usage = p.stream_chat(request, channel, cancel).await.unwrap();
+    let reply = p.stream_chat(request, channel, cancel).await.unwrap();
 
     assert_eq!(deltas(&events_log), vec!["Hel", "lo"]);
     assert_eq!(
-        usage,
+        reply.usage,
         Usage {
             tokens_in: Some(25),
             tokens_out: Some(12),
@@ -187,10 +189,10 @@ async fn ignores_unknown_events_and_non_text_deltas() {
     let (channel, events_log) = capture();
     let cancel = CancellationToken::new();
 
-    let usage = p.stream_chat(req(), channel, cancel).await.unwrap();
+    let reply = p.stream_chat(req(), channel, cancel).await.unwrap();
     assert!(deltas(&events_log).is_empty());
     assert_eq!(
-        usage,
+        reply.usage,
         Usage {
             tokens_in: Some(10),
             tokens_out: Some(5),

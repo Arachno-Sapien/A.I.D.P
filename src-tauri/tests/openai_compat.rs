@@ -3,7 +3,8 @@
 mod common;
 
 use aidp_lib::gateway::{
-    openai_compat::OpenAiCompat, ModelProvider, ProviderError, Usage,
+    openai_compat::OpenAiCompat, ModelProvider, ProviderError, ToolCall, ToolOutput, ToolRound,
+    ToolSpec, Usage,
 };
 use common::{capture, deltas, req, sse};
 use secrecy::SecretString;
@@ -50,11 +51,11 @@ async fn streams_deltas_and_returns_usage() {
     let (channel, events) = capture();
     let cancel = CancellationToken::new();
 
-    let usage = p.stream_chat(req(), channel, cancel).await.unwrap();
+    let reply = p.stream_chat(req(), channel, cancel).await.unwrap();
 
     assert_eq!(deltas(&events), vec!["Hel", "lo"]);
     assert_eq!(
-        usage,
+        reply.usage,
         Usage {
             tokens_in: Some(5),
             tokens_out: Some(2)
@@ -400,4 +401,309 @@ async fn test_connection_follows_list_models() {
         p.test_connection().await.unwrap_err(),
         ProviderError::InvalidKey
     );
+}
+
+#[tokio::test]
+async fn sends_tools_only_when_given() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(sse(&[
+            r#"{"choices":[{"delta":{"content":"ok"}}]}"#,
+            "[DONE]",
+        ])))
+        .mount(&server)
+        .await;
+
+    let p = provider(&server);
+    let (channel, _) = capture();
+    // 1. Without tools: body has no "tools" key
+    let mut request_no_tools = req();
+    request_no_tools.tools = vec![];
+    p.stream_chat(request_no_tools, channel, CancellationToken::new())
+        .await
+        .unwrap();
+
+    let requests = server.received_requests().await.unwrap();
+    assert_eq!(requests.len(), 1);
+    let body_no_tools: serde_json::Value = serde_json::from_slice(&requests[0].body).unwrap();
+    assert!(body_no_tools.get("tools").is_none());
+
+    // 2. With two specs:
+    let (channel2, _) = capture();
+    let mut request_with_tools = req();
+    request_with_tools.tools = vec![
+        ToolSpec {
+            name: "list_files",
+            description: "List files",
+            schema: json!({"type": "object", "properties": {"path": {"type": "string"}}}),
+        },
+        ToolSpec {
+            name: "read_file",
+            description: "Read a file",
+            schema: json!({"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}),
+        },
+    ];
+    p.stream_chat(request_with_tools, channel2, CancellationToken::new())
+        .await
+        .unwrap();
+
+    let requests2 = server.received_requests().await.unwrap();
+    assert_eq!(requests2.len(), 2);
+    let body_with_tools: serde_json::Value = serde_json::from_slice(&requests2[1].body).unwrap();
+    let tools = body_with_tools.get("tools").unwrap().as_array().unwrap();
+    assert_eq!(tools.len(), 2);
+    assert_eq!(tools[1]["function"]["name"], "read_file");
+    assert_eq!(
+        tools[1]["function"]["parameters"],
+        json!({"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]})
+    );
+}
+
+#[tokio::test]
+async fn parses_streamed_tool_calls() {
+    let server = MockServer::start().await;
+    let body = sse(&[
+        r#"{"choices":[{"delta":{"content":"Let me check."}}]}"#,
+        r#"{"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_1","type":"function","function":{"name":"read_file","arguments":"{\"pa"}}]}}]}"#,
+        r#"{"choices":[{"delta":{"tool_calls":[{"index":1,"id":"call_2","type":"function","function":{"name":"list_files","arguments":"{\"path\":\"dir\"}"}}]}}]}"#,
+        r#"{"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"th\":\"a.ts\"}"}}]}}]}"#,
+        r#"{"choices":[{"delta":{},"finish_reason":"tool_calls"}]}"#,
+        "[DONE]",
+    ]);
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(body))
+        .mount(&server)
+        .await;
+
+    let p = provider(&server);
+    let (channel, events) = capture();
+    let reply = p
+        .stream_chat(req(), channel, CancellationToken::new())
+        .await
+        .unwrap();
+
+    assert_eq!(deltas(&events), vec!["Let me check."]);
+    assert_eq!(
+        reply.tool_calls,
+        vec![
+            ToolCall {
+                id: "call_1".to_string(),
+                name: "read_file".to_string(),
+                input: json!({"path": "a.ts"}),
+            },
+            ToolCall {
+                id: "call_2".to_string(),
+                name: "list_files".to_string(),
+                input: json!({"path": "dir"}),
+            },
+        ]
+    );
+    assert_eq!(
+        reply.assistant,
+        json!({
+            "role": "assistant",
+            "content": "Let me check.",
+            "tool_calls": [
+                {
+                    "id": "call_1",
+                    "type": "function",
+                    "function": {
+                        "name": "read_file",
+                        "arguments": "{\"path\":\"a.ts\"}"
+                    }
+                },
+                {
+                    "id": "call_2",
+                    "type": "function",
+                    "function": {
+                        "name": "list_files",
+                        "arguments": "{\"path\":\"dir\"}"
+                    }
+                }
+            ]
+        })
+    );
+}
+
+#[tokio::test]
+async fn tool_calls_with_stop_and_no_ids() {
+    let server = MockServer::start().await;
+    let body = sse(&[
+        r#"{"choices":[{"delta":{"tool_calls":[{"function":{"name":"list_files","arguments":"{}"}}]}}]}"#,
+        r#"{"choices":[{"delta":{},"finish_reason":"stop"}]}"#,
+        "[DONE]",
+    ]);
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(body))
+        .mount(&server)
+        .await;
+
+    let p = provider(&server);
+    let (channel, _) = capture();
+    let reply = p
+        .stream_chat(req(), channel, CancellationToken::new())
+        .await
+        .unwrap();
+
+    assert_eq!(
+        reply.tool_calls,
+        vec![ToolCall {
+            id: "call_0".to_string(),
+            name: "list_files".to_string(),
+            input: json!({}),
+        }]
+    );
+}
+
+#[tokio::test]
+async fn keeps_extra_tool_call_fields() {
+    let server = MockServer::start().await;
+    let body = sse(&[
+        r#"{"choices":[{"delta":{"tool_calls":[{"index":0,"id":"c1","type":"function","function":{"name":"fn1","arguments":"{}"},"extra_content":{"google":{"thought_signature":"sig"}}}]}}]}"#,
+        r#"{"choices":[{"delta":{},"finish_reason":"tool_calls"}]}"#,
+        "[DONE]",
+    ]);
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(body))
+        .mount(&server)
+        .await;
+
+    let p = provider(&server);
+    let (channel, _) = capture();
+    let reply = p
+        .stream_chat(req(), channel, CancellationToken::new())
+        .await
+        .unwrap();
+
+    assert_eq!(
+        reply.assistant["tool_calls"][0]["extra_content"],
+        json!({"google": {"thought_signature": "sig"}})
+    );
+}
+
+#[tokio::test]
+async fn invalid_arguments_stay_a_string() {
+    let server = MockServer::start().await;
+    let body = sse(&[
+        r#"{"choices":[{"delta":{"tool_calls":[{"index":0,"id":"c1","type":"function","function":{"name":"fn1","arguments":"{bad"}}]}}]}"#,
+        r#"{"choices":[{"delta":{},"finish_reason":"tool_calls"}]}"#,
+        "[DONE]",
+    ]);
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(body))
+        .mount(&server)
+        .await;
+
+    let p = provider(&server);
+    let (channel, _) = capture();
+    let reply = p
+        .stream_chat(req(), channel, CancellationToken::new())
+        .await
+        .unwrap();
+
+    assert_eq!(
+        reply.tool_calls[0].input,
+        serde_json::Value::String("{bad".to_string())
+    );
+}
+
+#[tokio::test]
+async fn cut_off_tool_call_is_an_error() {
+    let server = MockServer::start().await;
+    let body = sse(&[
+        r#"{"choices":[{"delta":{"tool_calls":[{"index":0,"id":"c1","type":"function","function":{"name":"fn1","arguments":"{\"a\":1"}}]}}]}"#,
+        r#"{"choices":[{"delta":{},"finish_reason":"length"}]}"#,
+        "[DONE]",
+    ]);
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(body))
+        .mount(&server)
+        .await;
+
+    let p = provider(&server);
+    let (channel, _) = capture();
+    let err = p
+        .stream_chat(req(), channel, CancellationToken::new())
+        .await
+        .unwrap_err();
+
+    assert_eq!(
+        err,
+        ProviderError::Provider {
+            message: "The reply was cut off before its tool call was complete.".to_string(),
+        }
+    );
+}
+
+#[tokio::test]
+async fn renders_tool_rounds() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(sse(&[
+            r#"{"choices":[{"delta":{"content":"done"}}]}"#,
+            "[DONE]",
+        ])))
+        .mount(&server)
+        .await;
+
+    let p = provider(&server);
+    let (channel, _) = capture();
+
+    let mut request = req();
+    request.rounds = vec![ToolRound {
+        assistant: json!({
+            "role": "assistant",
+            "content": null,
+            "tool_calls": [
+                {
+                    "id": "call_1",
+                    "type": "function",
+                    "function": {"name": "read_file", "arguments": "{\"path\":\"a.ts\"}"}
+                },
+                {
+                    "id": "call_2",
+                    "type": "function",
+                    "function": {"name": "read_file", "arguments": "{\"path\":\"missing.ts\"}"}
+                }
+            ]
+        }),
+        results: vec![
+            ToolOutput {
+                call_id: "call_1".to_string(),
+                content: "file contents".to_string(),
+                is_error: false,
+            },
+            ToolOutput {
+                call_id: "call_2".to_string(),
+                content: "file not found".to_string(),
+                is_error: true,
+            },
+        ],
+    }];
+
+    p.stream_chat(request, channel, CancellationToken::new())
+        .await
+        .unwrap();
+
+    let requests = server.received_requests().await.unwrap();
+    assert_eq!(requests.len(), 1);
+    let body: serde_json::Value = serde_json::from_slice(&requests[0].body).unwrap();
+    let msgs = body.get("messages").unwrap().as_array().unwrap();
+
+    let len = msgs.len();
+    assert!(len >= 3);
+    assert_eq!(msgs[len - 3]["role"], "assistant");
+    assert_eq!(msgs[len - 2]["role"], "tool");
+    assert_eq!(msgs[len - 2]["tool_call_id"], "call_1");
+    assert_eq!(msgs[len - 2]["content"], "file contents");
+    assert_eq!(msgs[len - 1]["role"], "tool");
+    assert_eq!(msgs[len - 1]["tool_call_id"], "call_2");
+    assert_eq!(msgs[len - 1]["content"], "Error: file not found");
 }

@@ -413,16 +413,18 @@ impl Services {
         };
 
         let prov = provider(row.kind, self.http.clone(), row.base_url, key);
-        let usage = prov
+        let reply = prov
             .stream_chat(
                 ChatRequest {
                     model: model_id,
                     messages,
+                    tools: vec![],
+                    rounds: vec![],
                 },
                 out,
                 cancel,
             )
             .await?;
-        Ok(usage)
+        Ok(reply.usage)
     }
 }

@@ -2,7 +2,7 @@ use crate::gateway::http::{
     list_error, map_http_error, map_reqwest_error, read_sse, Step, LIST_TIMEOUT,
 };
 use crate::gateway::{
-    ChatEvent, ChatRequest, ModelInfo, ModelProvider, ProviderError, Role, Usage,
+    ChatEvent, ChatRequest, ModelInfo, ModelProvider, ProviderError, Reply, Role, Usage,
 };
 use async_trait::async_trait;
 use reqwest::header::HeaderValue;
@@ -174,7 +174,7 @@ impl ModelProvider for Anthropic {
         req: ChatRequest,
         out: Channel<ChatEvent>,
         cancel: CancellationToken,
-    ) -> Result<Usage, ProviderError> {
+    ) -> Result<Reply, ProviderError> {
         let mut system_parts = Vec::new();
         let mut anthropic_messages = Vec::new();
 
@@ -302,7 +302,11 @@ impl ModelProvider for Anthropic {
         })
         .await?;
 
-        Ok(usage)
+        Ok(Reply {
+            usage,
+            tool_calls: vec![],
+            assistant: serde_json::json!({"role": "assistant", "content": []}),
+        })
     }
 }
 

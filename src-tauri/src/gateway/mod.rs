@@ -82,10 +82,49 @@ pub struct ChatMessage {
     pub content: String,
 }
 
-#[derive(Serialize, Deserialize, Type, Clone, Debug, PartialEq)]
+pub const TOOLS_UNSUPPORTED: &str =
+    "This model can't use tools. Turn off Agent to ask without them.";
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ToolSpec {
+    pub name: &'static str,
+    pub description: &'static str,
+    pub schema: serde_json::Value,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ToolCall {
+    pub id: String,
+    pub name: String,
+    pub input: serde_json::Value,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ToolOutput {
+    pub call_id: String,
+    pub content: String,
+    pub is_error: bool,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ToolRound {
+    pub assistant: serde_json::Value,
+    pub results: Vec<ToolOutput>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Reply {
+    pub usage: Usage,
+    pub tool_calls: Vec<ToolCall>,
+    pub assistant: serde_json::Value,
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct ChatRequest {
     pub model: String,
     pub messages: Vec<ChatMessage>,
+    pub tools: Vec<ToolSpec>,
+    pub rounds: Vec<ToolRound>,
 }
 
 #[derive(Serialize, Deserialize, Type, Clone, Debug, Default, PartialEq)]
@@ -118,6 +157,16 @@ pub enum ChatEvent {
     Delta(String),
     Done(Usage),
     Error(ProviderError),
+    ToolCall {
+        id: u32,
+        action: crate::tools::ToolAction,
+        #[serde(rename = "needsAnswer")]
+        needs_answer: bool,
+    },
+    ToolResult {
+        id: u32,
+        outcome: crate::tools::ToolOutcome,
+    },
 }
 
 #[async_trait]
@@ -133,7 +182,7 @@ pub trait ModelProvider: Send + Sync {
         req: ChatRequest,
         out: Channel<ChatEvent>,
         cancel: CancellationToken,
-    ) -> Result<Usage, ProviderError>;
+    ) -> Result<Reply, ProviderError>;
 }
 
 #[cfg(test)]
@@ -160,6 +209,29 @@ mod tests {
             }))
             .unwrap(),
             r#"{"event":"done","data":{"tokensIn":10,"tokensOut":20}}"#
+        );
+        assert_eq!(
+            serde_json::to_string(&ChatEvent::ToolCall {
+                id: 3,
+                action: crate::tools::ToolAction::ReadFile {
+                    path: "src/a.ts".to_string(),
+                },
+                needs_answer: false,
+            })
+            .unwrap(),
+            r#"{"event":"toolCall","data":{"id":3,"action":{"tool":"readFile","path":"src/a.ts"},"needsAnswer":false}}"#
+        );
+        assert_eq!(
+            serde_json::to_string(&ChatEvent::ToolResult {
+                id: 3,
+                outcome: crate::tools::ToolOutcome::Command {
+                    exit_code: Some(0),
+                    output: "ok".to_string(),
+                    timed_out: false,
+                },
+            })
+            .unwrap(),
+            r#"{"event":"toolResult","data":{"id":3,"outcome":{"status":"command","exitCode":0,"output":"ok","timedOut":false}}}"#
         );
     }
 }

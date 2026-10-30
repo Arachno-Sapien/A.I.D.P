@@ -1,7 +1,9 @@
 use crate::gateway::http::{
     list_error, map_http_error, map_reqwest_error, read_sse, Step, LIST_TIMEOUT,
 };
-use crate::gateway::{ChatEvent, ChatRequest, ModelInfo, ModelProvider, ProviderError, Usage};
+use crate::gateway::{
+    ChatEvent, ChatRequest, ModelInfo, ModelProvider, ProviderError, Reply, Usage,
+};
 use async_trait::async_trait;
 use reqwest::header::HeaderValue;
 use secrecy::{ExposeSecret, SecretString};
@@ -27,13 +29,41 @@ impl OpenAiCompat {
 }
 
 #[derive(Deserialize)]
+struct ChunkDeltaFunction {
+    name: Option<String>,
+    arguments: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct ChunkDeltaToolCall {
+    index: Option<u32>,
+    id: Option<String>,
+    #[serde(rename = "type")]
+    #[allow(dead_code)]
+    call_type: Option<String>,
+    function: Option<ChunkDeltaFunction>,
+    #[serde(flatten)]
+    extra: serde_json::Map<String, serde_json::Value>,
+}
+
+#[derive(Deserialize)]
 struct ChunkChoiceDelta {
     content: Option<String>,
+    tool_calls: Option<Vec<ChunkDeltaToolCall>>,
 }
 
 #[derive(Deserialize)]
 struct ChunkChoice {
     delta: Option<ChunkChoiceDelta>,
+    finish_reason: Option<String>,
+}
+
+#[derive(Default)]
+struct PartialCall {
+    id: Option<String>,
+    name: Option<String>,
+    arguments: String,
+    extra: serde_json::Map<String, serde_json::Value>,
 }
 
 #[derive(Deserialize)]
@@ -139,7 +169,7 @@ impl ModelProvider for OpenAiCompat {
         req: ChatRequest,
         out: Channel<ChatEvent>,
         cancel: CancellationToken,
-    ) -> Result<Usage, ProviderError> {
+    ) -> Result<Reply, ProviderError> {
         let url = format!("{}/chat/completions", self.base_url);
 
         let mut auth_header =
@@ -149,11 +179,57 @@ impl ModelProvider for OpenAiCompat {
             };
         auth_header.set_sensitive(true);
 
-        let body = json!({
-            "model": req.model,
-            "messages": req.messages,
-            "stream": true,
-        });
+        let mut body_map = serde_json::Map::new();
+        body_map.insert("model".to_string(), json!(req.model));
+        body_map.insert("stream".to_string(), json!(true));
+
+        let mut messages_val: Vec<serde_json::Value> = req
+            .messages
+            .into_iter()
+            .map(|m| {
+                json!({
+                    "role": m.role,
+                    "content": m.content,
+                })
+            })
+            .collect();
+
+        for round in req.rounds {
+            messages_val.push(round.assistant);
+            for res in round.results {
+                let content = if res.is_error {
+                    format!("Error: {}", res.content)
+                } else {
+                    res.content
+                };
+                messages_val.push(json!({
+                    "role": "tool",
+                    "tool_call_id": res.call_id,
+                    "content": content,
+                }));
+            }
+        }
+        body_map.insert("messages".to_string(), json!(messages_val));
+
+        if !req.tools.is_empty() {
+            let tools_val: Vec<serde_json::Value> = req
+                .tools
+                .into_iter()
+                .map(|spec| {
+                    json!({
+                        "type": "function",
+                        "function": {
+                            "name": spec.name,
+                            "description": spec.description,
+                            "parameters": spec.schema,
+                        }
+                    })
+                })
+                .collect();
+            body_map.insert("tools".to_string(), json!(tools_val));
+        }
+
+        let body = serde_json::Value::Object(body_map);
 
         let request = self
             .client
@@ -187,6 +263,10 @@ impl ModelProvider for OpenAiCompat {
         }
 
         let mut final_usage = Usage::default();
+        let mut accumulated_text = String::new();
+        let mut accumulated_tool_calls: std::collections::BTreeMap<u32, PartialCall> =
+            std::collections::BTreeMap::new();
+        let mut last_finish_reason: Option<String> = None;
 
         let on_data = |line: &str| -> Result<Step, ProviderError> {
             if line == "[DONE]" {
@@ -224,15 +304,46 @@ impl ModelProvider for OpenAiCompat {
                 }
             }
 
-            if let Some(content) = chunk
-                .choices
-                .first()
-                .and_then(|c| c.delta.as_ref())
-                .and_then(|d| d.content.as_deref())
-                && !content.is_empty()
-                && out.send(ChatEvent::Delta(content.to_string())).is_err()
-            {
-                return Err(ProviderError::Cancelled);
+            if let Some(choice) = chunk.choices.first() {
+                if let Some(reason) = &choice.finish_reason {
+                    last_finish_reason = Some(reason.clone());
+                }
+
+                if let Some(delta) = &choice.delta {
+                    if let Some(content) = delta.content.as_deref()
+                        && !content.is_empty()
+                    {
+                        accumulated_text.push_str(content);
+                        if out.send(ChatEvent::Delta(content.to_string())).is_err() {
+                            return Err(ProviderError::Cancelled);
+                        }
+                    }
+
+                    if let Some(tool_calls) = &delta.tool_calls {
+                        for (idx, item) in tool_calls.iter().enumerate() {
+                            let key = item.index.unwrap_or(idx as u32);
+                            let partial = accumulated_tool_calls.entry(key).or_default();
+                            if let Some(id) = &item.id
+                                && !id.is_empty()
+                            {
+                                partial.id = Some(id.clone());
+                            }
+                            if let Some(func) = &item.function {
+                                if let Some(name) = &func.name
+                                    && !name.is_empty()
+                                {
+                                    partial.name = Some(name.clone());
+                                }
+                                if let Some(args) = &func.arguments {
+                                    partial.arguments.push_str(args);
+                                }
+                            }
+                            for (k, v) in &item.extra {
+                                partial.extra.insert(k.clone(), v.clone());
+                            }
+                        }
+                    }
+                }
             }
 
             Ok(Step::Continue)
@@ -240,6 +351,73 @@ impl ModelProvider for OpenAiCompat {
 
         read_sse(resp, &cancel, on_data).await?;
 
-        Ok(final_usage)
+        if last_finish_reason.as_deref() == Some("length") && !accumulated_tool_calls.is_empty() {
+            return Err(ProviderError::Provider {
+                message: "The reply was cut off before its tool call was complete.".to_string(),
+            });
+        }
+
+        let mut tool_calls = Vec::new();
+        let mut tool_calls_json = Vec::new();
+
+        for (idx, partial) in accumulated_tool_calls {
+            let call_id = partial.id.unwrap_or_else(|| format!("call_{idx}"));
+            let func_name = partial.name.unwrap_or_default();
+            let input = match serde_json::from_str::<serde_json::Value>(&partial.arguments) {
+                Ok(val) => val,
+                Err(_) => serde_json::Value::String(partial.arguments.clone()),
+            };
+
+            tool_calls.push(crate::gateway::ToolCall {
+                id: call_id.clone(),
+                name: func_name.clone(),
+                input,
+            });
+
+            let mut call_obj = serde_json::Map::new();
+            call_obj.insert("id".to_string(), serde_json::Value::String(call_id));
+            call_obj.insert(
+                "type".to_string(),
+                serde_json::Value::String("function".to_string()),
+            );
+            call_obj.insert(
+                "function".to_string(),
+                json!({
+                    "name": func_name,
+                    "arguments": partial.arguments,
+                }),
+            );
+            for (k, v) in partial.extra {
+                call_obj.insert(k, v);
+            }
+            tool_calls_json.push(serde_json::Value::Object(call_obj));
+        }
+
+        let mut assistant_map = serde_json::Map::new();
+        assistant_map.insert(
+            "role".to_string(),
+            serde_json::Value::String("assistant".to_string()),
+        );
+        if accumulated_text.is_empty() {
+            assistant_map.insert("content".to_string(), serde_json::Value::Null);
+        } else {
+            assistant_map.insert(
+                "content".to_string(),
+                serde_json::Value::String(accumulated_text),
+            );
+        }
+        if !tool_calls_json.is_empty() {
+            assistant_map.insert(
+                "tool_calls".to_string(),
+                serde_json::Value::Array(tool_calls_json),
+            );
+        }
+        let assistant = serde_json::Value::Object(assistant_map);
+
+        Ok(Reply {
+            usage: final_usage,
+            tool_calls,
+            assistant,
+        })
     }
 }

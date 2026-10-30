@@ -39,10 +39,10 @@ Carry-overs from M3 are in `docs/phases/M3.md` under "What's left": M4 reuses `w
 
 ## In progress
 
-Task: M4 Task 2: Gateway types and OpenAI-compatible tool calling
+Task: M4 Task 3: Anthropic tool calling
 Tool + model: Antigravity (Gemini 3.8 Flash)
 Date: 2026-10-30
-Next step: Step 1 of Task 2: write failing tests in tests/openai_compat.rs for tool-call streaming and replay.
+Next step: Step 1 of Task 3: write failing tests in tests/anthropic.rs for Anthropic tool calling and thinking blocks.
 
 ## Next 3 tasks
 

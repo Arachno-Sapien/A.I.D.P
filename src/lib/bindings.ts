@@ -48,9 +48,23 @@ export type AppError_Serialize = { kind: "provider"; error: ProviderError_Serial
 
 export type ChatEvent = ChatEvent_Serialize | ChatEvent_Deserialize;
 
-export type ChatEvent_Deserialize = { event: "delta"; data: string } | { event: "done"; data: Usage_Deserialize } | { event: "error"; data: ProviderError_Deserialize };
+export type ChatEvent_Deserialize = { event: "delta"; data: string } | { event: "done"; data: Usage_Deserialize } | { event: "error"; data: ProviderError_Deserialize } | { event: "toolCall"; data: {
+	id: number,
+	action: ToolAction,
+	needsAnswer: boolean,
+} } | { event: "toolResult"; data: {
+	id: number,
+	outcome: ToolOutcome_Deserialize,
+} };
 
-export type ChatEvent_Serialize = { event: "delta"; data: string } | { event: "done"; data: Usage_Serialize } | { event: "error"; data: ProviderError_Serialize };
+export type ChatEvent_Serialize = { event: "delta"; data: string } | { event: "done"; data: Usage_Serialize } | { event: "error"; data: ProviderError_Serialize } | { event: "toolCall"; data: {
+	id: number,
+	action: ToolAction,
+	needsAnswer: boolean,
+} } | { event: "toolResult"; data: {
+	id: number,
+	outcome: ToolOutcome_Serialize,
+} };
 
 export type ChatMessage = {
 	role: Role,
@@ -150,6 +164,14 @@ export type ProviderError_Deserialize = { kind: "invalidKey" } | { kind: "rateLi
 export type ProviderError_Serialize = { kind: "invalidKey" } | { kind: "rateLimited"; retryAfterSecs: number | null } | { kind: "modelNotFound" } | { kind: "contextTooLong" } | { kind: "offline" } | { kind: "provider"; message: string } | { kind: "cancelled" };
 
 export type Role = "system" | "user" | "assistant";
+
+export type ToolAction = { tool: "listFiles"; path: string } | { tool: "readFile"; path: string } | { tool: "search"; query: string; path: string } | { tool: "editFile"; path: string; before: string; after: string } | { tool: "createFile"; path: string; text: string } | { tool: "runCommand"; command: string; folder: string } | { tool: "invalid"; name: string };
+
+export type ToolOutcome = ToolOutcome_Serialize | ToolOutcome_Deserialize;
+
+export type ToolOutcome_Deserialize = { status: "ok"; summary: string } | { status: "command"; exitCode?: number | null; output: string; timedOut: boolean } | { status: "declined" } | { status: "error"; message: string } | { status: "stopped" };
+
+export type ToolOutcome_Serialize = { status: "ok"; summary: string } | { status: "command"; exitCode: number | null; output: string; timedOut: boolean } | { status: "declined" } | { status: "error"; message: string } | { status: "stopped" };
 
 export type Usage = Usage_Serialize | Usage_Deserialize;
 

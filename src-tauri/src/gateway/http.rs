@@ -38,6 +38,13 @@ fn parse_error_detail(body: &str) -> String {
 }
 
 pub fn map_http_error(status: u16, retry_after: Option<&str>, body: &str) -> ProviderError {
+    let lower = body.to_ascii_lowercase();
+    if (status == 400 || status == 404) && lower.contains("tool") && lower.contains("support") {
+        return ProviderError::Provider {
+            message: crate::gateway::TOOLS_UNSUPPORTED.to_string(),
+        };
+    }
+
     match status {
         401 | 403 => ProviderError::InvalidKey,
         404 => ProviderError::ModelNotFound,
@@ -134,7 +141,19 @@ mod tests {
     fn map_http_error_table() {
         assert_eq!(map_http_error(401, None, ""), ProviderError::InvalidKey);
         assert_eq!(map_http_error(403, None, ""), ProviderError::InvalidKey);
-        assert_eq!(map_http_error(404, None, ""), ProviderError::ModelNotFound);
+        assert_eq!(
+            map_http_error(404, None, "No endpoints found that support tool use"),
+            ProviderError::Provider {
+                message: crate::gateway::TOOLS_UNSUPPORTED.to_string()
+            }
+        );
+        assert_eq!(
+            map_http_error(400, None, "tools is not supported with this model"),
+            ProviderError::Provider {
+                message: crate::gateway::TOOLS_UNSUPPORTED.to_string()
+            }
+        );
+        assert_eq!(map_http_error(404, None, "model not found"), ProviderError::ModelNotFound);
         assert_eq!(
             map_http_error(429, Some("7"), ""),
             ProviderError::RateLimited {
