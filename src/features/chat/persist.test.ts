@@ -94,3 +94,27 @@ describe("persist", () => {
   });
 });
 
+
+it("keeps a provider error's message", () => {
+  const msg = {
+    id: "a",
+    role: "assistant",
+    text: "partial",
+    status: "error",
+    error: { kind: "provider", message: "upstream failed" },
+  } as Parameters<typeof toStored>[0];
+  const row = {
+    id: 5,
+    role: "assistant",
+    contentParts: toStored(msg),
+    modelRef: null,
+    modelName: null,
+    status: "error",
+    errorKind: "provider",
+    tokensIn: null,
+    tokensOut: null,
+    createdAt: 1,
+  } as Parameters<typeof fromStored>[0];
+
+  expect(fromStored(row).error).toEqual({ kind: "provider", message: "upstream failed" });
+});

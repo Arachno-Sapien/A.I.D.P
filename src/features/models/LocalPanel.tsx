@@ -16,6 +16,7 @@ export function LocalPanel() {
     localModels,
     pull,
     pullError,
+    ollamaError,
     ollamaLoading,
     startOllama,
     openOllamaDownload,
@@ -30,6 +31,12 @@ export function LocalPanel() {
   const [confirmDeleteName, setConfirmDeleteName] = useState<string | null>(
     null,
   );
+
+  const errorLine = ollamaError ? (
+    <p role="alert" className="text-xs text-red-400">
+      {ollamaError}
+    </p>
+  ) : null;
 
   const formatSize = (sizeMb: number) => {
     if (sizeMb >= 1024) {
@@ -59,6 +66,7 @@ export function LocalPanel() {
         >
           Get Ollama
         </button>
+        {errorLine}
       </div>
     );
   }
@@ -85,6 +93,7 @@ export function LocalPanel() {
         >
           {ollamaLoading ? "Starting…" : "Start"}
         </button>
+        {errorLine}
       </div>
     );
   }
@@ -160,6 +169,7 @@ export function LocalPanel() {
         </div>
       )}
 
+      {errorLine}
       {pullError && (
         <div className="p-2.5 rounded bg-red-950/50 border border-red-900/60 text-xs text-red-300">
           {pullError}

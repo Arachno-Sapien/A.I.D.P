@@ -264,3 +264,14 @@ describe("LocalPanel", () => {
     );
   });
 });
+
+describe("LocalPanel errors", () => {
+  it("shows why an action failed", () => {
+    useModelsStore.setState({
+      ollama: { state: "stopped" },
+      ollamaError: "Ollama didn't start. Try starting it from the Start menu.",
+    });
+    render(<LocalPanel />);
+    expect(screen.getByText("Ollama didn't start. Try starting it from the Start menu.")).toBeDefined();
+  });
+});

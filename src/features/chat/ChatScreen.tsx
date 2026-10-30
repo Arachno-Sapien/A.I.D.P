@@ -28,8 +28,12 @@ export function ChatScreen({
   const cloudConnections = connections.filter((c) => c.kind !== "ollama");
   const isOllamaRunning = ollama?.state === "running";
 
+  // Only the first visit opens the newest chat: Chat unmounts when another
+  // screen is shown, and reloading on return would drop a streaming reply.
   useEffect(() => {
-    void openPlace(null);
+    if (!useChatStore.getState().opened) {
+      void openPlace(null);
+    }
   }, [openPlace]);
 
   return (

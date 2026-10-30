@@ -381,3 +381,14 @@ describe("AiPanel", () => {
     });
   });
 });
+
+describe("AiPanel while a reply streams", () => {
+  it("hides Clear, which would delete the conversation mid-reply", () => {
+    useWorkspaceChatStore.setState({
+      messages: [{ id: "a", role: "user", text: "hi", status: "complete" }],
+      streaming: true,
+    });
+    render(<AiPanel />);
+    expect(screen.queryByRole("button", { name: "Clear" })).toBeNull();
+  });
+});

@@ -78,3 +78,30 @@ describe("ConversationList", () => {
     expect(commands.deleteConversation).toHaveBeenCalledWith(2);
   });
 });
+
+describe("ConversationList while a reply streams", () => {
+  it("can't switch, create or delete chats", () => {
+    // Switching mid-reply lost the reply from history (review of Task 6).
+    const load = vi.fn();
+    const startNew = vi.fn();
+    useChatStore.setState({
+      conversationId: 1,
+      conversations: [
+        { id: 1, title: "Rust questions", updatedAt: 100 },
+        { id: 2, title: "React notes", updatedAt: 90 },
+      ],
+      messages: [],
+      streaming: true,
+      load,
+      startNew,
+    });
+    render(<ConversationList />);
+
+    fireEvent.click(screen.getByText("React notes"));
+    expect(load).not.toHaveBeenCalled();
+    const newChat = screen.getByRole("button", { name: /new chat/i }) as HTMLButtonElement;
+    expect(newChat.disabled).toBe(true);
+    const del = screen.getByRole("button", { name: "Delete React notes" }) as HTMLButtonElement;
+    expect(del.disabled).toBe(true);
+  });
+});

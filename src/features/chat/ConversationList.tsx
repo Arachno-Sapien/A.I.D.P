@@ -2,8 +2,10 @@ import { useState } from "react";
 import { useChatStore } from "./store";
 
 export function ConversationList() {
-  const { conversations, conversationId, load, startNew, remove } =
+  const { conversations, conversationId, streaming, load, startNew, remove } =
     useChatStore();
+  // Switching mid-reply would leave the reply unsaved, so the list waits for it.
+  const busyTitle = streaming ? "Wait for the reply to finish" : undefined;
   const [filter, setFilter] = useState("");
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
 
@@ -25,6 +27,8 @@ export function ConversationList() {
       <div className="p-3 border-b border-neutral-800 space-y-2">
         <button
           type="button"
+          disabled={streaming}
+          title={busyTitle}
           onClick={() => {
             setConfirmDeleteId(null);
             startNew();
@@ -90,7 +94,7 @@ export function ConversationList() {
               <div
                 key={c.id}
                 onClick={() => {
-                  if (c.id !== conversationId) {
+                  if (!streaming && c.id !== conversationId) {
                     void load(c.id);
                   }
                 }}
@@ -110,6 +114,8 @@ export function ConversationList() {
                 <button
                   type="button"
                   aria-label={`Delete ${c.title}`}
+                  disabled={streaming}
+                  title={busyTitle}
                   onClick={(e) => {
                     e.stopPropagation();
                     setConfirmDeleteId(c.id);

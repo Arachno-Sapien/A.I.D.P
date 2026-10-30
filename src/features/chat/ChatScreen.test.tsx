@@ -165,3 +165,19 @@ describe("ChatScreen", () => {
     expect(onNavigate).toHaveBeenCalled();
   });
 });
+
+describe("ChatScreen history", () => {
+  it("opens the newest chat only on the first visit", () => {
+    // Coming back to Chat reloaded the newest chat, dropping a reply still streaming.
+    const openPlace = vi.fn(async () => {
+      useChatStore.setState({ opened: true });
+    });
+    useChatStore.setState({ openPlace, opened: false });
+
+    const first = render(<ChatScreen />);
+    first.unmount();
+    render(<ChatScreen />);
+
+    expect(openPlace).toHaveBeenCalledTimes(1);
+  });
+});

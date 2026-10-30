@@ -43,6 +43,8 @@ export interface ModelsStore {
   localModels: LocalModelView[];
   pull: PullProgress | null;
   pullError: string | null;
+  /** Why the last Start, Get Ollama, Delete, Free memory or context change failed. */
+  ollamaError: string | null;
   ollamaLoading: boolean;
 
   refresh(): Promise<void>;
@@ -68,6 +70,7 @@ export const useModelsStore = create<ModelsStore>((set, get) => ({
   localModels: [],
   pull: null,
   pullError: null,
+  ollamaError: null,
   ollamaLoading: false,
 
   refresh: async () => {
@@ -132,14 +135,18 @@ export const useModelsStore = create<ModelsStore>((set, get) => ({
   },
 
   startOllama: async () => {
-    set({ ollamaLoading: true });
-    await commands.ollamaStart();
+    set({ ollamaLoading: true, ollamaError: null });
+    const res = await commands.ollamaStart();
+    if (res.status === "error") {
+      set({ ollamaError: appErrorText(res.error) });
+    }
     await get().refreshOllama();
     set({ ollamaLoading: false });
   },
 
   openOllamaDownload: async () => {
-    await commands.ollamaOpenDownload();
+    const res = await commands.ollamaOpenDownload();
+    set({ ollamaError: res.status === "error" ? appErrorText(res.error) : null });
   },
 
   pullModel: async (name: string) => {
@@ -170,7 +177,10 @@ export const useModelsStore = create<ModelsStore>((set, get) => ({
       set({ pull: null });
       await get().refreshOllama();
     } else {
-      set({ pull: null, pullError: appErrorText(res.error) });
+      // Cancel is the user's own choice, not a failed download.
+      const cancelled =
+        res.error.kind === "provider" && res.error.error.kind === "cancelled";
+      set({ pull: null, pullError: cancelled ? null : appErrorText(res.error) });
     }
   },
 
@@ -180,17 +190,20 @@ export const useModelsStore = create<ModelsStore>((set, get) => ({
   },
 
   deleteLocal: async (name: string) => {
-    await commands.ollamaDelete(name);
+    const res = await commands.ollamaDelete(name);
+    set({ ollamaError: res.status === "error" ? appErrorText(res.error) : null });
     await get().refreshOllama();
   },
 
   unloadLocal: async (name: string) => {
-    await commands.ollamaUnload(name);
+    const res = await commands.ollamaUnload(name);
+    set({ ollamaError: res.status === "error" ? appErrorText(res.error) : null });
     await get().refreshOllama();
   },
 
   setContext: async (modelId: string, numCtx: number) => {
-    await commands.setModelContext(modelId, numCtx);
+    const res = await commands.setModelContext(modelId, numCtx);
+    set({ ollamaError: res.status === "error" ? appErrorText(res.error) : null });
     await get().refreshOllama();
   },
 }));

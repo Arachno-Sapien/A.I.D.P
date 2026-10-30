@@ -66,6 +66,8 @@ export interface ChatStore {
   messages: UiMessage[];
   streaming: boolean;
   conversationId: number | null;
+  /** Set by the first openPlace, so coming back to Chat doesn't reload it mid-reply. */
+  opened: boolean;
   place: string | null;
   conversations: Conversation[];
   saveError: string | null;
@@ -91,12 +93,13 @@ export const createChatStore = (surface: ChatSurface, hooks?: ChatHooks) =>
     messages: [],
     streaming: false,
     conversationId: null,
+    opened: false,
     place: null,
     conversations: [],
     saveError: null,
 
     openPlace: async (place: string | null) => {
-      set({ place });
+      set({ place, opened: true });
       const res = await commands.listConversations(place);
       if (res.status === "ok") {
         const conversations = res.data;

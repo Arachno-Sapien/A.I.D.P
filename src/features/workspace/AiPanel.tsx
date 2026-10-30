@@ -212,6 +212,7 @@ export function AiPanel({ onApply }: AiPanelProps) {
           </label>
 
           {messages.length > 0 &&
+            !streaming &&
             (confirmClear ? (
               <span className="flex items-center gap-1.5 text-xs text-neutral-300">
                 <span>Clear this chat?</span>
