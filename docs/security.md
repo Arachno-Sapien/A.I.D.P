@@ -67,7 +67,7 @@ The database file contains **no secret keys**. Even if the database file is extr
 
 ## 6. App Lockdown: CSP, Capabilities, and Navigation Guard
 
-- **Strict Content Security Policy (CSP):** The app shell strictly defines allowable sources. Inline scripts outside the bundled frontend are forbidden.
+- **Strict Content Security Policy (CSP):** The app shell strictly defines allowable sources. Inline scripts outside the bundled frontend are forbidden. Inline styles are allowed (decision 0009) because the code editor creates its styles at runtime.
 - **Minimal Tauri Capabilities:** Tauri core capabilities are locked down. File system (`fs`) and OS process execution (`shell`) plugins are turned off in the frontend. The UI cannot initiate arbitrary network requests (`fetch`/XHR) or read local files directly.
 - **Navigation Guard:** Tauri's `on_navigation` hook intercepts every navigation event. Any attempt to navigate the main WebView window away from the local app origin (`http://localhost` or `tauri://localhost`) is cancelled immediately.
 - **Safe Markdown Rendering:** AI responses are rendered using `react-markdown` with `skipHtml={true}`. Raw HTML tags in model replies (such as `<script>` or `<img onerror=...>`) are stripped out, preventing cross-site scripting (XSS) attacks from untrusted model outputs.
@@ -98,8 +98,9 @@ Folder selection uses `tauri-plugin-dialog` v2:
 - **Recent folder validation:** `open_recent` verifies that any requested path matches an entry in the SQLite `settings` table before opening, preventing arbitrary path opening via forged IPC calls.
 
 ### Release CSP and the editor
-- The release CSP is `default-src 'self' ipc: http://ipc.localhost`, with no inline styles (dev adds `style-src 'unsafe-inline'`). CodeMirror adds its styles at runtime through constructable stylesheets and the CSSOM, which this policy should allow.
-- **Not yet confirmed by eye.** The human checks the editor's look in the release build during the M3 live check (plan Task 12, step 4) and records the result here. If styles are missing, the fallback is `style-src 'self' 'unsafe-inline'` (styles only; scripts stay locked), with a decision record.
+- The release CSP is `default-src 'self' ipc: http://ipc.localhost; style-src 'self' 'unsafe-inline'` (decision 0009). Scripts are still limited to the app's own files: `script-src` falls back to `default-src 'self'`.
+- Why inline styles are allowed: CodeMirror creates a `<style>` element at runtime. Under the earlier policy (no inline styles) the M3 live check showed the release editor without its layout (2026-10-30). Dev already allowed inline styles, which is why only the release build was affected.
+- Keep `index.html` free of `<style>` tags: if one appears, Tauri adds a nonce to `style-src`, browsers then ignore `'unsafe-inline'`, and the editor breaks again.
 
 ---
 
