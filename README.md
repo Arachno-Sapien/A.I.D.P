@@ -113,7 +113,7 @@ v0.1 is split into seven milestones, and each one ends with an app that runs. Th
 3. M2: keys in the keychain, adding and testing providers, and Anthropic support. Done.
 4. M3: the coding workspace. File tree, editor, the AI panel, and edits as diffs. Done.
 5. M4: agent tools and a terminal. The model can read, search and edit files and run commands, each with your approval. Done.
-6. M5: Ollama, chat history and settings.
+6. M5: Ollama, chat history and settings. Done.
 7. M6: the v0.1 release. A Windows installer built by CI, auto-update, and a test run on an 8 GB RAM machine.
 
 After v0.1 come an MCP client for outside tools, browser checks with Playwright, and the practice area.

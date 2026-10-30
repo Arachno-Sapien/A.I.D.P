@@ -442,11 +442,11 @@ For M1 only, the key comes from a git-ignored local config file. M2 replaces it 
 
 **M5 Ollama, history, and settings**
 
-- [ ] App detects Ollama and starts it if stopped
-- [ ] Downloaded models appear in the picker and work in Chat and the workspace
-- [ ] Download with progress and cancel; delete with confirmation; Free memory unloads the model
-- [ ] Chats survive an app restart, and each message records its model
-- [ ] Settings for default model, theme, and keep\_alive work
+- [x] App detects Ollama and starts it if stopped
+- [x] Downloaded models appear in the picker and work in Chat and the workspace
+- [x] Download with progress and cancel; delete with confirmation; Free memory unloads the model
+- [x] Chats survive an app restart, and each message records its model
+- [x] Settings for default model, theme, and keep\_alive work
 
 **M6 v0.1 release**
 
