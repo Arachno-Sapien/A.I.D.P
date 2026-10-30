@@ -482,6 +482,54 @@ describe("useChatStore", () => {
     );
   });
 
+  it("saves a partial reply after the folder changes", async () => {
+    useChatStore.setState({
+      conversationId: 7,
+      place: "/folder-a",
+      conversations: [
+        { id: 7, title: "Chat 7", workspacePath: "/folder-a", updatedAt: 100 },
+      ],
+    });
+    vi.mocked(commands.appendMessage).mockResolvedValue({
+      status: "ok",
+      data: 1,
+    });
+    vi.mocked(commands.loadMessages).mockResolvedValue({
+      status: "ok",
+      data: [],
+    });
+
+    await useChatStore.getState().send("hello", { connectionId: 1, modelId: "m1" });
+    const channel = vi.mocked(commands.sendMessage).mock.calls[0][4] as any;
+
+    channel.onmessage({ event: "delta", data: "Hel" });
+
+    // User switches folder / loads conversation 9
+    await useChatStore.getState().load(9);
+    expect(useChatStore.getState().conversationId).toBe(9);
+
+    // Cancelled error arrives for conversation 7's stream
+    channel.onmessage({
+      event: "error",
+      data: { kind: "cancelled" },
+    });
+
+    // appendMessage(7, { status: "stopped", ... "Hel" ... })
+    expect(commands.appendMessage).toHaveBeenCalledWith(
+      7,
+      expect.objectContaining({
+        role: "assistant",
+        status: "stopped",
+        contentParts: expect.stringContaining("Hel"),
+      }),
+    );
+    // Nothing is appended to 9
+    const callsTo9 = vi
+      .mocked(commands.appendMessage)
+      .mock.calls.filter((call) => call[0] === 9);
+    expect(callsTo9.length).toBe(0);
+  });
+
   it("opens the newest chat and restores model names", async () => {
     vi.mocked(commands.listConversations).mockResolvedValueOnce({
       status: "ok",

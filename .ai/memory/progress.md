@@ -41,7 +41,8 @@ Carry-overs: `docs/phases/M4.md` and `docs/phases/M5.md`, "What's left → To M6
 M6 Task 1 done 2026-10-31 by Claude Code (Opus 5.5): CI run 41112982172 green on Windows, macOS and Linux, with 211 Rust tests (1 ignored) and 187 Vitest tests on each; nothing needed fixing.
 M6 Task 2 done 2026-10-31 by Claude Code (Opus 5.5) in `dada40c`: login-shell PATH on macOS and Linux (`login_path.rs`, called first in `main.rs`), Ollama paths on macOS, macOS login terminal. CI run 41115631396 green (214 Rust tests on Windows and Linux, 215 on macOS). Still assumed until a Mac user confirms: Finder's minimal PATH and the Ollama.app path.
 M6 Task 3 done 2026-10-31 by Claude Code (Opus 5.5): job object for Stop on Windows (`dc84d24`); model commands refused for full-width characters everywhere and, on Windows, for any character the ANSI code page doesn't hold exactly or that gets an ASCII trail byte (three automated security reviews: `61a9ca4`, `9f2aa6a`, `b9ccfd3`). CI run 41121384526 green (217 Rust tests on Windows and macOS, 216 on Linux).
-Next step: M6 Task 4 (Agent label `shrink-0` in `AiPanel.tsx`, model select `min-w-0 truncate` in `ModelPicker.tsx`; partial reply saved to the conversation it was sent in, `workspace/chatStore.ts`), then stop for review.
+M6 Task 4 done 2026-10-31 by Antigravity (Gemini 2.5 Pro): Agent label `shrink-0 whitespace-nowrap` in `AiPanel.tsx`, model select `min-w-0 truncate` with `title` in `ModelPicker.tsx`; `inFlightReplies` in `createChatStore` retains originating `conversationId` and streamed text so partial replies on folder switch are saved to the correct conversation. 189 Vitest tests and 217 Rust tests passing.
+Next step: stop for review of Tasks 1 to 4 as agreed in the plan, before proceeding with Task 5 (update signing key D4).
 
 ## Next 3 tasks
 

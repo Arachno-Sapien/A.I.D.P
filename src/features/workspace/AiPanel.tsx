@@ -192,7 +192,7 @@ export function AiPanel({ onApply }: AiPanelProps) {
       <ModelPicker>
         <div className="flex items-center gap-3">
           <label
-            className={`flex items-center gap-1.5 text-xs select-none ${
+            className={`flex items-center gap-1.5 text-xs select-none shrink-0 whitespace-nowrap ${
               isAgentDisabled
                 ? "text-neutral-500 cursor-not-allowed"
                 : "text-neutral-300 cursor-pointer"

@@ -83,13 +83,18 @@ export interface ChatStore {
     extra?: SendExtra,
   ): Promise<void>;
   stop(): Promise<void>;
-  applyEvent(id: string, ev: ChatEvent): void;
+  applyEvent(id: string, ev: ChatEvent, convId?: number | null): void;
   answer(id: number, approve: boolean): Promise<boolean>;
   clear(): void;
 }
 
-export const createChatStore = (surface: ChatSurface, hooks?: ChatHooks) =>
-  create<ChatStore>((set, get) => ({
+export const createChatStore = (surface: ChatSurface, hooks?: ChatHooks) => {
+  const inFlightReplies = new Map<
+    string,
+    { message: UiMessage; convId: number | null }
+  >();
+
+  return create<ChatStore>((set, get) => ({
     messages: [],
     streaming: false,
     conversationId: null,
@@ -237,6 +242,11 @@ export const createChatStore = (surface: ChatSurface, hooks?: ChatHooks) =>
         content: extra?.content ?? trimmed,
       });
 
+      inFlightReplies.set(assistantId, {
+        message: assistantPlaceholder,
+        convId: activeConvId,
+      });
+
       set((state) => ({
         messages: [...state.messages, userMessage, assistantPlaceholder],
         streaming: true,
@@ -244,7 +254,7 @@ export const createChatStore = (surface: ChatSurface, hooks?: ChatHooks) =>
 
       const channel = new Channel<ChatEvent_Deserialize>();
       channel.onmessage = (ev: ChatEvent_Deserialize) => {
-        get().applyEvent(assistantId, ev);
+        get().applyEvent(assistantId, ev, activeConvId);
       };
 
       const res = isAgent
@@ -262,6 +272,7 @@ export const createChatStore = (surface: ChatSurface, hooks?: ChatHooks) =>
             channel,
           );
       if (res.status === "error") {
+        inFlightReplies.delete(assistantId);
         set((state) => ({
           messages: state.messages.map((m) =>
             m.id === assistantId
@@ -273,8 +284,30 @@ export const createChatStore = (surface: ChatSurface, hooks?: ChatHooks) =>
       }
     },
 
-    applyEvent: (id: string, ev: ChatEvent) => {
+    applyEvent: (id: string, ev: ChatEvent, convId?: number | null) => {
+      const inFlight = inFlightReplies.get(id);
+
       if (ev.event === "delta") {
+        if (inFlight) {
+          let parts = inFlight.message.parts;
+          if (parts) {
+            const last = parts[parts.length - 1];
+            if (last && last.kind === "text") {
+              parts = [
+                ...parts.slice(0, -1),
+                { kind: "text", text: last.text + ev.data },
+              ];
+            } else {
+              parts = [...parts, { kind: "text", text: ev.data }];
+            }
+          }
+          inFlight.message = {
+            ...inFlight.message,
+            text: inFlight.message.text + ev.data,
+            parts,
+          };
+        }
+
         set((state) => ({
           messages: state.messages.map((m) => {
             if (m.id !== id) return m;
@@ -303,6 +336,12 @@ export const createChatStore = (surface: ChatSurface, hooks?: ChatHooks) =>
           action: ev.data.action,
           needsAnswer: ev.data.needsAnswer,
         };
+        if (inFlight) {
+          const parts = inFlight.message.parts
+            ? [...inFlight.message.parts, { kind: "step" as const, step }]
+            : inFlight.message.parts;
+          inFlight.message = { ...inFlight.message, parts };
+        }
         set((state) => ({
           messages: state.messages.map((m) => {
             if (m.id !== id) return m;
@@ -313,6 +352,16 @@ export const createChatStore = (surface: ChatSurface, hooks?: ChatHooks) =>
         hooks?.onToolCall?.(step);
       } else if (ev.event === "toolResult") {
         let updatedStep: ToolStep | undefined;
+        if (inFlight && inFlight.message.parts) {
+          const parts = inFlight.message.parts.map((p) => {
+            if (p.kind === "step" && p.step.id === ev.data.id) {
+              updatedStep = { ...p.step, outcome: ev.data.outcome };
+              return { kind: "step" as const, step: updatedStep };
+            }
+            return p;
+          });
+          inFlight.message = { ...inFlight.message, parts };
+        }
         set((state) => ({
           messages: state.messages.map((m) => {
             if (m.id !== id || !m.parts) return m;
@@ -330,6 +379,11 @@ export const createChatStore = (surface: ChatSurface, hooks?: ChatHooks) =>
           hooks?.onToolResult?.(updatedStep);
         }
       } else if (ev.event === "done") {
+        inFlightReplies.delete(id);
+        const targetConvId =
+          inFlight?.convId ??
+          (convId !== undefined ? convId : get().conversationId);
+
         let completedMsg: UiMessage | undefined;
         set((state) => ({
           messages: state.messages.map((m) => {
@@ -349,12 +403,27 @@ export const createChatStore = (surface: ChatSurface, hooks?: ChatHooks) =>
           streaming: false,
         }));
 
-        const activeConvId = get().conversationId;
-        if (activeConvId !== null && completedMsg) {
+        if (!completedMsg && inFlight) {
+          completedMsg = {
+            ...inFlight.message,
+            status: "complete",
+            parts: inFlight.message.parts?.map((p) => {
+              if (p.kind === "step" && !p.step.outcome) {
+                return {
+                  kind: "step" as const,
+                  step: { ...p.step, outcome: { status: "stopped" as const } },
+                };
+              }
+              return p;
+            }),
+          };
+        }
+
+        if (targetConvId !== null && completedMsg) {
           const usage = (ev.data as any)?.usage ?? ev.data;
           const msgToSave = completedMsg;
           void commands
-            .appendMessage(activeConvId, {
+            .appendMessage(targetConvId, {
               role: "assistant",
               contentParts: toStored(msgToSave),
               modelRef: msgToSave.modelRef ?? null,
@@ -371,6 +440,11 @@ export const createChatStore = (surface: ChatSurface, hooks?: ChatHooks) =>
             });
         }
       } else if (ev.event === "error") {
+        inFlightReplies.delete(id);
+        const targetConvId =
+          inFlight?.convId ??
+          (convId !== undefined ? convId : get().conversationId);
+
         const isCancelled = ev.data.kind === "cancelled";
         const status: MessageStatus = isCancelled ? "stopped" : "error";
         const errorKind = isCancelled ? null : ev.data.kind;
@@ -399,11 +473,27 @@ export const createChatStore = (surface: ChatSurface, hooks?: ChatHooks) =>
           streaming: false,
         }));
 
-        const activeConvId = get().conversationId;
-        if (activeConvId !== null && endedMsg) {
+        if (!endedMsg && inFlight) {
+          endedMsg = {
+            ...inFlight.message,
+            status,
+            error: isCancelled ? undefined : ev.data,
+            parts: inFlight.message.parts?.map((p) => {
+              if (p.kind === "step" && !p.step.outcome) {
+                return {
+                  kind: "step" as const,
+                  step: { ...p.step, outcome: { status: "stopped" as const } },
+                };
+              }
+              return p;
+            }),
+          };
+        }
+
+        if (targetConvId !== null && endedMsg) {
           const msgToSave = endedMsg;
           void commands
-            .appendMessage(activeConvId, {
+            .appendMessage(targetConvId, {
               role: "assistant",
               contentParts: toStored(msgToSave),
               modelRef: msgToSave.modelRef ?? null,
@@ -447,5 +537,6 @@ export const createChatStore = (surface: ChatSurface, hooks?: ChatHooks) =>
       set({ messages: [], streaming: false });
     },
   }));
+};
 
 export const useChatStore = createChatStore("chat");

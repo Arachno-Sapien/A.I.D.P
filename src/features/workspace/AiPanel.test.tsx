@@ -342,6 +342,35 @@ describe("AiPanel", () => {
     expect(userMsg?.content).not.toContain("a".repeat(16_385));
   });
 
+  it("keeps the Agent label whole", () => {
+    const longModelName = "A".repeat(60);
+    vi.mocked(useModelsStore).mockReturnValue({
+      chatModels: [
+        {
+          connectionId: 1,
+          modelId: "long-model",
+          displayName: longModelName,
+          connectionLabel: "Provider",
+          supportsTools: true,
+        },
+      ],
+      selected: { connectionId: 1, modelId: "long-model" },
+      loaded: true,
+      select: vi.fn(),
+      load: vi.fn(),
+    } as any);
+
+    render(<AiPanel />);
+
+    const agentCheckbox = screen.getByRole("checkbox", { name: "Agent" });
+    const agentLabel = agentCheckbox.closest("label");
+    expect(agentLabel?.className).toContain("shrink-0");
+
+    const select = screen.getByRole("combobox", { name: "Model" }) as HTMLSelectElement;
+    expect(select.className).toContain("min-w-0");
+    expect(select.getAttribute("title")).toBe(longModelName);
+  });
+
   it("Clear button asks confirmation and removes the conversation", async () => {
     useWorkspaceChatStore.setState({
       conversationId: 55,
