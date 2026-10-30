@@ -38,8 +38,8 @@ Carry-overs: `docs/phases/M4.md` and `docs/phases/M5.md`, "What's left → To M6
 
 ## In progress
 
-Nothing claimed. Claude Code (Opus 5.5) wrote the M6 plan on 2026-10-30; the human approved it on 2026-10-31.
-Next step: an agent claims and starts M6 Task 1 (the gate on three OSes in `.github/workflows/ci.yml`).
+M6 Task 1 (the gate on Windows, macOS and Linux), claimed by Claude Code (Opus 5.5) on 2026-10-31.
+Next step: after the human pushes the CI matrix change, read the macOS and Linux logs (`gh run view --log-failed`) and fix each failure test-first.
 
 ## Next 3 tasks
 
