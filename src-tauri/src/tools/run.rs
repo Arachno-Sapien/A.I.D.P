@@ -132,6 +132,13 @@ pub fn parse(name: &str, input: &serde_json::Value) -> Result<ToolInput, String>
                     c as u32
                 ));
             }
+            let full_width = args.command.chars().find(|c| ('\u{FF01}'..='\u{FF5E}').contains(c));
+            if let Some(c) = full_width {
+                return Err(format!(
+                    "Invalid arguments for {name}: the command contains a full-width character (U+{:04X}), which some programs turn into the ASCII character it looks like. Use plain ASCII.",
+                    c as u32
+                ));
+            }
             Ok(ToolInput::RunCommand {
                 command: args.command,
             })

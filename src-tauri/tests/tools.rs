@@ -146,6 +146,27 @@ fn command_with_hidden_characters_is_refused() {
 }
 
 #[test]
+fn command_with_full_width_characters_is_refused() {
+    // Some Windows programs turn a full-width character into the ASCII one it
+    // looks like, so `＂` on the card could run as `"`.
+    for (command, code) in [
+        ("echo ＂hi＂", "U+FF02"),
+        ("dir ｜ more", "U+FF5C"),
+        ("echo ａ", "U+FF41"),
+        ("echo ～", "U+FF5E"),
+    ] {
+        let err = parse("run_command", &json!({ "command": command })).unwrap_err();
+        assert!(
+            err.starts_with("Invalid arguments for run_command: the command contains a full-width character")
+                && err.contains(code),
+            "{command:?}: {err}"
+        );
+    }
+    // The ideographic space and half-width katakana are outside the range.
+    assert!(parse("run_command", &json!({ "command": "echo \"hi\"\u{3000}ｱ" })).is_ok());
+}
+
+#[test]
 fn specs_are_valid_schemas() {
     let list = specs();
     let names: Vec<&str> = list.iter().map(|s| s.name).collect();
@@ -695,6 +716,34 @@ async fn stop_works_with_a_background_process() {
         .unwrap();
     assert!(start.elapsed() < Duration::from_secs(3), "took {:?}", start.elapsed());
     assert_eq!(end, CommandEnd::Stopped);
+}
+
+/// The shell starts a process and exits at once, so the process has no living
+/// parent; Stop must still end it before it writes late.txt.
+#[tokio::test]
+async fn stop_ends_a_detached_process() {
+    let dir = TempDir::new();
+    let root = dir.path();
+    let cancel = CancellationToken::new();
+    let cmd = if cfg!(windows) {
+        "start /b cmd /c \"ping -n 4 127.0.0.1 >nul & echo late> late.txt\""
+    } else {
+        "(sleep 3; echo late > late.txt) &"
+    };
+
+    let cancel_clone = cancel.clone();
+    tokio::spawn(async move {
+        tokio::time::sleep(Duration::from_secs(1)).await;
+        cancel_clone.cancel();
+    });
+
+    let end = run_command(root, cmd, Duration::from_secs(30), &cancel, OUTPUT_LIMIT)
+        .await
+        .unwrap();
+    assert_eq!(end, CommandEnd::Stopped);
+
+    tokio::time::sleep(Duration::from_secs(5)).await;
+    assert!(!root.join("late.txt").exists(), "the detached process kept running");
 }
 
 #[tokio::test]

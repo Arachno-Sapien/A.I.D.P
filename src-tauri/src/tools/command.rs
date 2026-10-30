@@ -48,6 +48,60 @@ async fn read_capped<R: tokio::io::AsyncRead + Unpin>(mut reader: R) -> Vec<u8> 
     out
 }
 
+/// Every process a command starts, on Windows. Dropping the job ends them all,
+/// including a process whose parent already exited, which `taskkill /T` misses.
+/// Elsewhere the command's process group does the same.
+#[cfg(windows)]
+struct Job(windows_sys::Win32::Foundation::HANDLE);
+
+// SAFETY: a job handle may be used and closed from any thread.
+#[cfg(windows)]
+unsafe impl Send for Job {}
+
+#[cfg(windows)]
+impl Job {
+    /// A job holding `child` that ends its processes when dropped, or `None` if
+    /// Windows refuses; the command then relies on `taskkill /T` alone.
+    fn holding(child: &tokio::process::Child) -> Option<Job> {
+        use windows_sys::Win32::System::JobObjects::{
+            AssignProcessToJobObject, CreateJobObjectW, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+            JOBOBJECT_EXTENDED_LIMIT_INFORMATION, JobObjectExtendedLimitInformation,
+            SetInformationJobObject,
+        };
+        let process = child.raw_handle()?;
+        // ponytail: a process the shell starts before the assignment below
+        // escapes the job; creating the child suspended would close that gap.
+        // SAFETY: null attributes and name are allowed; `info` outlives the call;
+        // `process` is the live child's handle; the job handle is owned by `Job`.
+        unsafe {
+            let handle = CreateJobObjectW(std::ptr::null(), std::ptr::null());
+            if handle.is_null() {
+                return None;
+            }
+            let job = Job(handle);
+            let mut info = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
+            info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+            let limited = SetInformationJobObject(
+                job.0,
+                JobObjectExtendedLimitInformation,
+                std::ptr::from_ref(&info).cast(),
+                std::mem::size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
+            ) != 0;
+            (limited && AssignProcessToJobObject(job.0, process) != 0).then_some(job)
+        }
+    }
+}
+
+#[cfg(windows)]
+impl Drop for Job {
+    fn drop(&mut self) {
+        // SAFETY: the handle came from CreateJobObjectW and is closed only here.
+        unsafe {
+            windows_sys::Win32::Foundation::CloseHandle(self.0);
+        }
+    }
+}
+
 /// How long the output readers get after a kill to reach the end of the output.
 const KILL_GRACE: Duration = Duration::from_secs(2);
 
@@ -150,6 +204,8 @@ pub async fn run_command(
     })?;
 
     let pid = spawned.id();
+    #[cfg(windows)]
+    let job = Job::holding(&spawned);
     let stdout = spawned.stdout.take();
     let stderr = spawned.stderr.take();
 
@@ -190,9 +246,9 @@ pub async fn run_command(
     };
     drop(done);
 
-    // ponytail: on Windows a process whose parent already exited is outside
-    // the tree taskkill sees and keeps running; a job object would catch it.
     kill_tree(pid).await;
+    #[cfg(windows)]
+    drop(job);
     let _ = spawned.start_kill();
     let _ = spawned.wait().await;
 
