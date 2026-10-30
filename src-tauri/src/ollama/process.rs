@@ -15,6 +15,22 @@ pub fn find_binary() -> Option<PathBuf> {
         }
     }
 
+    // The Ollama app keeps its CLI inside the bundle and links it into
+    // /usr/local/bin; Homebrew installs to /opt/homebrew/bin on Apple silicon.
+    #[cfg(target_os = "macos")]
+    {
+        for candidate in [
+            "/Applications/Ollama.app/Contents/Resources/ollama",
+            "/opt/homebrew/bin/ollama",
+            "/usr/local/bin/ollama",
+        ] {
+            let candidate = PathBuf::from(candidate);
+            if candidate.is_file() {
+                return Some(candidate);
+            }
+        }
+    }
+
     let path_var = std::env::var_os("PATH")?;
     first_in(std::env::split_paths(&path_var), EXE)
 }

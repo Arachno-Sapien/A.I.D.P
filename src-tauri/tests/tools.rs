@@ -14,6 +14,14 @@ use std::time::{Duration, Instant};
 use tokio_util::sync::CancellationToken;
 
 #[test]
+fn run_command_description_names_the_shell() {
+    let specs = specs();
+    let run = specs.iter().find(|s| s.name == "run_command").unwrap();
+    let shell = if cfg!(windows) { "Runs with cmd.exe" } else { "Runs with sh" };
+    assert!(run.description.contains(shell), "{}", run.description);
+}
+
+#[test]
 fn parse_table() {
     // 1. Minimal args parse for each of 6 tools
     let lf = parse("list_files", &json!({})).unwrap();

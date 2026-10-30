@@ -39,7 +39,8 @@ Carry-overs: `docs/phases/M4.md` and `docs/phases/M5.md`, "What's left → To M6
 ## In progress
 
 M6 Task 1 done 2026-10-31 by Claude Code (Opus 5.5): CI run 41112982172 green on Windows, macOS and Linux, with 211 Rust tests (1 ignored) and 187 Vitest tests on each; nothing needed fixing.
-Next step: M6 Task 2 (`src-tauri/src/login_path.rs` with `extract_path` and `run_with_limit`, Ollama paths on macOS, `-l` for the macOS terminal, the shell named in the `run_command` description).
+M6 Task 2 (macOS and Linux differences), claimed by Claude Code (Opus 5.5) on 2026-10-31.
+Next step: `src-tauri/src/login_path.rs` (`extract_path`, `run_with_limit`, `apply_login_path`) called from `main.rs`; Ollama paths on macOS; `-l` for the macOS terminal; a test pinning the shell named in the `run_command` description (already per-OS).
 
 ## Next 3 tasks
 

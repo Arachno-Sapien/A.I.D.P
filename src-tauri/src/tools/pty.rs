@@ -56,6 +56,10 @@ pub fn default_shell() -> CommandBuilder {
     } else {
         let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".to_string());
         let mut cmd = CommandBuilder::new(shell);
+        // Terminal.app starts login shells, which is where macOS users set PATH.
+        if cfg!(target_os = "macos") {
+            cmd.arg("-l");
+        }
         cmd.env("TERM", "xterm-256color");
         cmd
     }
@@ -217,6 +221,13 @@ pub struct TerminalState {
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn macos_shell_is_login() {
+        let shell = default_shell();
+        assert!(shell.get_argv().iter().any(|a| a == "-l"), "{:?}", shell.get_argv());
+    }
 
     #[test]
     fn take_utf8_table() {
