@@ -132,9 +132,9 @@ pub fn parse(name: &str, input: &serde_json::Value) -> Result<ToolInput, String>
                     c as u32
                 ));
             }
-            if let Some(c) = args.command.chars().find(|&c| turns_into_ascii(c)) {
+            if let Some(c) = args.command.chars().find(|&c| received_differently(c)) {
                 return Err(format!(
-                    "Invalid arguments for {name}: the command contains a character (U+{:04X}) that some programs turn into the ASCII character it looks like. Use plain ASCII.",
+                    "Invalid arguments for {name}: the command contains a character (U+{:04X}) that some programs would receive as a different ASCII character. Use plain ASCII.",
                     c as u32
                 ));
             }
@@ -181,25 +181,26 @@ fn is_hidden(c: char) -> bool {
         )
 }
 
-/// Characters some programs turn into the ASCII punctuation or space they look
-/// like, so the card would read differently from what runs: the full-width
-/// forms (U+FF01 to U+FF5E) on every OS, and on Windows anything the ANSI code
-/// page's best fit maps to one ASCII byte that is not a letter or digit (the
-/// WorstFit attacks, such as `∕` to `/`). A program that reads its command line
-/// through the ANSI API gets it converted that way. The OEM code page is left
-/// out: it converts console text, not command lines, and would also refuse
-/// curly quotes and dashes.
-fn turns_into_ascii(c: char) -> bool {
-    ('\u{FF01}'..='\u{FF5E}').contains(&c) || best_fits_to_ascii(c)
+/// Characters some programs would receive as a different ASCII character, so
+/// the card would read differently from what runs. On every OS, the full-width
+/// forms (U+FF01 to U+FF5E), which some programs turn into the ASCII character
+/// they look like. On Windows, also every character the ANSI code page does not
+/// hold exactly: a program reading its command line through the ANSI API gets
+/// it by best fit (`∕` as `/`, the WorstFit attacks) or as the wildcard `?`.
+/// The OEM code page is left out: it converts console text, not command lines.
+fn received_differently(c: char) -> bool {
+    ('\u{FF01}'..='\u{FF5E}').contains(&c) || outside_ansi_code_page(c)
 }
 
 #[cfg(windows)]
-fn best_fits_to_ascii(c: char) -> bool {
-    use windows_sys::Win32::Globalization::{GetACP, WideCharToMultiByte};
+fn outside_ansi_code_page(c: char) -> bool {
+    use windows_sys::Win32::Globalization::{GetACP, WC_NO_BEST_FIT_CHARS, WideCharToMultiByte};
     const CP_UTF8: u32 = 65001;
+    // The process code page is the system's, the one child programs get, as
+    // long as the app's manifest does not set `activeCodePage` (it doesn't).
     // SAFETY: takes no arguments.
     let cp = unsafe { GetACP() };
-    // UTF-8 has no best fit, and it rejects the `used_default` argument.
+    // UTF-8 holds every character, and it rejects the flag and `used_default`.
     if c.is_ascii() || cp == CP_UTF8 {
         return false;
     }
@@ -211,7 +212,7 @@ fn best_fits_to_ascii(c: char) -> bool {
     let n = unsafe {
         WideCharToMultiByte(
             cp,
-            0,
+            WC_NO_BEST_FIT_CHARS,
             wide.as_ptr(),
             wide.len() as i32,
             out.as_mut_ptr(),
@@ -220,11 +221,11 @@ fn best_fits_to_ascii(c: char) -> bool {
             &mut used_default,
         )
     };
-    n == 1 && used_default == 0 && out[0].is_ascii() && !out[0].is_ascii_alphanumeric()
+    n == 0 || used_default != 0 || (n == 1 && out[0].is_ascii())
 }
 
 #[cfg(not(windows))]
-fn best_fits_to_ascii(_c: char) -> bool {
+fn outside_ansi_code_page(_c: char) -> bool {
     false
 }
 

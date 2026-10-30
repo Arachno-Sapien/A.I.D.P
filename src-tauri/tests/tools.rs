@@ -140,9 +140,10 @@ fn command_with_hidden_characters_is_refused() {
         );
     }
     // Tabs and line breaks are visible in the card and stay allowed, and so is
-    // ordinary non-ASCII text.
+    // ordinary non-ASCII text (on Windows, what its code page holds; see
+    // command_with_ascii_lookalikes_is_refused).
     assert!(parse("run_command", &json!({ "command": "echo a\tb\r\necho c" })).is_ok());
-    assert!(parse("run_command", &json!({ "command": "echo héllo 日本 > ñ.txt" })).is_ok());
+    assert!(parse("run_command", &json!({ "command": "echo héllo > ñ.txt" })).is_ok());
 }
 
 fn assert_lookalike_refused(command: &str, code: &str) {
@@ -152,7 +153,7 @@ fn assert_lookalike_refused(command: &str, code: &str) {
     assert!(
         err.starts_with("Invalid arguments for run_command: the command contains a character (")
             && err.contains(code)
-            && err.contains("turn into the ASCII character it looks like"),
+            && err.contains("would receive as a different ASCII character"),
         "{command:?}: {err}"
     );
 }
@@ -169,14 +170,22 @@ fn command_with_ascii_lookalikes_is_refused() {
     ] {
         assert_lookalike_refused(command, code);
     }
-    // On Windows the ANSI and OEM code pages' best fit does the same to more
-    // characters (WorstFit): a division slash becomes `/`, an en space a space.
     if cfg!(windows) {
+        // A program reading its command line through the ANSI API gets every
+        // character the ANSI code page (1252 on the dev machine and CI) does not
+        // hold exactly as something else: best fit turns a division slash into
+        // `/` and an en space into a space (WorstFit), `ł` into `l`, and a
+        // character with no mapping into the wildcard `?`.
         assert_lookalike_refused("type a\u{2215}b", "U+2215");
         assert_lookalike_refused("echo a\u{2002}b", "U+2002");
+        assert_lookalike_refused("del 日.txt", "U+65E5");
+        assert_lookalike_refused("echo ł", "U+0142");
+        // What code page 1252 holds exactly stays allowed.
+        assert!(parse("run_command", &json!({ "command": "echo héllo “x” – 5€ > ñ.txt" })).is_ok());
+    } else {
+        // Elsewhere only the full-width forms are refused.
+        assert!(parse("run_command", &json!({ "command": "echo \"hi\" ｱ ł 日本" })).is_ok());
     }
-    // Half-width katakana, and a letter that at most loses its accent, stay allowed.
-    assert!(parse("run_command", &json!({ "command": "echo \"hi\" ｱ ł" })).is_ok());
 }
 
 #[test]
