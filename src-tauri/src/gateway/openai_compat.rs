@@ -360,7 +360,11 @@ impl ModelProvider for OpenAiCompat {
         let mut tool_calls = Vec::new();
         let mut tool_calls_json = Vec::new();
 
-        for (idx, partial) in accumulated_tool_calls {
+        for (idx, mut partial) in accumulated_tool_calls {
+            // Some providers send "" for a call without arguments.
+            if partial.arguments.trim().is_empty() {
+                partial.arguments = "{}".to_string();
+            }
             let call_id = partial.id.unwrap_or_else(|| format!("call_{idx}"));
             let func_name = partial.name.unwrap_or_default();
             let input = match serde_json::from_str::<serde_json::Value>(&partial.arguments) {

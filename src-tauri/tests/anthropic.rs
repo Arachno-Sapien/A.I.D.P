@@ -879,3 +879,47 @@ async fn redacted_thinking_is_kept() {
     );
 }
 
+#[tokio::test]
+async fn malformed_content_block_does_not_panic() {
+    // A broken proxy at a custom base URL; release builds abort on a panic.
+    let server = MockServer::start().await;
+    let body = events(&[
+        (
+            "content_block_start",
+            r#"{"type":"content_block_start","index":0,"content_block":"oops"}"#,
+        ),
+        (
+            "content_block_delta",
+            r#"{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"hi"}}"#,
+        ),
+        (
+            "content_block_delta",
+            r#"{"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"hm"}}"#,
+        ),
+        (
+            "content_block_delta",
+            r#"{"type":"content_block_delta","index":0,"delta":{"type":"signature_delta","signature":"s"}}"#,
+        ),
+        ("content_block_stop", r#"{"type":"content_block_stop","index":0}"#),
+        (
+            "message_delta",
+            r#"{"type":"message_delta","delta":{"stop_reason":"end_turn"}}"#,
+        ),
+        ("message_stop", r#"{"type":"message_stop"}"#),
+    ]);
+    Mock::given(method("POST"))
+        .and(path("/v1/messages"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(body))
+        .mount(&server)
+        .await;
+
+    let p = test_provider(&server);
+    let (channel, _) = capture();
+    let reply = p
+        .stream_chat(req(), channel, CancellationToken::new())
+        .await
+        .unwrap();
+
+    assert_eq!(reply.assistant["content"][0], json!("oops"));
+}
+

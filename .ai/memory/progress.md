@@ -4,7 +4,7 @@ Updated: 2026-10-30 by Claude Code (Opus 5.5)
 
 ## Current milestone: M4 Agent tools and terminal
 
-Plan approved 2026-10-30 with the defaults for D1 (widen rule 6), D2 (limits) and D3 (shells). Plan: `docs/superpowers/plans/2026-10-30-m4-agent-tools.md` (12 tasks; stop for review after Task 7). Phase doc: `docs/phases/M4.md`. No code yet.
+Plan approved 2026-10-30 with the defaults for D1 (widen rule 6), D2 (limits) and D3 (shells). Plan: `docs/superpowers/plans/2026-10-30-m4-agent-tools.md` (12 tasks; stop for review after Task 7). Phase doc: `docs/phases/M4.md`. Tasks 1 to 7 (backend) done by Antigravity, reviewed and fixed by Claude Code on 2026-10-30 (log `2026-10-30-m4-review-fixes.md`). Not pushed.
 
 - [ ] `ChatEvent::ToolCall` and tool calling in the OpenAI-compatible and Anthropic adapters
 - [ ] `list_files`, `read_file`, `search`, `edit_file`, `create_file`, and `run_command` work inside the folder
@@ -39,13 +39,11 @@ Carry-overs from M3 are in `docs/phases/M3.md` under "What's left": M4 reuses `w
 
 ## In progress
 
-Task: Fix the review findings on M4 Tasks 1 to 7 (search follows links, Stop blocked by background processes, one-line read, Anthropic panic, create_file names, blank arguments, unreadable entries)
-Tool + model: Claude Code (Opus 5.5)
-Date: 2026-10-30
-Next step: `workspace/search.rs`: skip links and unreadable entries (test `search_skips_links`), then the file tools, the command runner and the adapters.
+Nothing claimed. Review fixes for Tasks 1 to 7 are committed; the tree is green.
+Next step: M4 Task 8 (Agent mode in the AI panel) from the plan.
 
 ## Next 3 tasks
 
-1. M4 Tasks 1 to 7 (capability, both adapters, workspace helpers with the wider secret list, file tools, command runner, the loop).
-2. Review of Tasks 1 to 7 by Claude Code before any UI work.
-3. M4 Tasks 8 to 12 (agent UI, terminal backend and panel, docs, live check and close).
+1. M4 Task 8: Agent mode in the AI panel.
+2. M4 Tasks 9 and 10: terminal backend and panel.
+3. M4 Tasks 11 and 12: docs, live check, close.

@@ -613,6 +613,32 @@ async fn invalid_arguments_stay_a_string() {
 }
 
 #[tokio::test]
+async fn blank_arguments_mean_no_arguments() {
+    // Some providers send "" for a call without arguments.
+    let server = MockServer::start().await;
+    let body = sse(&[
+        r#"{"choices":[{"delta":{"tool_calls":[{"index":0,"id":"c1","type":"function","function":{"name":"list_files","arguments":""}}]}}]}"#,
+        r#"{"choices":[{"delta":{},"finish_reason":"tool_calls"}]}"#,
+        "[DONE]",
+    ]);
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(body))
+        .mount(&server)
+        .await;
+
+    let p = provider(&server);
+    let (channel, _) = capture();
+    let reply = p
+        .stream_chat(req(), channel, CancellationToken::new())
+        .await
+        .unwrap();
+
+    assert_eq!(reply.tool_calls[0].input, serde_json::json!({}));
+    assert_eq!(reply.assistant["tool_calls"][0]["function"]["arguments"], "{}");
+}
+
+#[tokio::test]
 async fn cut_off_tool_call_is_an_error() {
     let server = MockServer::start().await;
     let body = sse(&[

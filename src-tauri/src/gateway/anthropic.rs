@@ -63,6 +63,20 @@ struct ModelEntry {
 const MAX_TOKENS: u32 = 8192;
 const MAX_TOKENS_WITH_TOOLS: u32 = 32000;
 
+/// Appends a streamed piece to a block's string field in place. A block that
+/// is not an object (a broken proxy) is left as it is instead of panicking.
+fn append(block: &mut serde_json::Value, key: &str, piece: &str) {
+    let Some(obj) = block.as_object_mut() else {
+        return;
+    };
+    match obj.get_mut(key) {
+        Some(serde_json::Value::String(cur)) => cur.push_str(piece),
+        _ => {
+            obj.insert(key.to_string(), serde_json::Value::String(piece.to_string()));
+        }
+    }
+}
+
 #[derive(Deserialize)]
 #[serde(tag = "type")]
 enum StreamEvent {
@@ -334,49 +348,23 @@ impl ModelProvider for Anthropic {
                         "text_delta" => {
                             if let Some(text) = delta.get("text").and_then(|t| t.as_str()) {
                                 if let Some(block) = blocks.get_mut(&index) {
-                                    if let Some(cur) =
-                                        block.get_mut("text").and_then(|t| t.as_str())
-                                    {
-                                        let updated = format!("{cur}{text}");
-                                        block["text"] = serde_json::Value::String(updated);
-                                    } else {
-                                        block["text"] =
-                                            serde_json::Value::String(text.to_string());
-                                    }
+                                    append(block, "text", text);
                                 }
                                 if out.send(ChatEvent::Delta(text.to_string())).is_err() {
                                     return Err(ProviderError::Cancelled);
                                 }
                             }
                         }
-                        "thinking_delta" => {
-                            if let Some(th) = delta.get("thinking").and_then(|t| t.as_str())
+                        "thinking_delta" | "signature_delta" => {
+                            let key = if delta_type == "thinking_delta" {
+                                "thinking"
+                            } else {
+                                "signature"
+                            };
+                            if let Some(piece) = delta.get(key).and_then(|t| t.as_str())
                                 && let Some(block) = blocks.get_mut(&index)
                             {
-                                if let Some(cur) =
-                                    block.get_mut("thinking").and_then(|t| t.as_str())
-                                {
-                                    let updated = format!("{cur}{th}");
-                                    block["thinking"] = serde_json::Value::String(updated);
-                                } else {
-                                    block["thinking"] =
-                                        serde_json::Value::String(th.to_string());
-                                }
-                            }
-                        }
-                        "signature_delta" => {
-                            if let Some(sig) = delta.get("signature").and_then(|t| t.as_str())
-                                && let Some(block) = blocks.get_mut(&index)
-                            {
-                                if let Some(cur) =
-                                    block.get_mut("signature").and_then(|t| t.as_str())
-                                {
-                                    let updated = format!("{cur}{sig}");
-                                    block["signature"] = serde_json::Value::String(updated);
-                                } else {
-                                    block["signature"] =
-                                        serde_json::Value::String(sig.to_string());
-                                }
+                                append(block, key, piece);
                             }
                         }
                         "input_json_delta" => {
