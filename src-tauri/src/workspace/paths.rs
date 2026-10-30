@@ -2,10 +2,16 @@ use super::WorkspaceError;
 use std::path::{Component, Path, PathBuf};
 
 /// The `.git` folder is refused like a path outside the folder: its config can
-/// hold credentials and its hooks run code. Case-insensitive, as on Windows.
+/// hold credentials and its hooks run code. Compared as Windows names it:
+/// case-insensitive, with trailing dots and spaces dropped (".git." is .git).
 fn has_git_part(p: &Path) -> bool {
-    p.components()
-        .any(|c| matches!(c, Component::Normal(n) if n.eq_ignore_ascii_case(".git")))
+    p.components().any(|c| match c {
+        Component::Normal(n) => n
+            .to_string_lossy()
+            .trim_end_matches(['.', ' '])
+            .eq_ignore_ascii_case(".git"),
+        _ => false,
+    })
 }
 
 pub fn in_git_dir(rel: &str) -> bool {

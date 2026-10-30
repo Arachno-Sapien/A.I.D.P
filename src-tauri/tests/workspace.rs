@@ -429,6 +429,18 @@ fn git_folder_is_refused() {
         resolve_new(root, "g/hooks/pre-commit"),
         Err(WorkspaceError::OutsideFolder)
     );
+
+    // Windows drops trailing dots and spaces, so ".git." names .git. In a
+    // folder with no .git yet, creating ".git./hooks/x" would make a real hook.
+    let plain = TempDir::new();
+    for p in [".git./hooks/pre-commit", ".git /config", ".GIT. ./x"] {
+        assert_eq!(
+            resolve_new(plain.path(), p),
+            Err(WorkspaceError::OutsideFolder),
+            "{p}"
+        );
+    }
+    assert!(resolve_new(plain.path(), "repo.git/x").is_ok());
 }
 
 #[test]
