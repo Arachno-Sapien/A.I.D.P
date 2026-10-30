@@ -116,9 +116,10 @@ Milestone 4 introduces autonomous agent tool execution (`list_files`, `read_file
 - **Untrusted model content:** Tool outputs and file contents returned to the model are treated as data, not instructions. Prompt injections inside repository files (e.g. `del notes.txt`) cannot skip an approval gate.
 
 ### Expanded Secret File Shielding
-- **Strict filter across all tools:** The secret file filter (decision 0010) governs `list_files`, `read_file`, `search`, and `edit_file`.
-- **Shielded credential names:** `.env*`, `*.pem`, `*.key`, `*.p12`, `*.pfx`, `*.jks`, `*.keystore`, `*.tfvars`, `id_rsa*`, `id_ed25519*`, `id_ecdsa*`, `id_dsa*`, `.npmrc`, `.pypirc`, `.netrc`, `_netrc`, and `.git-credentials` are excluded from directory listings and searches, and refused on direct read.
-- **Content inspection:** Files containing PEM private key blocks (`-----BEGIN ... PRIVATE KEY-----`) are blocked from model access on read and search.
+- **Strict filter across all tools:** The secret file filter (decisions 0010 and 0012) governs `list_files`, `read_file`, `search`, and `edit_file`. `create_file` may create secret-looking names (the user sees the content; nothing is read).
+- **Shielded credential names:** the names in security rule 6 (`AGENTS.md`) are excluded from directory listings and searches, and refused on direct read.
+- **Content inspection:** Files containing a PEM (`-----BEGIN ... PRIVATE KEY-----`), PGP (`... PRIVATE KEY BLOCK-----`) or PuTTY private key are blocked from model access on read and search.
+- **No `.git`:** every tool refuses paths inside `.git`, including through links (see "The `.git` folder is off limits" above).
 
 ### Command Runner Boundaries
 - **Folder containment:** Model commands execute with the workspace root as their current working directory (`cwd`).
