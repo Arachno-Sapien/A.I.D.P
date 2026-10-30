@@ -193,12 +193,12 @@ Five SQLite tables in one local file, read and written only by Rust. No table ev
 | Table | Holds | Key columns |
 | --- | --- | --- |
 | connections | One row per provider setup | id, kind (openai\_compat / anthropic / ollama), label, base\_url, key\_hint (last 4), last\_tested\_at, last\_test\_ok |
-| models | Models the user chose to show | id, connection\_id, model\_id, display\_name, context\_window, supports\_tools, is\_default, hidden |
-| conversations | One row per chat | id, title, model\_ref, system\_prompt, workspace\_path (null for plain chats), created\_at, updated\_at |
-| messages | Every message in a chat | id, conversation\_id, role, content\_parts (JSON: text; tool\_call and tool\_result from M4), model\_ref, status (complete / stopped / error), error\_kind, tokens\_in, tokens\_out, created\_at |
-| settings | App preferences | key, value (theme, default model, keep\_alive, history location, recent workspaces) |
+| models | Models the user chose to show | id, connection\_id, model\_id, display\_name, context\_window, supports\_tools, num\_ctx, is\_default, hidden |
+| conversations | One row per chat | id, title, workspace\_path (null for plain chats), created\_at, updated\_at |
+| messages | Every message in a chat | id, conversation\_id, role, content\_parts (JSON: text, chips, target, tool\_call and tool\_result), model\_name, model\_ref, status (complete / stopped / error), error\_kind, tokens\_in, tokens\_out, created\_at |
+| settings | App preferences | key, value (theme, default model, keep\_alive, recent workspaces) |
 
-Each message stores its own `model_ref`, so switching models in the middle of a chat keeps a correct record of who said what. A workspace's AI panel is a conversation with `workspace_path` set. Schema changes go through numbered migrations from day one.
+Each message stores its own `model_ref` and `model_name`, so switching models in the middle of a chat keeps a correct record of who said what. A workspace's AI panel is a conversation with `workspace_path` set. Schema changes go through numbered migrations from day one.
 
 ## Screens and user flows
 
@@ -478,7 +478,7 @@ The biggest risk is an agent-built Rust core you can't debug; the plan answers i
 
 - [x] App name: A.I.D.P (decision 0003). Repository: https://github.com/Arachno-Sapien/A.I.D.P
 - [ ] v0.1 for Windows only, or all three OSes?
-- [ ] Link to the Ollama installer, or download and run it from inside the app?
+- [x] Link to the Ollama installer, or download and run it from inside the app? Link to installer on ollama.com; the app starts it if stopped (decision 0013)
 - [ ] Chat export format: Markdown, JSON, or both?
 - [x] Open source from day one: yes, MIT OR Apache-2.0 (decision 0004)
 - [ ] After v0.1: allow "approve this command for the session" for repeat commands like the test runner?

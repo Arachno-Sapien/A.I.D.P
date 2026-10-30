@@ -95,7 +95,23 @@ Starting in Milestone 2, API keys and connections are configured directly inside
 
 ---
 
-## 5. Production Release Build
+## 6. Local Models with Ollama
+
+Starting in Milestone 5, A.I.D.P supports running models locally via Ollama without an API key:
+
+1. **Install Ollama:**
+   - Download and run the installer from [ollama.com/download](https://ollama.com/download).
+   - If Ollama is not installed, the **Models** page in A.I.D.P offers a **"Get Ollama"** shortcut that opens the download page.
+2. **Start Ollama:**
+   - If Ollama is installed but stopped, click **"Start"** on the Models page to launch `ollama serve`.
+3. **Download a Model:**
+   - On the **Models** page under **Ollama (local models)**, click **"Download"** on any suggested model (e.g. `qwen2.5-coder:1.5b`) or enter any model tag from the Ollama library.
+   - Progress and download speeds are shown live, with a **Cancel** option.
+4. **Chat and Workspace:**
+   - Downloaded models appear in the model picker under **Local · Ollama**.
+   - If Ollama is stopped, local options show as `(Ollama stopped)` until Ollama is started.
+   - Click **"Free memory"** on the Models page at any time to unload active models from RAM.
+
 
 To build the standalone release executable without generating installer bundles:
 ```bash

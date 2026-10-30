@@ -383,7 +383,6 @@ Test machines: dev laptop (RTX 3050 Ti 4 GB VRAM, 24 GB RAM) and one 8 GB RAM ma
 
 - The acronym's expansion. The display name A.I.D.P (decision 0003) and the repo https://github.com/Arachno-Sapien/A.I.D.P are settled; the expansion may change as features land.
 - v0.1 for Windows only, or all three OSes?
-- Link to the Ollama installer, or download and run it from inside the app?
 - Chat export format: Markdown, JSON, or both?
 
 When one is answered, write a decision record and remove it from this list.

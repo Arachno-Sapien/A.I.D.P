@@ -136,7 +136,21 @@ Milestone 4 introduces autonomous agent tool execution (`list_files`, `read_file
 
 ---
 
-## 9. Threat Model & Boundaries
+## 10. Local Runtime (Ollama) & Chat History Security
+
+Milestone 5 introduces local model support via Ollama and persistent chat history:
+
+### Ollama Localhost Boundary
+- **Fixed endpoint:** Ollama communications use fixed loopback addresses (`http://127.0.0.1:11434`), allowed by network transport rules without external network exposure.
+- **No credentials stored or transmitted:** Ollama requires no API keys; keychain storage is bypassed.
+- **Binary discovery & execution:** When launching `ollama serve`, the app checks explicit system directories (`%LOCALAPPDATA%\Programs\Ollama\`, `/usr/local/bin/`, etc.) and `PATH`. Relative entries on `PATH` (`.` or relative paths) are ignored to prevent local binary hijacking. Processes spawn with `CREATE_NO_WINDOW` on Windows.
+- **Model name validation:** All model names passed to pull, delete, or unload commands are verified with `valid_model_name`: alphanumeric, `:`, `.`, `-`, `_`, `/` only, 1 to 128 characters.
+- **Fixed download URL:** The "Get Ollama" button opens only `https://ollama.com/download` in the system default browser.
+
+### Chat History Storage
+- **Unencrypted SQLite database:** Conversations and messages are stored in `aidp.db` inside the user's OS application data directory (`%APPDATA%\com.aidp.desktop\aidp.db` on Windows).
+- **Sensitive data awareness:** Chat history stores user questions, attached files, and assistant replies unencrypted. While secret files are blocked from automated attachments, any file content or code explicitly sent by the user is persisted locally in `aidp.db`.
+
 
 **What this protects against:**
 - **Disk theft & backup leakage:** Stolen project files, SQLite database backups, or source code repositories do not expose your API keys.

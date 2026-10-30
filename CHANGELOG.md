@@ -10,6 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Local model runtime powered by Ollama: status detection, in-app start, model pull with live progress and cancel, deletion with confirmation, and memory unloading ("Free memory").
+- `ollama_chat` provider adapter supporting streaming replies, tool calling, per-model `num_ctx`, and `keep_alive` options.
+- Model picker grouping: cloud models grouped by provider and local models grouped under `Local · Ollama`, with disabled state and clear status when Ollama is stopped.
+- Text budgeting for small context windows: caps attached file context chips and agent `read_file` limits to match the model's context window.
+- Persistent chat history (SQLite migration 4): conversations and messages persisted locally in `aidp.db`; separate conversation history per workspace folder; Chat sidebar with filterable search and chat deletion.
+- Settings screen: configurable default model, interface theme (Dark, Light, System), and Ollama keep-alive duration.
+- Light and System theme support: dynamic Tailwind v4 neutral palette inversion, CodeMirror 6 theme compartment reconfiguration, and xterm terminal palette switching.
 - Autonomous agent tools in workspace AI panel: `list_files`, `read_file`, `search`, `edit_file`, `create_file`, and `run_command` with boundary confinement and secret file shielding.
 - User approval gate for model edits and commands: interactive diff review for file modifications and creation, and approval cards showing exact commands and working directory before execution; no auto-approve bypass.
 - Built-in terminal panel running native shell (`powershell.exe -NoLogo` on Windows, `$SHELL` on Unix; decision 0011) via `@xterm/xterm`, `@xterm/addon-fit`, and `portable-pty`, toggled via top bar or `Ctrl+\`.
