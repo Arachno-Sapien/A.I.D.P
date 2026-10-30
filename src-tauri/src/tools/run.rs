@@ -1,0 +1,456 @@
+use crate::tools::{ToolOutcome, LIST_LIMIT, READ_LIMIT, SEARCH_LIMIT};
+use crate::workspace::files::{self, list_tree, LineEnding};
+use crate::workspace::paths;
+use crate::workspace::search as ws_search;
+use crate::workspace::secret_files::{has_private_key, is_secret};
+use crate::workspace::WorkspaceError;
+use serde::Deserialize;
+use std::path::Path;
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum ToolInput {
+    ListFiles {
+        path: String,
+    },
+    ReadFile {
+        path: String,
+        start_line: Option<u32>,
+        end_line: Option<u32>,
+    },
+    Search {
+        query: String,
+        path: String,
+    },
+    EditFile {
+        path: String,
+        old_text: String,
+        new_text: String,
+    },
+    CreateFile {
+        path: String,
+        text: String,
+    },
+    RunCommand {
+        command: String,
+    },
+}
+
+#[derive(Deserialize)]
+struct ListFilesArgs {
+    #[serde(default)]
+    path: String,
+}
+
+#[derive(Deserialize)]
+struct ReadFileArgs {
+    path: String,
+    start_line: Option<u32>,
+    end_line: Option<u32>,
+}
+
+#[derive(Deserialize)]
+struct SearchArgs {
+    query: String,
+    #[serde(default)]
+    path: String,
+}
+
+#[derive(Deserialize)]
+struct EditFileArgs {
+    path: String,
+    old_text: String,
+    new_text: String,
+}
+
+#[derive(Deserialize)]
+struct CreateFileArgs {
+    path: String,
+    text: String,
+}
+
+#[derive(Deserialize)]
+struct RunCommandArgs {
+    command: String,
+}
+
+pub fn parse(name: &str, input: &serde_json::Value) -> Result<ToolInput, String> {
+    if !input.is_object() {
+        return Err(format!(
+            "Invalid arguments for {name}: they were not valid JSON."
+        ));
+    }
+
+    match name {
+        "list_files" => {
+            let args: ListFilesArgs = serde_json::from_value(input.clone())
+                .map_err(|e| format!("Invalid arguments for {name}: {e}."))?;
+            Ok(ToolInput::ListFiles { path: args.path })
+        }
+        "read_file" => {
+            let args: ReadFileArgs = serde_json::from_value(input.clone())
+                .map_err(|e| format!("Invalid arguments for {name}: {e}."))?;
+            Ok(ToolInput::ReadFile {
+                path: args.path,
+                start_line: args.start_line,
+                end_line: args.end_line,
+            })
+        }
+        "search" => {
+            let args: SearchArgs = serde_json::from_value(input.clone())
+                .map_err(|e| format!("Invalid arguments for {name}: {e}."))?;
+            Ok(ToolInput::Search {
+                query: args.query,
+                path: args.path,
+            })
+        }
+        "edit_file" => {
+            let args: EditFileArgs = serde_json::from_value(input.clone())
+                .map_err(|e| format!("Invalid arguments for {name}: {e}."))?;
+            Ok(ToolInput::EditFile {
+                path: args.path,
+                old_text: args.old_text,
+                new_text: args.new_text,
+            })
+        }
+        "create_file" => {
+            let args: CreateFileArgs = serde_json::from_value(input.clone())
+                .map_err(|e| format!("Invalid arguments for {name}: {e}."))?;
+            Ok(ToolInput::CreateFile {
+                path: args.path,
+                text: args.text,
+            })
+        }
+        "run_command" => {
+            let args: RunCommandArgs = serde_json::from_value(input.clone())
+                .map_err(|e| format!("Invalid arguments for {name}: {e}."))?;
+            Ok(ToolInput::RunCommand {
+                command: args.command,
+            })
+        }
+        _ => Err(format!("There is no tool named {name}.")),
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ToolRun {
+    pub for_model: String,
+    pub is_error: bool,
+    pub outcome: ToolOutcome,
+}
+
+pub fn refused(err: &WorkspaceError, path: &str) -> ToolRun {
+    let for_model = match err {
+        WorkspaceError::OutsideFolder => {
+            "Refused: paths must be relative to the project folder (like src/main.rs) and stay inside it.".to_string()
+        }
+        WorkspaceError::NotFound => format!("Not found: {path}"),
+        WorkspaceError::NotText => format!("{path} is not a text file."),
+        WorkspaceError::TooLarge { .. } => format!("{path} is larger than 2 MB."),
+        WorkspaceError::ChangedOnDisk => {
+            format!("{path} changed on disk after you read it; read it again before editing.")
+        }
+        WorkspaceError::AlreadyExists => {
+            format!("{path} already exists. Use edit_file to change it.")
+        }
+        WorkspaceError::Io { message } => message.clone(),
+        WorkspaceError::Storage { message } => message.clone(),
+        WorkspaceError::NoFolder => "No folder is open.".to_string(),
+    };
+    ToolRun {
+        outcome: ToolOutcome::Error {
+            message: for_model.clone(),
+        },
+        is_error: true,
+        for_model,
+    }
+}
+
+pub fn secret_refused(path: &str) -> ToolRun {
+    let for_model = format!(
+        "Refused: {path} looks like a secret file (keys, .env). It is never shared with you; ask the user to paste what you need."
+    );
+    ToolRun {
+        outcome: ToolOutcome::Error {
+            message: for_model.clone(),
+        },
+        is_error: true,
+        for_model,
+    }
+}
+
+pub fn list_files(root: &Path, path: &str) -> ToolRun {
+    match list_tree(root, path, LIST_LIMIT) {
+        Ok((entries, more)) => {
+            let count = entries.len();
+            let mut lines = entries.join("\n");
+            if more {
+                if !lines.is_empty() {
+                    lines.push('\n');
+                }
+                lines.push_str("(more entries not shown; list a subfolder)");
+            }
+            let summary = format!("{count} entries");
+            ToolRun {
+                for_model: lines,
+                is_error: false,
+                outcome: ToolOutcome::Ok { summary },
+            }
+        }
+        Err(err) => refused(&err, path),
+    }
+}
+
+pub fn read_file(
+    root: &Path,
+    path: &str,
+    start_line: Option<u32>,
+    end_line: Option<u32>,
+) -> ToolRun {
+    match files::read_file(root, path) {
+        Ok(file) => {
+            if file.is_secret {
+                return secret_refused(path);
+            }
+
+            let all_lines: Vec<&str> = file.text.lines().collect();
+            let total = all_lines.len() as u32;
+            if total == 0 {
+                let for_model = format!("{path}, lines 0-0 of 0:\n");
+                return ToolRun {
+                    for_model,
+                    is_error: false,
+                    outcome: ToolOutcome::Ok {
+                        summary: "lines 0-0 of 0".to_string(),
+                    },
+                };
+            }
+
+            let a = start_line.unwrap_or(1).clamp(1, total);
+            let b = end_line.unwrap_or(total).clamp(a, total);
+
+            let slice = &all_lines[(a - 1) as usize..b as usize];
+            let full_text = slice.join("\n");
+
+            let (text, cut_note) = if full_text.len() > READ_LIMIT {
+                let mut acc = String::new();
+                let mut k = a;
+                for (idx, line) in slice.iter().enumerate() {
+                    let line_len = line.len() + if idx > 0 { 1 } else { 0 };
+                    if acc.len() + line_len > READ_LIMIT && idx > 0 {
+                        break;
+                    }
+                    if idx > 0 {
+                        acc.push('\n');
+                    }
+                    acc.push_str(line);
+                    k = a + idx as u32;
+                }
+                let note = format!("\n[cut at line {k}; read on with start_line={}]", k + 1);
+                (acc, Some(note))
+            } else {
+                (full_text, None)
+            };
+
+            let for_model = match cut_note {
+                Some(note) => format!("{path}, lines {a}-{b} of {total}:\n{text}{note}"),
+                None => format!("{path}, lines {a}-{b} of {total}:\n{text}"),
+            };
+            let summary = format!("lines {a}-{b} of {total}");
+
+            ToolRun {
+                for_model,
+                is_error: false,
+                outcome: ToolOutcome::Ok { summary },
+            }
+        }
+        Err(err) => refused(&err, path),
+    }
+}
+
+pub fn search(root: &Path, query: &str, path: &str) -> ToolRun {
+    if query.is_empty() {
+        let for_model = "The search query is empty.".to_string();
+        return ToolRun {
+            outcome: ToolOutcome::Error {
+                message: for_model.clone(),
+            },
+            is_error: true,
+            for_model,
+        };
+    }
+
+    match ws_search::search(root, path, query, SEARCH_LIMIT) {
+        Ok((matches, cut)) => {
+            let count = matches.len();
+            if count == 0 && !cut {
+                return ToolRun {
+                    for_model: "No matches.".to_string(),
+                    is_error: false,
+                    outcome: ToolOutcome::Ok {
+                        summary: "0 matches".to_string(),
+                    },
+                };
+            }
+
+            let mut lines: Vec<String> = matches
+                .into_iter()
+                .map(|m| format!("{}:{}: {}", m.path, m.line, m.text))
+                .collect();
+
+            if cut {
+                if count >= SEARCH_LIMIT {
+                    lines.push("(stopped at 100 matches)".to_string());
+                } else {
+                    lines.push("(stopped after 20,000 files)".to_string());
+                }
+            }
+
+            let summary = format!("{count} matches");
+            ToolRun {
+                for_model: lines.join("\n"),
+                is_error: false,
+                outcome: ToolOutcome::Ok { summary },
+            }
+        }
+        Err(err) => refused(&err, path),
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Edit {
+    pub path: String,
+    pub before: String,
+    pub after: String,
+    pub line_ending: LineEnding,
+    pub has_bom: bool,
+    pub version: String,
+}
+
+pub fn prepare_edit(
+    root: &Path,
+    path: &str,
+    old_text: &str,
+    new_text: &str,
+) -> Result<Edit, ToolRun> {
+    if is_secret(path) {
+        return Err(secret_refused(path));
+    }
+
+    let old_norm = old_text.replace("\r\n", "\n");
+    let new_norm = new_text.replace("\r\n", "\n");
+
+    let file = files::read_file(root, path).map_err(|e| refused(&e, path))?;
+    if file.is_secret {
+        return Err(secret_refused(path));
+    }
+
+    let count = if old_norm.is_empty() {
+        0
+    } else {
+        file.text.match_indices(&old_norm).count()
+    };
+
+    if count == 0 {
+        let for_model = format!(
+            "old_text was not found in {path}. Read the file again and copy the text exactly."
+        );
+        return Err(ToolRun {
+            outcome: ToolOutcome::Error {
+                message: for_model.clone(),
+            },
+            is_error: true,
+            for_model,
+        });
+    }
+
+    if count > 1 {
+        let for_model = format!(
+            "old_text appears {count} times in {path}. Include more surrounding lines so it appears once."
+        );
+        return Err(ToolRun {
+            outcome: ToolOutcome::Error {
+                message: for_model.clone(),
+            },
+            is_error: true,
+            for_model,
+        });
+    }
+
+    let before = file.text.clone();
+    let after = file.text.replacen(&old_norm, &new_norm, 1);
+
+    Ok(Edit {
+        path: path.to_string(),
+        before,
+        after,
+        line_ending: file.line_ending,
+        has_bom: file.has_bom,
+        version: file.version,
+    })
+}
+
+pub fn apply_edit(root: &Path, edit: &Edit) -> ToolRun {
+    let req = files::WriteFile {
+        path: edit.path.clone(),
+        text: edit.after.clone(),
+        line_ending: edit.line_ending,
+        has_bom: edit.has_bom,
+        expected_version: Some(edit.version.clone()),
+    };
+    match files::write_file(root, req) {
+        Ok(_) => ToolRun {
+            for_model: format!("The user accepted the change; {} was written.", edit.path),
+            is_error: false,
+            outcome: ToolOutcome::Ok {
+                summary: "written".to_string(),
+            },
+        },
+        Err(err) => refused(&err, &edit.path),
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct NewFile {
+    pub path: String,
+    pub text: String,
+}
+
+pub fn prepare_create(root: &Path, path: &str, text: &str) -> Result<NewFile, ToolRun> {
+    if is_secret(path) || has_private_key(text) {
+        return Err(secret_refused(path));
+    }
+
+    paths::resolve_new(root, path).map_err(|e| refused(&e, path))?;
+
+    Ok(NewFile {
+        path: path.to_string(),
+        text: text.to_string(),
+    })
+}
+
+pub fn apply_create(root: &Path, file: &NewFile) -> ToolRun {
+    match files::create_file(root, &file.path, &file.text) {
+        Ok(_) => ToolRun {
+            for_model: format!("The user accepted; {} was created.", file.path),
+            is_error: false,
+            outcome: ToolOutcome::Ok {
+                summary: "created".to_string(),
+            },
+        },
+        Err(err) => refused(&err, &file.path),
+    }
+}
+
+pub fn declined(is_command: bool) -> ToolRun {
+    let for_model = if is_command {
+        "The user denied this command. Do not run it again unless they ask.".to_string()
+    } else {
+        "The user rejected this change. Ask them what to do instead of retrying it.".to_string()
+    };
+
+    ToolRun {
+        for_model,
+        is_error: false,
+        outcome: ToolOutcome::Declined,
+    }
+}
