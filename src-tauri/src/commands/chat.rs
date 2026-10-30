@@ -101,6 +101,8 @@ pub async fn run_agent(
 
     let provider = services.provider_for(connection_id)?;
     let local = services.model_options(connection_id, &model_id);
+    let context = services.context_tokens(connection_id, &model_id);
+    let text_limit = crate::tools::text_budget(context);
     let cancel = chat.begin(ChatSurface::Workspace);
 
     let result = crate::tools::agent::run(crate::tools::agent::AgentRun {
@@ -113,6 +115,7 @@ pub async fn run_agent(
         cancel,
         command_timeout: crate::tools::COMMAND_TIMEOUT,
         local,
+        text_limit,
     })
     .await;
 

@@ -139,6 +139,7 @@ async fn outside_path_is_refused_and_never_sent() {
         cancel,
         command_timeout: Duration::from_secs(5),
         local: Default::default(),
+        text_limit: aidp_lib::tools::READ_LIMIT,
     })
     .await;
 
@@ -226,6 +227,7 @@ async fn denied_command_never_runs() {
             cancel,
             command_timeout: Duration::from_secs(5),
         local: Default::default(),
+        text_limit: aidp_lib::tools::READ_LIMIT,
         })
         .await
     });
@@ -309,6 +311,7 @@ async fn approved_command_runs() {
             cancel,
             command_timeout: Duration::from_secs(5),
         local: Default::default(),
+        text_limit: aidp_lib::tools::READ_LIMIT,
         })
         .await
     });
@@ -385,6 +388,7 @@ async fn secret_file_is_never_sent() {
         cancel,
         command_timeout: Duration::from_secs(5),
         local: Default::default(),
+        text_limit: aidp_lib::tools::READ_LIMIT,
     })
     .await;
 
@@ -445,6 +449,7 @@ async fn instructions_in_files_never_skip_approval() {
             cancel,
             command_timeout: Duration::from_secs(5),
         local: Default::default(),
+        text_limit: aidp_lib::tools::READ_LIMIT,
         })
         .await
     });
@@ -520,6 +525,7 @@ async fn edit_waits_for_accept() {
             cancel,
             command_timeout: Duration::from_secs(5),
         local: Default::default(),
+        text_limit: aidp_lib::tools::READ_LIMIT,
         })
         .await
     });
@@ -596,6 +602,7 @@ async fn edit_waits_for_accept() {
             cancel: cancel2,
             command_timeout: Duration::from_secs(5),
         local: Default::default(),
+        text_limit: aidp_lib::tools::READ_LIMIT,
         })
         .await
     });
@@ -672,6 +679,7 @@ async fn stop_while_waiting() {
             cancel: cancel_clone,
             command_timeout: Duration::from_secs(5),
         local: Default::default(),
+        text_limit: aidp_lib::tools::READ_LIMIT,
         })
         .await
     });
@@ -745,6 +753,7 @@ async fn every_call_gets_one_result() {
         cancel,
         command_timeout: Duration::from_secs(5),
         local: Default::default(),
+        text_limit: aidp_lib::tools::READ_LIMIT,
     })
     .await;
 
@@ -815,6 +824,7 @@ async fn step_limit() {
         cancel,
         command_timeout: Duration::from_secs(5),
         local: Default::default(),
+        text_limit: aidp_lib::tools::READ_LIMIT,
     })
     .await;
 
@@ -836,4 +846,56 @@ async fn step_limit() {
         .filter(|e| matches!(e, ChatEvent::ToolCall { .. }))
         .count();
     assert_eq!(calls, 24);
+}
+
+#[tokio::test]
+async fn small_context_cuts_reads() {
+    let server = MockServer::start().await;
+    let dir = TempDir::new();
+    let root = dir.path();
+
+    // 50,000-char file
+    let big_content = "x".repeat(50_000);
+    fs::write(root.join("big.txt"), big_content).unwrap();
+
+    let resp1 = sse_tool_calls(&[("call_read", "read_file", json!({"path": "big.txt"}))]);
+    let resp2 = sse_text("Done");
+
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(QueueResponder::new(vec![resp1, resp2]))
+        .mount(&server)
+        .await;
+
+    let p = make_provider(&server);
+    let (channel, _events) = capture();
+    let approvals = Approvals::new();
+    let cancel = CancellationToken::new();
+
+    let res = run(AgentRun {
+        provider: &p,
+        model: "test-model".into(),
+        messages: vec![ChatMessage {
+            role: Role::User,
+            content: "Read big.txt".into(),
+        }],
+        root: root.to_path_buf(),
+        approvals: &approvals,
+        out: channel,
+        cancel,
+        command_timeout: Duration::from_secs(5),
+        local: Default::default(),
+        text_limit: 1000,
+    })
+    .await;
+
+    assert!(res.is_ok());
+
+    let reqs = server.received_requests().await.unwrap();
+    assert_eq!(reqs.len(), 2);
+    let body2: serde_json::Value = serde_json::from_slice(&reqs[1].body).unwrap();
+    let msgs = body2["messages"].as_array().unwrap();
+    let tool_msg = msgs.iter().find(|m| m["role"] == "tool").unwrap();
+    let content = tool_msg["content"].as_str().unwrap();
+    assert!(content.len() < 1200, "tool content was {} chars", content.len());
 }

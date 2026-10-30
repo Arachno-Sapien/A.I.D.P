@@ -1,4 +1,3 @@
-use crate::tools::OUTPUT_LIMIT;
 use crate::workspace::WorkspaceError;
 use std::path::Path;
 use std::time::Duration;
@@ -86,7 +85,13 @@ async fn collect(mut task: tokio::task::JoinHandle<Vec<u8>>) -> Vec<u8> {
     }
 }
 
-fn finished(exit_code: Option<i32>, stdout: &[u8], stderr: &[u8], timed_out: bool) -> CommandEnd {
+fn finished(
+    exit_code: Option<i32>,
+    stdout: &[u8],
+    stderr: &[u8],
+    timed_out: bool,
+    output_limit: usize,
+) -> CommandEnd {
     let mut combined = String::from_utf8_lossy(stdout).into_owned();
     let stderr = String::from_utf8_lossy(stderr);
     if !stderr.is_empty() {
@@ -95,7 +100,7 @@ fn finished(exit_code: Option<i32>, stdout: &[u8], stderr: &[u8], timed_out: boo
     }
     CommandEnd::Finished(CommandResult {
         exit_code,
-        output: tail(&combined, OUTPUT_LIMIT),
+        output: tail(&combined, output_limit),
         timed_out,
     })
 }
@@ -105,6 +110,7 @@ pub async fn run_command(
     command: &str,
     timeout: Duration,
     cancel: &CancellationToken,
+    output_limit: usize,
 ) -> Result<CommandEnd, WorkspaceError> {
     if !root.exists() || !root.is_dir() {
         return Err(WorkspaceError::NotFound);
@@ -177,7 +183,7 @@ pub async fn run_command(
             let status = status.map_err(|e| WorkspaceError::Io {
                 message: e.to_string(),
             })?;
-            return Ok(finished(status.code(), &out, &err, false));
+            return Ok(finished(status.code(), &out, &err, false, output_limit));
         }
         _ = tokio::time::sleep(timeout) => true,
         _ = cancel.cancelled() => false,
@@ -196,6 +202,6 @@ pub async fn run_command(
         return Ok(CommandEnd::Stopped);
     }
     let (out, err) = tokio::join!(collect(stdout_task), collect(stderr_task));
-    Ok(finished(None, &out, &err, true))
+    Ok(finished(None, &out, &err, true, output_limit))
 }
 

@@ -6,6 +6,7 @@ use aidp_lib::tools::run::{
     ToolInput,
 };
 use aidp_lib::tools::specs;
+use aidp_lib::tools::{OUTPUT_LIMIT, READ_LIMIT};
 use common::{link_dir, link_file, TempDir};
 use serde_json::json;
 use std::fs;
@@ -187,7 +188,7 @@ fn tool_paths_outside_are_refused() {
 
     let outside_paths = vec!["../x", "/etc/passwd"];
     for p in outside_paths {
-        let run = read_file(root, p, None, None);
+        let run = read_file(root, p, None, None, READ_LIMIT);
         assert!(run.is_error);
         assert_eq!(
             run.for_model,
@@ -196,7 +197,7 @@ fn tool_paths_outside_are_refused() {
     }
 
     if cfg!(windows) {
-        let run = read_file(root, "C:\\Windows\\win.ini", None, None);
+        let run = read_file(root, "C:\\Windows\\win.ini", None, None, READ_LIMIT);
         assert!(run.is_error);
         assert_eq!(
             run.for_model,
@@ -210,7 +211,7 @@ fn tool_paths_outside_are_refused() {
     let link_path = root.join("link_out");
     link_dir(&link_path, target.path());
 
-    let run = read_file(root, "link_out/foo.txt", None, None);
+    let run = read_file(root, "link_out/foo.txt", None, None, READ_LIMIT);
     assert!(run.is_error);
     assert_eq!(
         run.for_model,
@@ -225,7 +226,7 @@ fn read_file_refuses_secrets() {
 
     // 1. .env
     fs::write(root.join(".env"), "SECRET_KEY=123456789\n").unwrap();
-    let run = read_file(root, ".env", None, None);
+    let run = read_file(root, ".env", None, None, READ_LIMIT);
     assert!(run.is_error);
     assert_eq!(
         run.for_model,
@@ -236,7 +237,7 @@ fn read_file_refuses_secrets() {
     // 2. Symlink notes.txt -> .env
     let notes = root.join("notes.txt");
     if link_file(&notes, &root.join(".env")) {
-        let run_link = read_file(root, "notes.txt", None, None);
+        let run_link = read_file(root, "notes.txt", None, None, READ_LIMIT);
         assert!(run_link.is_error);
         assert_eq!(
             run_link.for_model,
@@ -250,7 +251,7 @@ fn read_file_refuses_secrets() {
         "-----BEGIN RSA PRIVATE KEY-----\nMIIE...\n-----END RSA PRIVATE KEY-----\n",
     )
     .unwrap();
-    let run_key = read_file(root, "config.txt", None, None);
+    let run_key = read_file(root, "config.txt", None, None, READ_LIMIT);
     assert!(run_key.is_error);
     assert_eq!(
         run_key.for_model,
@@ -272,7 +273,7 @@ fn git_folder_is_off_limits() {
     .unwrap();
     let refusal = "Refused: tools cannot use the .git folder. To see history or status, ask to run a git command.";
 
-    assert_eq!(read_file(root, ".git/config", None, None).for_model, refusal);
+    assert_eq!(read_file(root, ".git/config", None, None, READ_LIMIT).for_model, refusal);
     assert_eq!(list_files(root, ".git").for_model, refusal);
     assert_eq!(search(root, "placeholder", ".git").for_model, refusal);
     assert_eq!(
@@ -300,7 +301,7 @@ fn read_file_ranges_and_cut() {
         .join("\n");
     fs::write(root.join("ten.txt"), content).unwrap();
 
-    let run = read_file(root, "ten.txt", Some(3), Some(5));
+    let run = read_file(root, "ten.txt", Some(3), Some(5), READ_LIMIT);
     assert!(!run.is_error);
     assert_eq!(
         run.for_model,
@@ -312,7 +313,7 @@ fn read_file_ranges_and_cut() {
     let big_content = line_str.repeat(1500); // 150,000 chars, 1500 lines
     fs::write(root.join("big.txt"), big_content).unwrap();
 
-    let run_big = read_file(root, "big.txt", None, None);
+    let run_big = read_file(root, "big.txt", None, None, READ_LIMIT);
     assert!(!run_big.is_error);
     // 99 characters plus a line break each: 1,000 lines fit in 100,000.
     assert!(run_big
@@ -327,12 +328,26 @@ fn read_file_cuts_one_huge_line() {
     // A minified file: one line far over the limit, multi-byte characters at the cut.
     fs::write(root.join("min.js"), "é".repeat(150_000) + "\nnext").unwrap();
 
-    let run = read_file(root, "min.js", None, None);
+    let run = read_file(root, "min.js", None, None, READ_LIMIT);
     assert!(!run.is_error);
     assert!(run.for_model.len() < 100_200, "sent {} bytes", run.for_model.len());
     assert!(run
         .for_model
         .ends_with("\n[line 1 is too long and was cut; read on with start_line=2]"));
+}
+
+#[test]
+fn read_file_respects_a_smaller_limit() {
+    let dir = TempDir::new();
+    let root = dir.path();
+    let line_str = "a".repeat(99) + "\n";
+    let big_content = line_str.repeat(1500);
+    fs::write(root.join("test.txt"), big_content).unwrap();
+
+    let run = read_file(root, "test.txt", None, None, 1000);
+    assert!(!run.is_error);
+    assert!(run.for_model.contains("[cut at line"));
+    assert!(run.for_model.len() < 1200);
 }
 
 #[test]
@@ -518,7 +533,7 @@ async fn command_output_and_exit_code() {
     let root = dir.path();
     let cancel = CancellationToken::new();
 
-    let end = run_command(root, "echo hello", Duration::from_secs(5), &cancel)
+    let end = run_command(root, "echo hello", Duration::from_secs(5), &cancel, OUTPUT_LIMIT)
         .await
         .unwrap();
     match end {
@@ -531,7 +546,7 @@ async fn command_output_and_exit_code() {
     }
 
     let pwd_cmd = if cfg!(windows) { "cd" } else { "pwd" };
-    let end_pwd = run_command(root, pwd_cmd, Duration::from_secs(5), &cancel)
+    let end_pwd = run_command(root, pwd_cmd, Duration::from_secs(5), &cancel, OUTPUT_LIMIT)
         .await
         .unwrap();
     match end_pwd {
@@ -558,7 +573,7 @@ async fn command_nonzero_exit() {
     let root = dir.path();
     let cancel = CancellationToken::new();
 
-    let end = run_command(root, "exit 3", Duration::from_secs(5), &cancel)
+    let end = run_command(root, "exit 3", Duration::from_secs(5), &cancel, OUTPUT_LIMIT)
         .await
         .unwrap();
     match end {
@@ -577,7 +592,7 @@ async fn command_gets_no_input() {
 
     let cmd = if cfg!(windows) { "set /p X=" } else { "read X" };
     let start = Instant::now();
-    let end = run_command(root, cmd, Duration::from_secs(5), &cancel)
+    let end = run_command(root, cmd, Duration::from_secs(5), &cancel, OUTPUT_LIMIT)
         .await
         .unwrap();
     assert!(start.elapsed() < Duration::from_secs(5));
@@ -601,7 +616,7 @@ async fn timeout_kills_the_whole_tree() {
         "sh -c 'sleep 3; echo late > marker.txt'"
     };
 
-    let end = run_command(root, cmd, Duration::from_secs(1), &cancel)
+    let end = run_command(root, cmd, Duration::from_secs(1), &cancel, OUTPUT_LIMIT)
         .await
         .unwrap();
     match end {
@@ -634,7 +649,7 @@ async fn stop_kills_the_command() {
     });
 
     let start = Instant::now();
-    let end = run_command(root, cmd, Duration::from_secs(10), &cancel)
+    let end = run_command(root, cmd, Duration::from_secs(10), &cancel, OUTPUT_LIMIT)
         .await
         .unwrap();
     assert!(start.elapsed() < Duration::from_secs(3));
@@ -667,7 +682,7 @@ async fn stop_works_with_a_background_process() {
     });
 
     let start = Instant::now();
-    let end = run_command(dir.path(), background_command(), Duration::from_secs(60), &cancel)
+    let end = run_command(dir.path(), background_command(), Duration::from_secs(60), &cancel, OUTPUT_LIMIT)
         .await
         .unwrap();
     assert!(start.elapsed() < Duration::from_secs(3), "took {:?}", start.elapsed());
@@ -680,7 +695,7 @@ async fn timeout_works_with_a_background_process() {
     let cancel = CancellationToken::new();
 
     let start = Instant::now();
-    let end = run_command(dir.path(), background_command(), Duration::from_secs(1), &cancel)
+    let end = run_command(dir.path(), background_command(), Duration::from_secs(1), &cancel, OUTPUT_LIMIT)
         .await
         .unwrap();
     assert!(start.elapsed() < Duration::from_secs(5), "took {:?}", start.elapsed());
@@ -703,7 +718,7 @@ async fn output_keeps_the_tail() {
         "sh -c 'for i in $(seq 1 400); do printf \"%0100d\\n\" 0; done; echo END'".to_string()
     };
 
-    let end = run_command(root, &script, Duration::from_secs(10), &cancel)
+    let end = run_command(root, &script, Duration::from_secs(10), &cancel, OUTPUT_LIMIT)
         .await
         .unwrap();
     match end {

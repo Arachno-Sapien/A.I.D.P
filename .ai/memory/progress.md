@@ -38,9 +38,10 @@ Carry-overs: `docs/phases/M3.md` and `docs/phases/M4.md`, "What's left → To M5
 
 ## In progress
 
+Tasks 1 to 5 (Backend) completed; waiting for review before starting UI (Tasks 6 to 12).
 Claimed by Antigravity (Gemini 2.5 Pro), 2026-10-30.
-Task: M5 Task 5 - Text budget for small context windows (agent).
-Next step: Step 1 - write failing tests for text_budget, read_file with limit, and small_context_cuts_reads.
+Task: M5 Tasks 1 to 5 review stop.
+Next step: Task 6 - Chat history in the UI (`persist.ts`, `store.ts`, `ConversationList.tsx`, etc.).
 
 ## Next 3 tasks
 

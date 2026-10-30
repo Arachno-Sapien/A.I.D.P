@@ -22,6 +22,7 @@ pub struct AgentRun<'a> {
     pub cancel: CancellationToken,
     pub command_timeout: Duration,
     pub local: crate::gateway::LocalOptions,
+    pub text_limit: usize,
 }
 
 pub async fn run(args: AgentRun<'_>) -> Result<Usage, ProviderError> {
@@ -146,8 +147,9 @@ pub async fn run(args: AgentRun<'_>) -> Result<Usage, ProviderError> {
 
                     let root = args.root.clone();
                     let p = path.clone();
+                    let limit = args.text_limit;
                     let tool_run = tokio::task::spawn_blocking(move || {
-                        run::read_file(&root, &p, start_line, end_line)
+                        run::read_file(&root, &p, start_line, end_line, limit)
                     })
                     .await
                     .map_err(|_| ProviderError::Cancelled)?;
@@ -425,6 +427,7 @@ pub async fn run(args: AgentRun<'_>) -> Result<Usage, ProviderError> {
                                 &command,
                                 args.command_timeout,
                                 &args.cancel,
+                                crate::tools::OUTPUT_LIMIT.min(args.text_limit),
                             )
                             .await;
 

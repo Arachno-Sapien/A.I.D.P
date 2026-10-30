@@ -1,4 +1,4 @@
-use crate::tools::{ToolOutcome, LIST_LIMIT, READ_LIMIT, SEARCH_LIMIT};
+use crate::tools::{ToolOutcome, LIST_LIMIT, SEARCH_LIMIT};
 use crate::workspace::files::{self, list_tree, LineEnding};
 use crate::workspace::paths;
 use crate::workspace::search as ws_search;
@@ -252,6 +252,7 @@ pub fn read_file(
     path: &str,
     start_line: Option<u32>,
     end_line: Option<u32>,
+    limit: usize,
 ) -> ToolRun {
     match files::read_file(root, path) {
         Ok(file) => {
@@ -278,7 +279,7 @@ pub fn read_file(
             let slice = &all_lines[(a - 1) as usize..b as usize];
             let full_text = slice.join("\n");
 
-            let (text, cut_note) = if slice[0].len() > READ_LIMIT {
+            let (text, cut_note) = if slice[0].len() > limit {
                 // One line over the limit (a minified file): cut the line itself.
                 let first = slice[0];
                 let read_on = if a < total {
@@ -287,13 +288,13 @@ pub fn read_file(
                     String::new()
                 };
                 let note = format!("\n[line {a} is too long and was cut{read_on}]");
-                (first[..first.floor_char_boundary(READ_LIMIT)].to_string(), Some(note))
-            } else if full_text.len() > READ_LIMIT {
+                (first[..first.floor_char_boundary(limit)].to_string(), Some(note))
+            } else if full_text.len() > limit {
                 let mut acc = String::new();
                 let mut k = a;
                 for (idx, line) in slice.iter().enumerate() {
                     let line_len = line.len() + if idx > 0 { 1 } else { 0 };
-                    if acc.len() + line_len > READ_LIMIT && idx > 0 {
+                    if acc.len() + line_len > limit && idx > 0 {
                         break;
                     }
                     if idx > 0 {

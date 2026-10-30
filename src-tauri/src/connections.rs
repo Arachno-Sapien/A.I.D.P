@@ -500,6 +500,34 @@ impl Services {
         }
     }
 
+    pub fn context_tokens(&self, connection_id: u32, model_id: &str) -> Option<u32> {
+        let db = match self.db.lock() {
+            Ok(d) => d,
+            Err(_) => return None,
+        };
+        let query_res: rusqlite::Result<(String, Option<i64>, Option<i64>)> = db.query_row(
+            "SELECT c.kind, m.num_ctx, m.context_window
+             FROM models m
+             JOIN connections c ON m.connection_id = c.id
+             WHERE m.connection_id = ?1 AND m.model_id = ?2",
+            rusqlite::params![connection_id, model_id],
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+        );
+        match query_res {
+            Ok((kind_str, num_ctx, context_window)) => {
+                let kind = ConnectionKind::from_db(&kind_str).unwrap_or(ConnectionKind::OpenaiCompat);
+                if kind == ConnectionKind::Ollama {
+                    Some(num_ctx.map(|v| v as u32).unwrap_or_else(|| {
+                        context_window.map(|w| (w as u32).min(8192)).unwrap_or(8192)
+                    }))
+                } else {
+                    context_window.map(|w| w as u32)
+                }
+            }
+            Err(_) => None,
+        }
+    }
+
     pub fn set_model_context(&self, model_id: &str, num_ctx: u32) -> Result<(), AppError> {
         let db = self.db.lock().map_err(|e| AppError::Storage {
             message: e.to_string(),
