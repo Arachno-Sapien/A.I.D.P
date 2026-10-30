@@ -50,5 +50,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `config.local.json` still loads when an editor saves it with a byte-order mark.
 
 ### Security
+- Agent tools cannot use the `.git` folder, also through links or names Windows trims such as `.git.` (decision 0012).
+- PGP and PuTTY private keys and `*.ppk` files are treated as secret, like PEM keys (decision 0012).
+- A model command containing hidden or control characters is refused before its approval card appears, so the card always shows what runs.
 - Strict Content Security Policy (`default-src 'self' ipc: http://ipc.localhost`) in production with development-only CSP for Vite HMR.
 - Removed unused Tauri plugins (opener plugin disabled).

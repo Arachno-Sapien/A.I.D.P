@@ -432,13 +432,13 @@ For M1 only, the key comes from a git-ignored local config file. M2 replaces it 
 
 **M4 Agent tools and terminal**
 
-- [ ] `ChatEvent::ToolCall` and tool calling in the OpenAI-compatible and Anthropic adapters
-- [ ] `list_files`, `read_file`, `search`, `edit_file`, `create_file`, and `run_command` work inside the folder
-- [ ] Every edit shows a diff first; every model command asks first; no auto-approve
-- [ ] Secret-looking files are never read or sent unless the user adds them by hand
-- [ ] The terminal panel runs the user's shell in the folder; model commands have a timeout and Stop
-- [ ] Fake-provider tests: a model asking for a path outside the folder is refused, and a denied command never runs
-- [ ] Models without tool calling still get the M3 workspace
+- [x] `ChatEvent::ToolCall` and tool calling in the OpenAI-compatible and Anthropic adapters
+- [x] `list_files`, `read_file`, `search`, `edit_file`, `create_file`, and `run_command` work inside the folder
+- [x] Every edit shows a diff first; every model command asks first; no auto-approve
+- [x] Secret-looking files are never read or sent unless the user adds them by hand
+- [x] The terminal panel runs the user's shell in the folder; model commands have a timeout and Stop
+- [x] Fake-provider tests: a model asking for a path outside the folder is refused, and a denied command never runs
+- [x] Models without tool calling still get the M3 workspace
 
 **M5 Ollama, history, and settings**
 
