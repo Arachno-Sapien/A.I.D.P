@@ -531,8 +531,40 @@ async fn list_models_parses_display_name_and_context() {
             id: "claude-sonnet-5-5".to_string(),
             display_name: "Claude Sonnet 5.5".to_string(),
             context_window: Some(1000000),
+            supports_tools: Some(true),
         }]
     );
+}
+
+#[tokio::test]
+async fn list_models_marks_tools_supported() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/v1/models"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "data": [
+                {
+                    "id": "claude-sonnet-5-5",
+                    "display_name": "Claude Sonnet 5.5",
+                    "type": "model"
+                },
+                {
+                    "id": "claude-haiku-4-5",
+                    "display_name": "Claude Haiku 4.5",
+                    "type": "model"
+                }
+            ],
+            "has_more": false
+        })))
+        .mount(&server)
+        .await;
+
+    let p = test_provider(&server);
+    let models = p.list_models().await.unwrap();
+    assert_eq!(models.len(), 2);
+    for m in models {
+        assert_eq!(m.supports_tools, Some(true));
+    }
 }
 
 #[tokio::test]

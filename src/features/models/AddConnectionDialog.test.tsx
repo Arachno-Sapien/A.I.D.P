@@ -43,7 +43,7 @@ describe("AddConnectionDialog", () => {
           lastTestOk: true,
         },
         available: [
-          { id: "m1", displayName: "Model One", contextWindow: null },
+          { id: "m1", displayName: "Model One", contextWindow: null, supportsTools: null },
         ],
       },
     });
@@ -111,7 +111,7 @@ describe("AddConnectionDialog", () => {
           lastTestOk: true,
         },
         available: [
-          { id: "gpt-4", displayName: "GPT-4", contextWindow: 8192 },
+          { id: "gpt-4", displayName: "GPT-4", contextWindow: 8192, supportsTools: null },
         ],
       },
     });
@@ -144,8 +144,8 @@ describe("AddConnectionDialog", () => {
           lastTestOk: true,
         },
         available: [
-          { id: "m1", displayName: "Model One", contextWindow: null },
-          { id: "m2", displayName: "Model Two", contextWindow: null },
+          { id: "m1", displayName: "Model One", contextWindow: null, supportsTools: null },
+          { id: "m2", displayName: "Model Two", contextWindow: null, supportsTools: null },
         ],
       },
     });
@@ -173,7 +173,7 @@ describe("AddConnectionDialog", () => {
 
     await waitFor(() => {
       expect(commands.setModels).toHaveBeenCalledWith(1, [
-        { id: "m1", displayName: "Model One", contextWindow: null },
+        { id: "m1", displayName: "Model One", contextWindow: null, supportsTools: null },
       ]);
       expect(refreshSpy).toHaveBeenCalled();
     });
@@ -220,6 +220,7 @@ describe("AddConnectionDialog", () => {
       id: `model-${i}`,
       displayName: `Model ${i}`,
       contextWindow: null,
+      supportsTools: null,
     }));
 
     vi.mocked(commands.addConnection).mockResolvedValue({

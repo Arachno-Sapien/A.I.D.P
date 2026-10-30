@@ -161,6 +161,7 @@ impl ModelProvider for Anthropic {
                 display_name: entry.display_name.unwrap_or_else(|| entry.id.clone()),
                 id: entry.id,
                 context_window: entry.max_input_tokens,
+                supports_tools: Some(true),
             })
             .collect();
 

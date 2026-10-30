@@ -192,9 +192,9 @@ describe("ModelsScreen", () => {
     vi.mocked(commands.availableModels).mockResolvedValue({
       status: "ok",
       data: [
-        { id: "m1", displayName: "Model 1", contextWindow: null },
-        { id: "m2", displayName: "Model 2", contextWindow: null },
-        { id: "m3", displayName: "Model 3", contextWindow: null },
+        { id: "m1", displayName: "Model 1", contextWindow: null, supportsTools: null },
+        { id: "m2", displayName: "Model 2", contextWindow: null, supportsTools: null },
+        { id: "m3", displayName: "Model 3", contextWindow: null, supportsTools: null },
       ],
     });
     vi.mocked(commands.setModels).mockResolvedValue({
@@ -222,8 +222,8 @@ describe("ModelsScreen", () => {
 
     await waitFor(() => {
       expect(commands.setModels).toHaveBeenCalledWith(1, [
-        { id: "m1", displayName: "Model 1", contextWindow: null },
-        { id: "m2", displayName: "Model 2", contextWindow: null },
+        { id: "m1", displayName: "Model 1", contextWindow: null, supportsTools: null },
+        { id: "m2", displayName: "Model 2", contextWindow: null, supportsTools: null },
       ]);
     });
   });

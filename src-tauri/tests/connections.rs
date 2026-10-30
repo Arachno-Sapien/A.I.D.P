@@ -436,6 +436,7 @@ async fn delete_removes_row_models_and_keychain_entry() {
                 id: "m1".to_string(),
                 display_name: "M1".to_string(),
                 context_window: None,
+                supports_tools: None,
             }],
         )
         .unwrap();
@@ -507,11 +508,13 @@ async fn set_models_default_and_chat_models() {
                     id: "m1".to_string(),
                     display_name: "Model One".to_string(),
                     context_window: None,
+                    supports_tools: None,
                 },
                 ModelInfo {
                     id: "m2".to_string(),
                     display_name: "Model Two".to_string(),
                     context_window: None,
+                    supports_tools: None,
                 },
             ],
         )

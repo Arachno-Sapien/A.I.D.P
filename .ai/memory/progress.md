@@ -39,8 +39,10 @@ Carry-overs from M3 are in `docs/phases/M3.md` under "What's left": M4 reuses `w
 
 ## In progress
 
-M4 plan written and approved (Claude Code, Opus 5.5, 2026-10-30). Not executed.
-Next step: M4 Task 1: add a nullable `supports_tools` column (migration 3 in `src-tauri/src/db/mod.rs`), `ModelInfo.supports_tools` and `ChatModel.supports_tools`, filled from OpenRouter's `supported_parameters`, and always yes for Anthropic.
+Task: M4 Task 2: Gateway types and OpenAI-compatible tool calling
+Tool + model: Antigravity (Gemini 3.8 Flash)
+Date: 2026-10-30
+Next step: Step 1 of Task 2: write failing tests in tests/openai_compat.rs for tool-call streaming and replay.
 
 ## Next 3 tasks
 

@@ -94,6 +94,7 @@ impl ModelProvider for OpenAiCompat {
             id: Option<String>,
             name: Option<String>,
             context_length: Option<u32>,
+            supported_parameters: Option<Vec<String>>,
         }
 
         #[derive(Deserialize)]
@@ -117,10 +118,14 @@ impl ModelProvider for OpenAiCompat {
             .filter_map(|m| {
                 let id = m.id?;
                 let display_name = m.name.unwrap_or_else(|| id.clone());
+                let supports_tools = m
+                    .supported_parameters
+                    .map(|params| params.iter().any(|p| p == "tools"));
                 Some(ModelInfo {
                     id,
                     display_name,
                     context_window: m.context_length,
+                    supports_tools,
                 })
             })
             .collect();

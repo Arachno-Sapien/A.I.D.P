@@ -281,14 +281,53 @@ async fn list_models_parses_ids_names_and_context() {
                 id: "a-model".to_string(),
                 display_name: "a-model".to_string(),
                 context_window: None,
+                supports_tools: None,
             },
             aidp_lib::gateway::ModelInfo {
                 id: "b/model-b".to_string(),
                 display_name: "Model B".to_string(),
                 context_window: Some(128000),
+                supports_tools: None,
             },
         ]
     );
+}
+
+#[tokio::test]
+async fn list_models_reads_supported_parameters() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/v1/models"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "data": [
+                {
+                    "id": "model-tools",
+                    "name": "Model with Tools",
+                    "supported_parameters": ["tools", "temperature"]
+                },
+                {
+                    "id": "model-no-tools",
+                    "name": "Model without Tools",
+                    "supported_parameters": ["temperature"]
+                },
+                {
+                    "id": "model-unknown",
+                    "name": "Model Unknown"
+                }
+            ]
+        })))
+        .mount(&server)
+        .await;
+
+    let p = provider(&server);
+    let models = p.list_models().await.unwrap();
+    assert_eq!(models.len(), 3);
+    let m1 = models.iter().find(|m| m.id == "model-tools").unwrap();
+    let m2 = models.iter().find(|m| m.id == "model-no-tools").unwrap();
+    let m3 = models.iter().find(|m| m.id == "model-unknown").unwrap();
+    assert_eq!(m1.supports_tools, Some(true));
+    assert_eq!(m2.supports_tools, Some(false));
+    assert_eq!(m3.supports_tools, None);
 }
 
 #[tokio::test]

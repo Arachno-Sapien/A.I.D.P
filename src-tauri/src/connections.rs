@@ -77,6 +77,7 @@ pub struct ChatModel {
     pub model_id: String,
     pub display_name: String,
     pub is_default: bool,
+    pub supports_tools: Option<bool>,
 }
 
 #[derive(Serialize, Deserialize, Type, Clone, Debug, PartialEq)]
@@ -360,6 +361,7 @@ impl Services {
                 model_id: r.model_id,
                 display_name: r.display_name,
                 is_default: r.is_default,
+                supports_tools: r.supports_tools,
             })
             .collect())
     }

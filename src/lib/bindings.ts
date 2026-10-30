@@ -11,7 +11,7 @@ export const commands = {
 	replaceKey: (id: number, apiKey: string) => typedError<ConnectionView_Serialize, AppError_Serialize>(__TAURI_INVOKE("replace_key", { id, apiKey })),
 	deleteConnection: (id: number) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("delete_connection", { id })),
 	setModels: (connectionId: number, models: ModelInfo_Deserialize[]) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("set_models", { connectionId, models })),
-	chatModels: () => typedError<ChatModel[], AppError_Serialize>(__TAURI_INVOKE("chat_models")),
+	chatModels: () => typedError<ChatModel_Serialize[], AppError_Serialize>(__TAURI_INVOKE("chat_models")),
 	setDefaultModel: (connectionId: number, modelId: string) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("set_default_model", { connectionId, modelId })),
 	sendMessage: (surface: ChatSurface, connectionId: number, modelId: string, messages: ChatMessage[], onEvent: Channel<ChatEvent_Deserialize>) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("send_message", { surface, connectionId, modelId, messages, onEvent })),
 	stopReply: (surface: ChatSurface) => __TAURI_INVOKE<void>("stop_reply", { surface }),
@@ -57,12 +57,24 @@ export type ChatMessage = {
 	content: string,
 };
 
-export type ChatModel = {
+export type ChatModel = ChatModel_Serialize | ChatModel_Deserialize;
+
+export type ChatModel_Deserialize = {
 	connectionId: number,
 	connectionLabel: string,
 	modelId: string,
 	displayName: string,
 	isDefault: boolean,
+	supportsTools?: boolean | null,
+};
+
+export type ChatModel_Serialize = {
+	connectionId: number,
+	connectionLabel: string,
+	modelId: string,
+	displayName: string,
+	isDefault: boolean,
+	supportsTools: boolean | null,
 };
 
 export type ChatSurface = "chat" | "workspace";
@@ -114,12 +126,14 @@ export type ModelInfo_Deserialize = {
 	id: string,
 	displayName: string,
 	contextWindow?: number | null,
+	supportsTools?: boolean | null,
 };
 
 export type ModelInfo_Serialize = {
 	id: string,
 	displayName: string,
 	contextWindow: number | null,
+	supportsTools: boolean | null,
 };
 
 export type NewConnection = {

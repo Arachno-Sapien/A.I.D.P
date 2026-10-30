@@ -46,6 +46,7 @@ describe("useModelsStore", () => {
           modelId: "m1",
           displayName: "Model 1",
           isDefault: false,
+          supportsTools: null,
         },
         {
           connectionId: 1,
@@ -53,6 +54,7 @@ describe("useModelsStore", () => {
           modelId: "m2",
           displayName: "Model 2",
           isDefault: true,
+          supportsTools: null,
         },
       ],
     });
@@ -80,6 +82,7 @@ describe("useModelsStore", () => {
           modelId: "m1",
           displayName: "Model 1",
           isDefault: false,
+          supportsTools: null,
         },
         {
           connectionId: 1,
@@ -87,6 +90,7 @@ describe("useModelsStore", () => {
           modelId: "m2",
           displayName: "Model 2",
           isDefault: false,
+          supportsTools: null,
         },
       ],
     });

@@ -28,6 +28,9 @@ CREATE TABLE models (
     r#"
 CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 "#,
+    r#"
+ALTER TABLE models ADD COLUMN supports_tools INTEGER;
+"#,
 ];
 
 pub fn open(path: &Path) -> rusqlite::Result<Connection> {
@@ -70,13 +73,56 @@ mod tests {
         let version: i32 = conn
             .query_row("PRAGMA user_version;", [], |row| row.get(0))
             .unwrap();
-        assert_eq!(version, 2);
+        assert_eq!(version, 3);
 
         migrate(&mut conn).unwrap();
         let version_after: i32 = conn
             .query_row("PRAGMA user_version;", [], |row| row.get(0))
             .unwrap();
-        assert_eq!(version_after, 2);
+        assert_eq!(version_after, 3);
+    }
+
+    #[test]
+    fn chat_models_carry_tool_support() {
+        let mut conn = open_in_memory().unwrap();
+        let id = insert_connection(
+            &conn,
+            ConnectionKind::OpenaiCompat,
+            "OpenRouter",
+            "https://openrouter.ai/api/v1",
+            "1234",
+            100,
+        )
+        .unwrap();
+
+        let m1 = ModelInfo {
+            id: "m1".to_string(),
+            display_name: "M1".to_string(),
+            context_window: None,
+            supports_tools: Some(true),
+        };
+        let m2 = ModelInfo {
+            id: "m2".to_string(),
+            display_name: "M2".to_string(),
+            context_window: None,
+            supports_tools: Some(false),
+        };
+        let m3 = ModelInfo {
+            id: "m3".to_string(),
+            display_name: "M3".to_string(),
+            context_window: None,
+            supports_tools: None,
+        };
+
+        set_models(&mut conn, id, &[m1, m2, m3]).unwrap();
+        let rows = list_chat_models(&conn).unwrap();
+        assert_eq!(rows.len(), 3);
+        let r1 = rows.iter().find(|r| r.model_id == "m1").unwrap();
+        let r2 = rows.iter().find(|r| r.model_id == "m2").unwrap();
+        let r3 = rows.iter().find(|r| r.model_id == "m3").unwrap();
+        assert_eq!(r1.supports_tools, Some(true));
+        assert_eq!(r2.supports_tools, Some(false));
+        assert_eq!(r3.supports_tools, None);
     }
 
     #[test]
@@ -99,6 +145,7 @@ mod tests {
                 id: "m1".to_string(),
                 display_name: "Model 1".to_string(),
                 context_window: Some(4096),
+                supports_tools: None,
             }],
         )
         .unwrap();
@@ -134,16 +181,19 @@ mod tests {
             id: "a".to_string(),
             display_name: "A".to_string(),
             context_window: None,
+            supports_tools: None,
         };
         let m_b = ModelInfo {
             id: "b".to_string(),
             display_name: "B".to_string(),
             context_window: None,
+            supports_tools: None,
         };
         let m_c = ModelInfo {
             id: "c".to_string(),
             display_name: "C".to_string(),
             context_window: None,
+            supports_tools: None,
         };
 
         set_models(&mut conn, id, &[m_a, m_b.clone()]).unwrap();
@@ -186,16 +236,19 @@ mod tests {
             id: "m1".to_string(),
             display_name: "M1".to_string(),
             context_window: None,
+            supports_tools: None,
         };
         let m2 = ModelInfo {
             id: "m2".to_string(),
             display_name: "M2".to_string(),
             context_window: None,
+            supports_tools: None,
         };
         let m3 = ModelInfo {
             id: "m3".to_string(),
             display_name: "M3".to_string(),
             context_window: None,
+            supports_tools: None,
         };
 
         set_models(&mut conn, id1, &[m1, m2]).unwrap();
@@ -228,11 +281,13 @@ mod tests {
             id: "m1".to_string(),
             display_name: "M1".to_string(),
             context_window: None,
+            supports_tools: None,
         };
         let m2 = ModelInfo {
             id: "m2".to_string(),
             display_name: "M2".to_string(),
             context_window: None,
+            supports_tools: None,
         };
 
         set_models(&mut conn, id, &[m1, m2]).unwrap();
@@ -266,11 +321,13 @@ mod tests {
             id: "a_model".to_string(),
             display_name: "A Model".to_string(),
             context_window: None,
+            supports_tools: None,
         };
         let m2 = ModelInfo {
             id: "z_model".to_string(),
             display_name: "Z Model".to_string(),
             context_window: None,
+            supports_tools: None,
         };
 
         set_models(&mut conn, id, &[m1, m2]).unwrap();

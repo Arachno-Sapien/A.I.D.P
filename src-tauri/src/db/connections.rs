@@ -19,6 +19,7 @@ pub struct ChatModelRow {
     pub model_id: String,
     pub display_name: String,
     pub is_default: bool,
+    pub supports_tools: Option<bool>,
 }
 
 fn parse_connection_row(row: &rusqlite::Row) -> rusqlite::Result<ConnectionRow> {
@@ -159,7 +160,7 @@ pub fn set_models(
     };
 
     let mut stmt = tx.prepare(
-        "INSERT INTO models (connection_id, model_id, display_name, context_window, is_default) VALUES (?1, ?2, ?3, ?4, ?5)",
+        "INSERT INTO models (connection_id, model_id, display_name, context_window, is_default, supports_tools) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
     )?;
 
     for model in models {
@@ -170,6 +171,7 @@ pub fn set_models(
             model.display_name,
             model.context_window,
             if is_default { 1 } else { 0 },
+            model.supports_tools.map(|b| if b { 1i64 } else { 0i64 }),
         ])?;
     }
     drop(stmt);
@@ -180,7 +182,7 @@ pub fn set_models(
 
 pub fn list_chat_models(conn: &Connection) -> rusqlite::Result<Vec<ChatModelRow>> {
     let mut stmt = conn.prepare(
-        "SELECT m.connection_id, c.label, m.model_id, m.display_name, m.is_default
+        "SELECT m.connection_id, c.label, m.model_id, m.display_name, m.is_default, m.supports_tools
          FROM models m
          JOIN connections c ON m.connection_id = c.id
          ORDER BY m.is_default DESC, m.connection_id ASC, m.display_name ASC",
@@ -195,6 +197,8 @@ pub fn list_chat_models(conn: &Connection) -> rusqlite::Result<Vec<ChatModelRow>
         let display_name: String = row.get(3)?;
         let is_default_int: i64 = row.get(4)?;
         let is_default = is_default_int != 0;
+        let supports_tools_int: Option<i64> = row.get(5)?;
+        let supports_tools = supports_tools_int.map(|v| v != 0);
 
         Ok(ChatModelRow {
             connection_id,
@@ -202,6 +206,7 @@ pub fn list_chat_models(conn: &Connection) -> rusqlite::Result<Vec<ChatModelRow>
             model_id,
             display_name,
             is_default,
+            supports_tools,
         })
     })?;
 

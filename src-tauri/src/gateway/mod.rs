@@ -65,6 +65,7 @@ pub struct ModelInfo {
     pub id: String,
     pub display_name: String,
     pub context_window: Option<u32>,
+    pub supports_tools: Option<bool>,
 }
 
 #[derive(Serialize, Deserialize, Type, Clone, Debug, PartialEq)]
