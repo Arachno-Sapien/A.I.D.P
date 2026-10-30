@@ -39,8 +39,8 @@ Carry-overs: `docs/phases/M4.md` and `docs/phases/M5.md`, "What's left → To M6
 ## In progress
 
 M6 Task 1 done 2026-10-31 by Claude Code (Opus 5.5): CI run 41112982172 green on Windows, macOS and Linux, with 211 Rust tests (1 ignored) and 187 Vitest tests on each; nothing needed fixing.
-M6 Task 2 (macOS and Linux differences), claimed by Claude Code (Opus 5.5) on 2026-10-31.
-Next step: `src-tauri/src/login_path.rs` (`extract_path`, `run_with_limit`, `apply_login_path`) called from `main.rs`; Ollama paths on macOS; `-l` for the macOS terminal; a test pinning the shell named in the `run_command` description (already per-OS).
+M6 Task 2 done 2026-10-31 by Claude Code (Opus 5.5) in `dada40c`: login-shell PATH on macOS and Linux (`login_path.rs`, called first in `main.rs`), Ollama paths on macOS, macOS login terminal. CI run 41115631396 green (214 Rust tests on Windows and Linux, 215 on macOS). Still assumed until a Mac user confirms: Finder's minimal PATH and the Ollama.app path.
+Next step: M6 Task 3 (job object in `tools/command.rs` on Windows; full-width refusal in `tools/run.rs`; test `stop_ends_a_detached_process` first, and watch it fail on Windows).
 
 ## Next 3 tasks
 
