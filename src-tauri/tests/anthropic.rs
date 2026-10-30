@@ -4,7 +4,8 @@ mod common;
 
 use aidp_lib::gateway::{
     anthropic::Anthropic, provider, ChatEvent, ChatMessage, ChatRequest, ConnectionKind,
-    ModelInfo, ModelProvider, ProviderError, Role, Usage,
+    ModelInfo, ModelProvider, ProviderError, Role, ToolCall, ToolOutput, ToolRound, ToolSpec,
+    Usage,
 };
 use common::{capture, deltas, events, req};
 use secrecy::SecretString;
@@ -612,6 +613,269 @@ fn factory_builds_the_right_adapter() {
         client,
         "https://api.anthropic.com/v1".to_string(),
         key,
+    );
+}
+
+#[tokio::test]
+async fn sends_tools_and_more_tokens() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/v1/messages"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(events(&[
+            ("message_stop", r#"{"type":"message_stop"}"#),
+        ])))
+        .mount(&server)
+        .await;
+
+    let p = test_provider(&server);
+    let (channel, _) = capture();
+
+    let mut request = req();
+    request.tools = vec![ToolSpec {
+        name: "read_file",
+        description: "Read a file",
+        schema: json!({"type": "object", "properties": {"path": {"type": "string"}}}),
+    }];
+
+    p.stream_chat(request, channel, CancellationToken::new())
+        .await
+        .unwrap();
+
+    let requests = server.received_requests().await.unwrap();
+    assert_eq!(requests.len(), 1);
+    let body: serde_json::Value = serde_json::from_slice(&requests[0].body).unwrap();
+    assert_eq!(body["max_tokens"], 32000);
+    assert_eq!(
+        body["tools"][0],
+        json!({
+            "name": "read_file",
+            "description": "Read a file",
+            "input_schema": {"type": "object", "properties": {"path": {"type": "string"}}}
+        })
+    );
+}
+
+#[tokio::test]
+async fn parses_tool_use_and_keeps_thinking() {
+    let server = MockServer::start().await;
+    let body = events(&[
+        (
+            "content_block_start",
+            r#"{"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":"","signature":""}}"#,
+        ),
+        (
+            "content_block_delta",
+            r#"{"type":"content_block_delta","index":0,"delta":{"type":"signature_delta","signature":"sig"}}"#,
+        ),
+        ("content_block_stop", r#"{"type":"content_block_stop","index":0}"#),
+        (
+            "content_block_start",
+            r#"{"type":"content_block_start","index":1,"content_block":{"type":"text","text":""}}"#,
+        ),
+        (
+            "content_block_delta",
+            r#"{"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"Reading."}}"#,
+        ),
+        ("content_block_stop", r#"{"type":"content_block_stop","index":1}"#),
+        (
+            "content_block_start",
+            r#"{"type":"content_block_start","index":2,"content_block":{"type":"tool_use","id":"toolu_1","name":"read_file","input":{}}}"#,
+        ),
+        (
+            "content_block_delta",
+            r#"{"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"{\"path\":"}}"#,
+        ),
+        (
+            "content_block_delta",
+            r#"{"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"\"a.ts\"}"}}"#,
+        ),
+        ("content_block_stop", r#"{"type":"content_block_stop","index":2}"#),
+        (
+            "message_delta",
+            r#"{"type":"message_delta","delta":{"stop_reason":"tool_use"}}"#,
+        ),
+        ("message_stop", r#"{"type":"message_stop"}"#),
+    ]);
+    Mock::given(method("POST"))
+        .and(path("/v1/messages"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(body))
+        .mount(&server)
+        .await;
+
+    let p = test_provider(&server);
+    let (channel, events_log) = capture();
+    let reply = p
+        .stream_chat(req(), channel, CancellationToken::new())
+        .await
+        .unwrap();
+
+    assert_eq!(deltas(&events_log), vec!["Reading."]);
+    assert_eq!(
+        reply.tool_calls,
+        vec![ToolCall {
+            id: "toolu_1".to_string(),
+            name: "read_file".to_string(),
+            input: json!({"path": "a.ts"}),
+        }]
+    );
+    assert_eq!(
+        reply.assistant["content"],
+        json!([
+            {"type": "thinking", "thinking": "", "signature": "sig"},
+            {"type": "text", "text": "Reading."},
+            {"type": "tool_use", "id": "toolu_1", "name": "read_file", "input": {"path": "a.ts"}}
+        ])
+    );
+}
+
+#[tokio::test]
+async fn renders_tool_rounds() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/v1/messages"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(events(&[
+            ("message_stop", r#"{"type":"message_stop"}"#),
+        ])))
+        .mount(&server)
+        .await;
+
+    let p = test_provider(&server);
+    let (channel, _) = capture();
+
+    let assistant_msg = json!({
+        "role": "assistant",
+        "content": [
+            {"type": "thinking", "thinking": "plan", "signature": "s"},
+            {"type": "tool_use", "id": "t1", "name": "read_file", "input": {"path": "a.ts"}},
+            {"type": "tool_use", "id": "t2", "name": "read_file", "input": {"path": "b.ts"}}
+        ]
+    });
+
+    let mut request = req();
+    request.rounds = vec![ToolRound {
+        assistant: assistant_msg.clone(),
+        results: vec![
+            ToolOutput {
+                call_id: "t1".to_string(),
+                content: "a contents".to_string(),
+                is_error: false,
+            },
+            ToolOutput {
+                call_id: "t2".to_string(),
+                content: "not found".to_string(),
+                is_error: true,
+            },
+        ],
+    }];
+
+    p.stream_chat(request, channel, CancellationToken::new())
+        .await
+        .unwrap();
+
+    let requests = server.received_requests().await.unwrap();
+    assert_eq!(requests.len(), 1);
+    let body: serde_json::Value = serde_json::from_slice(&requests[0].body).unwrap();
+    let msgs = body["messages"].as_array().unwrap();
+
+    let len = msgs.len();
+    assert!(len >= 2);
+    assert_eq!(msgs[len - 2], assistant_msg);
+    assert_eq!(
+        msgs[len - 1],
+        json!({
+            "role": "user",
+            "content": [
+                {
+                    "type": "tool_result",
+                    "tool_use_id": "t1",
+                    "content": "a contents"
+                },
+                {
+                    "type": "tool_result",
+                    "tool_use_id": "t2",
+                    "content": "not found",
+                    "is_error": true
+                }
+            ]
+        })
+    );
+}
+
+#[tokio::test]
+async fn max_tokens_with_tool_use_is_an_error() {
+    let server = MockServer::start().await;
+    let body = events(&[
+        (
+            "content_block_start",
+            r#"{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"toolu_1","name":"read_file","input":{}}}"#,
+        ),
+        (
+            "content_block_delta",
+            r#"{"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{\"path\":"}}"#,
+        ),
+        (
+            "message_delta",
+            r#"{"type":"message_delta","delta":{"stop_reason":"max_tokens"}}"#,
+        ),
+        ("message_stop", r#"{"type":"message_stop"}"#),
+    ]);
+    Mock::given(method("POST"))
+        .and(path("/v1/messages"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(body))
+        .mount(&server)
+        .await;
+
+    let p = test_provider(&server);
+    let (channel, _) = capture();
+    let err = p
+        .stream_chat(req(), channel, CancellationToken::new())
+        .await
+        .unwrap_err();
+
+    assert_eq!(
+        err,
+        ProviderError::Provider {
+            message: "The reply was cut off before its tool call was complete.".to_string(),
+        }
+    );
+}
+
+#[tokio::test]
+async fn redacted_thinking_is_kept() {
+    let server = MockServer::start().await;
+    let body = events(&[
+        (
+            "content_block_start",
+            r#"{"type":"content_block_start","index":0,"content_block":{"type":"redacted_thinking","data":"redacted-bytes"}}"#,
+        ),
+        ("content_block_stop", r#"{"type":"content_block_stop","index":0}"#),
+        (
+            "content_block_start",
+            r#"{"type":"content_block_start","index":1,"content_block":{"type":"text","text":"Done."}}"#,
+        ),
+        ("content_block_stop", r#"{"type":"content_block_stop","index":1}"#),
+        (
+            "message_delta",
+            r#"{"type":"message_delta","delta":{"stop_reason":"end_turn"}}"#,
+        ),
+        ("message_stop", r#"{"type":"message_stop"}"#),
+    ]);
+    Mock::given(method("POST"))
+        .and(path("/v1/messages"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(body))
+        .mount(&server)
+        .await;
+
+    let p = test_provider(&server);
+    let (channel, _) = capture();
+    let reply = p
+        .stream_chat(req(), channel, CancellationToken::new())
+        .await
+        .unwrap();
+
+    assert_eq!(
+        reply.assistant["content"][0],
+        json!({"type": "redacted_thinking", "data": "redacted-bytes"})
     );
 }
 

@@ -39,10 +39,10 @@ Carry-overs from M3 are in `docs/phases/M3.md` under "What's left": M4 reuses `w
 
 ## In progress
 
-Task: M4 Task 3: Anthropic tool calling
+Task: M4 Task 4: Workspace helpers for the tools (and D1)
 Tool + model: Antigravity (Gemini 3.8 Flash)
 Date: 2026-10-30
-Next step: Step 1 of Task 3: write failing tests in tests/anthropic.rs for Anthropic tool calling and thinking blocks.
+Next step: Step 1 of Task 4: write failing tests in tests/workspace.rs for resolve_new, list_tree, search, create_file, and D1 widened secret filter.
 
 ## Next 3 tasks
 

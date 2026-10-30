@@ -60,6 +60,9 @@ struct ModelEntry {
     max_input_tokens: Option<u32>,
 }
 
+const MAX_TOKENS: u32 = 8192;
+const MAX_TOKENS_WITH_TOOLS: u32 = 32000;
+
 #[derive(Deserialize)]
 #[serde(tag = "type")]
 enum StreamEvent {
@@ -67,9 +70,19 @@ enum StreamEvent {
     MessageStart {
         message: Option<MessageStartPayload>,
     },
+    #[serde(rename = "content_block_start")]
+    ContentBlockStart {
+        index: u32,
+        content_block: serde_json::Value,
+    },
     #[serde(rename = "content_block_delta")]
     ContentBlockDelta {
-        delta: Option<DeltaPayload>,
+        index: u32,
+        delta: serde_json::Value,
+    },
+    #[serde(rename = "content_block_stop")]
+    ContentBlockStop {
+        index: u32,
     },
     #[serde(rename = "message_delta")]
     MessageDelta {
@@ -99,13 +112,6 @@ struct InputUsagePayload {
 #[derive(Deserialize)]
 struct OutputUsagePayload {
     output_tokens: Option<u32>,
-}
-
-#[derive(Deserialize)]
-struct DeltaPayload {
-    #[serde(rename = "type")]
-    delta_type: Option<String>,
-    text: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -192,14 +198,59 @@ impl ModelProvider for Anthropic {
             }
         }
 
+        for round in req.rounds {
+            anthropic_messages.push(round.assistant);
+            let results_val: Vec<serde_json::Value> = round
+                .results
+                .into_iter()
+                .map(|res| {
+                    let mut obj = json!({
+                        "type": "tool_result",
+                        "tool_use_id": res.call_id,
+                        "content": res.content,
+                    });
+                    if res.is_error {
+                        obj["is_error"] = json!(true);
+                    }
+                    obj
+                })
+                .collect();
+            anthropic_messages.push(json!({
+                "role": "user",
+                "content": results_val,
+            }));
+        }
+
+        let max_tokens = if req.tools.is_empty() {
+            MAX_TOKENS
+        } else {
+            MAX_TOKENS_WITH_TOOLS
+        };
+
         let mut body_map = serde_json::Map::new();
         body_map.insert("model".to_string(), json!(req.model));
         body_map.insert("stream".to_string(), json!(true));
-        body_map.insert("max_tokens".to_string(), json!(8192));
+        body_map.insert("max_tokens".to_string(), json!(max_tokens));
         if !system_parts.is_empty() {
             body_map.insert("system".to_string(), json!(system_parts.join("\n\n")));
         }
         body_map.insert("messages".to_string(), json!(anthropic_messages));
+
+        if !req.tools.is_empty() {
+            let tools_val: Vec<serde_json::Value> = req
+                .tools
+                .into_iter()
+                .map(|spec| {
+                    json!({
+                        "name": spec.name,
+                        "description": spec.description,
+                        "input_schema": spec.schema,
+                    })
+                })
+                .collect();
+            body_map.insert("tools".to_string(), json!(tools_val));
+        }
+
         let body_json = serde_json::Value::Object(body_map);
 
         let url = format!("{}/messages", self.base_url);
@@ -236,6 +287,13 @@ impl ModelProvider for Anthropic {
         }
 
         let mut usage = Usage::default();
+        let mut blocks: std::collections::BTreeMap<u32, serde_json::Value> =
+            std::collections::BTreeMap::new();
+        let mut input_buffers: std::collections::BTreeMap<u32, String> =
+            std::collections::BTreeMap::new();
+        let mut tool_call_inputs: std::collections::BTreeMap<u32, serde_json::Value> =
+            std::collections::BTreeMap::new();
+        let mut last_stop_reason: Option<String> = None;
 
         read_sse(resp, &cancel, |payload| {
             let event = match serde_json::from_str::<StreamEvent>(payload) {
@@ -260,13 +318,97 @@ impl ModelProvider for Anthropic {
                     }
                     Ok(Step::Continue)
                 }
-                StreamEvent::ContentBlockDelta { delta } => {
-                    if let Some(d) = delta
-                        && d.delta_type.as_deref() == Some("text_delta")
-                        && let Some(text) = d.text
-                        && out.send(ChatEvent::Delta(text)).is_err()
+                StreamEvent::ContentBlockStart {
+                    index,
+                    content_block,
+                } => {
+                    blocks.insert(index, content_block);
+                    Ok(Step::Continue)
+                }
+                StreamEvent::ContentBlockDelta { index, delta } => {
+                    let delta_type = delta
+                        .get("type")
+                        .and_then(|t| t.as_str())
+                        .unwrap_or_default();
+                    match delta_type {
+                        "text_delta" => {
+                            if let Some(text) = delta.get("text").and_then(|t| t.as_str()) {
+                                if let Some(block) = blocks.get_mut(&index) {
+                                    if let Some(cur) =
+                                        block.get_mut("text").and_then(|t| t.as_str())
+                                    {
+                                        let updated = format!("{cur}{text}");
+                                        block["text"] = serde_json::Value::String(updated);
+                                    } else {
+                                        block["text"] =
+                                            serde_json::Value::String(text.to_string());
+                                    }
+                                }
+                                if out.send(ChatEvent::Delta(text.to_string())).is_err() {
+                                    return Err(ProviderError::Cancelled);
+                                }
+                            }
+                        }
+                        "thinking_delta" => {
+                            if let Some(th) = delta.get("thinking").and_then(|t| t.as_str())
+                                && let Some(block) = blocks.get_mut(&index)
+                            {
+                                if let Some(cur) =
+                                    block.get_mut("thinking").and_then(|t| t.as_str())
+                                {
+                                    let updated = format!("{cur}{th}");
+                                    block["thinking"] = serde_json::Value::String(updated);
+                                } else {
+                                    block["thinking"] =
+                                        serde_json::Value::String(th.to_string());
+                                }
+                            }
+                        }
+                        "signature_delta" => {
+                            if let Some(sig) = delta.get("signature").and_then(|t| t.as_str())
+                                && let Some(block) = blocks.get_mut(&index)
+                            {
+                                if let Some(cur) =
+                                    block.get_mut("signature").and_then(|t| t.as_str())
+                                {
+                                    let updated = format!("{cur}{sig}");
+                                    block["signature"] = serde_json::Value::String(updated);
+                                } else {
+                                    block["signature"] =
+                                        serde_json::Value::String(sig.to_string());
+                                }
+                            }
+                        }
+                        "input_json_delta" => {
+                            if let Some(pj) = delta.get("partial_json").and_then(|t| t.as_str()) {
+                                input_buffers.entry(index).or_default().push_str(pj);
+                            }
+                        }
+                        _ => {}
+                    }
+                    Ok(Step::Continue)
+                }
+                StreamEvent::ContentBlockStop { index } => {
+                    if let Some(block) = blocks.get_mut(&index)
+                        && block.get("type").and_then(|t| t.as_str()) == Some("tool_use")
                     {
-                        return Err(ProviderError::Cancelled);
+                        let raw = input_buffers.remove(&index).unwrap_or_default();
+                        let parsed = if raw.trim().is_empty() {
+                            Ok(json!({}))
+                        } else {
+                            serde_json::from_str::<serde_json::Value>(&raw)
+                        };
+                        match parsed {
+                            Ok(val) => {
+                                block["input"] = val.clone();
+                                tool_call_inputs.insert(index, val);
+                            }
+                            Err(_) => {
+                                block["input"] = json!({});
+                                tool_call_inputs
+                                    .insert(index, serde_json::Value::String(raw));
+                            }
+                        }
                     }
                     Ok(Step::Continue)
                 }
@@ -277,11 +419,14 @@ impl ModelProvider for Anthropic {
                         usage.tokens_out = u.output_tokens;
                     }
                     if let Some(d) = delta
-                        && d.stop_reason.as_deref() == Some("refusal")
+                        && let Some(reason) = d.stop_reason
                     {
-                        return Err(ProviderError::Provider {
-                            message: "The model declined to answer this request.".to_string(),
-                        });
+                        if reason == "refusal" {
+                            return Err(ProviderError::Provider {
+                                message: "The model declined to answer this request.".to_string(),
+                            });
+                        }
+                        last_stop_reason = Some(reason);
                     }
                     Ok(Step::Continue)
                 }
@@ -302,10 +447,50 @@ impl ModelProvider for Anthropic {
         })
         .await?;
 
+        let has_tool_use = blocks
+            .values()
+            .any(|b| b.get("type").and_then(|t| t.as_str()) == Some("tool_use"));
+
+        if last_stop_reason.as_deref() == Some("max_tokens") && has_tool_use {
+            return Err(ProviderError::Provider {
+                message: "The reply was cut off before its tool call was complete.".to_string(),
+            });
+        }
+
+        let mut tool_calls = Vec::new();
+        let mut content_array = Vec::new();
+
+        for (idx, block) in blocks {
+            if block.get("type").and_then(|t| t.as_str()) == Some("tool_use") {
+                let id = block
+                    .get("id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or_default()
+                    .to_string();
+                let name = block
+                    .get("name")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or_default()
+                    .to_string();
+                let input = tool_call_inputs
+                    .remove(&idx)
+                    .or_else(|| block.get("input").cloned())
+                    .unwrap_or_else(|| json!({}));
+
+                tool_calls.push(crate::gateway::ToolCall { id, name, input });
+            }
+            content_array.push(block);
+        }
+
+        let assistant = json!({
+            "role": "assistant",
+            "content": content_array,
+        });
+
         Ok(Reply {
             usage,
-            tool_calls: vec![],
-            assistant: serde_json::json!({"role": "assistant", "content": []}),
+            tool_calls,
+            assistant,
         })
     }
 }
