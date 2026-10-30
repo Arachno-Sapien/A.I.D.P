@@ -34,7 +34,7 @@ pub async fn run(args: AgentRun<'_>) -> Result<Usage, ProviderError> {
     let mut rounds: Vec<ToolRound> = Vec::new();
     let specs_list = specs();
 
-    for _step in 0..MAX_STEPS {
+    for step in 1..=MAX_STEPS {
         let req = ChatRequest {
             model: args.model.clone(),
             messages: full_messages.clone(),
@@ -56,6 +56,10 @@ pub async fn run(args: AgentRun<'_>) -> Result<Usage, ProviderError> {
 
         if reply.tool_calls.is_empty() {
             return Ok(total_usage);
+        }
+        // The last step's results would never reach the model: don't run or ask for them.
+        if step == MAX_STEPS {
+            break;
         }
 
         let mut results: Vec<ToolOutput> = Vec::new();

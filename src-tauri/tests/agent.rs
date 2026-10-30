@@ -789,7 +789,7 @@ async fn step_limit() {
         .await;
 
     let p = make_provider(&server);
-    let (channel, _) = capture();
+    let (channel, events) = capture();
     let approvals = Approvals::new();
     let cancel = CancellationToken::new();
 
@@ -817,4 +817,13 @@ async fn step_limit() {
 
     let reqs = server.received_requests().await.unwrap();
     assert_eq!(reqs.len(), 25);
+
+    // The 25th reply's tools would never reach the model, so they do not run.
+    let calls = events
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|e| matches!(e, ChatEvent::ToolCall { .. }))
+        .count();
+    assert_eq!(calls, 24);
 }

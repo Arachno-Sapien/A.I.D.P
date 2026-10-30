@@ -253,8 +253,25 @@ fn read_file_ranges_and_cut() {
 
     let run_big = read_file(root, "big.txt", None, None);
     assert!(!run_big.is_error);
-    assert!(run_big.for_model.contains("[cut at line "));
-    assert!(run_big.for_model.contains("; read on with start_line="));
+    // 99 characters plus a line break each: 1,000 lines fit in 100,000.
+    assert!(run_big
+        .for_model
+        .ends_with("\n[cut at line 1000; read on with start_line=1001]"));
+}
+
+#[test]
+fn read_file_cuts_one_huge_line() {
+    let dir = TempDir::new();
+    let root = dir.path();
+    // A minified file: one line far over the limit, multi-byte characters at the cut.
+    fs::write(root.join("min.js"), "é".repeat(150_000) + "\nnext").unwrap();
+
+    let run = read_file(root, "min.js", None, None);
+    assert!(!run.is_error);
+    assert!(run.for_model.len() < 100_200, "sent {} bytes", run.for_model.len());
+    assert!(run
+        .for_model
+        .ends_with("\n[line 1 is too long and was cut; read on with start_line=2]"));
 }
 
 #[test]
@@ -406,6 +423,10 @@ fn create_file_flow() {
         err.for_model,
         "n/new.txt already exists. Use edit_file to change it."
     );
+
+    // Secret-looking names may be created: the user sees the content, and nothing is read.
+    assert!(prepare_create(root, ".env.example", "API_KEY=\n").is_ok());
+    assert!(prepare_create(root, ".npmrc", "registry=https://registry.npmjs.org/\n").is_ok());
 }
 
 #[test]

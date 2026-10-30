@@ -2,7 +2,7 @@ use crate::tools::{ToolOutcome, LIST_LIMIT, READ_LIMIT, SEARCH_LIMIT};
 use crate::workspace::files::{self, list_tree, LineEnding};
 use crate::workspace::paths;
 use crate::workspace::search as ws_search;
-use crate::workspace::secret_files::{has_private_key, is_secret};
+use crate::workspace::secret_files::is_secret;
 use crate::workspace::WorkspaceError;
 use serde::Deserialize;
 use std::path::Path;
@@ -231,7 +231,17 @@ pub fn read_file(
             let slice = &all_lines[(a - 1) as usize..b as usize];
             let full_text = slice.join("\n");
 
-            let (text, cut_note) = if full_text.len() > READ_LIMIT {
+            let (text, cut_note) = if slice[0].len() > READ_LIMIT {
+                // One line over the limit (a minified file): cut the line itself.
+                let first = slice[0];
+                let read_on = if a < total {
+                    format!("; read on with start_line={}", a + 1)
+                } else {
+                    String::new()
+                };
+                let note = format!("\n[line {a} is too long and was cut{read_on}]");
+                (first[..first.floor_char_boundary(READ_LIMIT)].to_string(), Some(note))
+            } else if full_text.len() > READ_LIMIT {
                 let mut acc = String::new();
                 let mut k = a;
                 for (idx, line) in slice.iter().enumerate() {
@@ -415,11 +425,8 @@ pub struct NewFile {
     pub text: String,
 }
 
+/// Secret-looking names may be created: the user sees the content, and nothing is read.
 pub fn prepare_create(root: &Path, path: &str, text: &str) -> Result<NewFile, ToolRun> {
-    if is_secret(path) || has_private_key(text) {
-        return Err(secret_refused(path));
-    }
-
     paths::resolve_new(root, path).map_err(|e| refused(&e, path))?;
 
     Ok(NewFile {
