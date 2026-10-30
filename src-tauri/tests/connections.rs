@@ -968,6 +968,65 @@ async fn set_model_context_bounds() {
 }
 
 #[tokio::test]
+async fn set_model_context_targets_the_local_model() {
+    // A cloud model with the same name must not be picked instead of the local one.
+    let server = MockServer::start().await;
+    let store = Arc::new(MemoryStore::default());
+    let services = create_services(store).with_ollama_url(server.uri());
+    let cloud_id = {
+        let db = services.db_conn().unwrap();
+        db::connections::insert_connection(
+            &db,
+            ConnectionKind::OpenaiCompat,
+            "Cloud",
+            "https://api.openai.com/v1",
+            "1234",
+            1,
+        )
+        .unwrap()
+    };
+    let same = |cw| ModelInfo {
+        id: "same:1b".to_string(),
+        display_name: "same:1b".to_string(),
+        supports_tools: Some(true),
+        context_window: Some(cw),
+    };
+    services.set_models(cloud_id, vec![same(4096)]).unwrap();
+    let local_id = services.ensure_ollama_connection().unwrap();
+    services.set_models(local_id, vec![same(32768)]).unwrap();
+
+    services.set_model_context("same:1b", 16384).unwrap();
+
+    let models = services.chat_models().unwrap();
+    let local = models.iter().find(|m| m.is_local).unwrap();
+    assert_eq!(local.context_tokens, Some(16384));
+}
+
+#[tokio::test]
+async fn local_model_names_are_checked() {
+    // Every request with a model name from the UI checks the name first (plan, Global Constraints).
+    let server = MockServer::start().await;
+    Mock::given(wiremock::matchers::any())
+        .respond_with(ResponseTemplate::new(200))
+        .expect(0)
+        .mount(&server)
+        .await;
+    let store = Arc::new(MemoryStore::default());
+    let services = create_services(store).with_ollama_url(server.uri());
+
+    for name in ["a b", "x;y", ""] {
+        assert!(
+            matches!(services.delete_local_model(name).await, Err(AppError::InvalidInput { .. })),
+            "delete {name:?}"
+        );
+        assert!(
+            matches!(services.unload_local_model(name).await, Err(AppError::InvalidInput { .. })),
+            "unload {name:?}"
+        );
+    }
+}
+
+#[tokio::test]
 async fn ollama_row_cannot_be_deleted() {
     let store = Arc::new(MemoryStore::default());
     let services = create_services(store);

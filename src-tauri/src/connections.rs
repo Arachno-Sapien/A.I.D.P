@@ -7,7 +7,7 @@ use crate::gateway::{
     provider, ChatEvent, ChatMessage, ChatRequest, ConnectionKind, LocalOptions, ModelInfo,
     ModelProvider, ProviderError, Usage,
 };
-use crate::ollama::{LocalModelView, Ollama};
+use crate::ollama::{local_num_ctx, valid_model_name, LocalModelView, Ollama};
 use crate::secrets::{key_hint, SecretError, SecretStore};
 use rusqlite::{Connection, OptionalExtension};
 use secrecy::SecretString;
@@ -116,6 +116,17 @@ pub(crate) fn now_secs() -> u32 {
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_secs() as u32)
         .unwrap_or(0)
+}
+
+/// Every request with a model name from the UI checks it first.
+pub(crate) fn check_model_name(name: &str) -> Result<(), AppError> {
+    if valid_model_name(name) {
+        Ok(())
+    } else {
+        Err(AppError::InvalidInput {
+            message: "Invalid model name.".to_string(),
+        })
+    }
 }
 
 pub struct Services {
@@ -382,10 +393,7 @@ impl Services {
             .map(|r| {
                 let is_local = r.connection_kind == ConnectionKind::Ollama;
                 let context_tokens = if is_local {
-                    Some(
-                        r.num_ctx
-                            .unwrap_or_else(|| r.context_window.map(|cw| cw.min(8192)).unwrap_or(8192)),
-                    )
+                    Some(local_num_ctx(r.num_ctx, r.context_window))
                 } else {
                     r.context_window
                 };
@@ -491,11 +499,8 @@ impl Services {
             Ok((nc, cw)) => (nc.map(|v| v as u32), cw.map(|v| v as u32)),
             Err(_) => (None, None),
         };
-        let num_ctx = num_ctx_val.unwrap_or_else(|| {
-            context_window_val.map(|cw| cw.min(8192)).unwrap_or(8192)
-        });
         LocalOptions {
-            num_ctx: Some(num_ctx),
+            num_ctx: Some(local_num_ctx(num_ctx_val, context_window_val)),
             keep_alive: None,
         }
     }
@@ -517,9 +522,10 @@ impl Services {
             Ok((kind_str, num_ctx, context_window)) => {
                 let kind = ConnectionKind::from_db(&kind_str).unwrap_or(ConnectionKind::OpenaiCompat);
                 if kind == ConnectionKind::Ollama {
-                    Some(num_ctx.map(|v| v as u32).unwrap_or_else(|| {
-                        context_window.map(|w| (w as u32).min(8192)).unwrap_or(8192)
-                    }))
+                    Some(local_num_ctx(
+                        num_ctx.map(|v| v as u32),
+                        context_window.map(|w| w as u32),
+                    ))
                 } else {
                     context_window.map(|w| w as u32)
                 }
@@ -537,7 +543,9 @@ impl Services {
                 "SELECT m.connection_id, c.kind, m.context_window
                  FROM models m
                  JOIN connections c ON m.connection_id = c.id
-                 WHERE m.model_id = ?1",
+                 WHERE m.model_id = ?1
+                 ORDER BY (c.kind = 'ollama') DESC, m.id
+                 LIMIT 1",
                 rusqlite::params![model_id],
                 |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
             )
@@ -571,6 +579,21 @@ impl Services {
             rusqlite::params![num_ctx as i64, conn_id, model_id],
         )?;
 
+        Ok(())
+    }
+
+    /// Deletes a downloaded model, then resyncs the picker.
+    pub async fn delete_local_model(&self, name: &str) -> Result<(), AppError> {
+        check_model_name(name)?;
+        self.ollama().delete(name).await?;
+        let _ = self.sync_local_models().await;
+        Ok(())
+    }
+
+    /// Unloads a model from memory ("Free memory").
+    pub async fn unload_local_model(&self, name: &str) -> Result<(), AppError> {
+        check_model_name(name)?;
+        self.ollama().unload(name).await?;
         Ok(())
     }
 
@@ -614,13 +637,12 @@ impl Services {
             let loaded_entry = loaded.iter().find(|l| l.name == tag.name).cloned();
             let db_info = rows.iter().find(|r| r.model_id == tag.name);
             let (supports_tools, context_length, num_ctx) = match db_info {
-                Some(r) => {
-                    let resolved_num_ctx = r
-                        .num_ctx
-                        .unwrap_or_else(|| r.context_window.map(|w| w.min(8192)).unwrap_or(8192));
-                    (r.supports_tools, r.context_window, resolved_num_ctx)
-                }
-                None => (None, None, 8192),
+                Some(r) => (
+                    r.supports_tools,
+                    r.context_window,
+                    local_num_ctx(r.num_ctx, r.context_window),
+                ),
+                None => (None, None, local_num_ctx(None, None)),
             };
 
             result.push(LocalModelView {

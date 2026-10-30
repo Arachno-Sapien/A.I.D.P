@@ -154,18 +154,13 @@ pub fn ollama_cancel_pull(state: State<'_, OllamaState>) {
 #[tauri::command]
 #[specta::specta]
 pub async fn ollama_delete(services: State<'_, Services>, name: String) -> Result<(), AppError> {
-    let ollama = services.ollama();
-    ollama.delete(&name).await?;
-    let _ = services.sync_local_models().await;
-    Ok(())
+    services.delete_local_model(&name).await
 }
 
 #[tauri::command]
 #[specta::specta]
 pub async fn ollama_unload(services: State<'_, Services>, name: String) -> Result<(), AppError> {
-    let ollama = services.ollama();
-    ollama.unload(&name).await?;
-    Ok(())
+    services.unload_local_model(&name).await
 }
 
 #[tauri::command]

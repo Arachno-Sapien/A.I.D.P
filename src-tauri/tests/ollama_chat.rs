@@ -260,6 +260,32 @@ async fn string_arguments_are_parsed() {
         reply.tool_calls[1].input,
         serde_json::Value::String("{bad".to_string())
     );
+
+    // Ollama parses replayed arguments into a map and rejects a string, so the
+    // replay always carries an object.
+    let calls = &reply.assistant["tool_calls"];
+    assert_eq!(calls[0]["function"]["arguments"], json!({ "path": "a" }));
+    assert_eq!(calls[1]["function"]["arguments"], json!({}));
+}
+
+#[tokio::test]
+async fn server_error_mentioning_not_found_is_not_model_not_found() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/api/chat"))
+        .respond_with(
+            ResponseTemplate::new(500).set_body_string(r#"{"error":"open blob: file not found"}"#),
+        )
+        .mount(&server)
+        .await;
+
+    let adapter = OllamaChat::new(reqwest::Client::new(), server.uri());
+    let (ch, _) = capture();
+    let err = adapter
+        .stream_chat(base_req(), ch, CancellationToken::new())
+        .await
+        .unwrap_err();
+    assert!(matches!(err, ProviderError::Provider { .. }), "{err:?}");
 }
 
 #[tokio::test]

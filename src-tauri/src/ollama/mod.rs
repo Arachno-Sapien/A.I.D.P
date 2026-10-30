@@ -11,6 +11,27 @@ use tokio_util::sync::CancellationToken;
 
 pub const OLLAMA_URL: &str = "http://127.0.0.1:11434";
 pub const OLLAMA_DOWNLOAD_URL: &str = "https://ollama.com/download";
+/// The context length a local model gets until the user sets one (plan D5).
+pub const DEFAULT_NUM_CTX: u32 = 8192;
+
+/// The context length a local model runs with: the user's choice, else the
+/// default capped at the model's maximum.
+pub fn local_num_ctx(num_ctx: Option<u32>, context_window: Option<u32>) -> u32 {
+    num_ctx.unwrap_or_else(|| context_window.map_or(DEFAULT_NUM_CTX, |w| w.min(DEFAULT_NUM_CTX)))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn local_num_ctx_table() {
+        assert_eq!(local_num_ctx(None, None), 8192);
+        assert_eq!(local_num_ctx(None, Some(4096)), 4096);
+        assert_eq!(local_num_ctx(None, Some(32768)), 8192);
+        assert_eq!(local_num_ctx(Some(16384), Some(32768)), 16384);
+    }
+}
 
 pub fn valid_model_name(name: &str) -> bool {
     if name.is_empty() || name.len() > 200 {

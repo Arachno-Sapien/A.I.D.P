@@ -1,7 +1,6 @@
 use crate::gateway::http::{map_http_error, map_reqwest_error, read_json_lines, Step};
 use crate::gateway::{
     ChatEvent, ChatRequest, ModelInfo, ModelProvider, ProviderError, Reply, ToolCall, Usage,
-    TOOLS_UNSUPPORTED,
 };
 use crate::ollama::Ollama;
 use async_trait::async_trait;
@@ -143,15 +142,8 @@ impl ModelProvider for OllamaChat {
                 .map(String::from);
             let body_text = resp.text().await.unwrap_or_default();
 
-            if status_code == 404 || body_text.contains("not found") {
-                return Err(ProviderError::ModelNotFound);
-            }
-            if status_code == 400 && body_text.contains("does not support tools") {
-                return Err(ProviderError::Provider {
-                    message: TOOLS_UNSUPPORTED.to_string(),
-                });
-            }
-
+            // 404 → ModelNotFound and "does not support tools" → TOOLS_UNSUPPORTED
+            // are mapped there; the status decides, not words in the body.
             return Err(map_http_error(
                 status_code,
                 retry_after.as_deref(),
@@ -211,6 +203,14 @@ impl ModelProvider for OllamaChat {
                             other => other.clone(),
                         };
 
+                        // Ollama parses replayed arguments into a map and rejects
+                        // anything else, so the replay always carries an object.
+                        let replay_args = if input.is_object() {
+                            input.clone()
+                        } else {
+                            json!({})
+                        };
+
                         let call_id = format!("call_{}", tool_calls.len());
                         tool_calls.push(ToolCall {
                             id: call_id,
@@ -221,7 +221,7 @@ impl ModelProvider for OllamaChat {
                         raw_tool_calls.push(json!({
                             "function": {
                                 "name": name,
-                                "arguments": raw_args,
+                                "arguments": replay_args,
                             }
                         }));
                     }
