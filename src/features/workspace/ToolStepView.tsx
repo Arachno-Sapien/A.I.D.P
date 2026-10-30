@@ -116,7 +116,7 @@ export function ToolStepView({ step, onAnswer }: ToolStepViewProps) {
               <div className="text-neutral-400">
                 {step.outcome.timedOut
                   ? "Timed out"
-                  : `Exit code ${step.outcome.exitCode ?? 0}`}
+                  : `Exit code ${step.outcome.exitCode ?? "unknown"}`}
               </div>
               <pre className="max-h-48 overflow-auto p-2 rounded bg-neutral-950 font-mono text-xs text-neutral-200 whitespace-pre-wrap">
                 {step.outcome.output}

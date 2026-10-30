@@ -70,4 +70,18 @@ describe("ToolStepView", () => {
     expect(screen.getByText("<b>x</b>")).toBeDefined();
     expect(container.querySelector("b")).toBeNull();
   });
+
+  it("a missing exit code is not shown as success", () => {
+    const step: ToolStep = {
+      id: 9,
+      action: { tool: "runCommand", command: "x", folder: "C:\\test" },
+      needsAnswer: false,
+      outcome: { status: "command", exitCode: null, output: "", timedOut: false },
+    };
+
+    render(<ToolStepView step={step} />);
+
+    expect(screen.getByText("Exit code unknown")).toBeDefined();
+    expect(screen.queryByText("Exit code 0")).toBeNull();
+  });
 });

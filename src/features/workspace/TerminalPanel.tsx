@@ -4,6 +4,16 @@ import { commands, type TerminalEvent } from "../../lib/bindings";
 import { mountTerminal, type MountedTerminal } from "./term";
 import { workspaceErrorText } from "./workspaceErrorText";
 
+// Rust keeps one terminal and each open replaces it, so opens and closes must
+// reach it in the order they were made: in dev, StrictMode opens, closes and
+// opens again at once, and a folder change closes then opens.
+let pending: Promise<unknown> = Promise.resolve();
+function inOrder<T>(call: () => Promise<T>): Promise<T> {
+  const next = pending.then(call, call);
+  pending = next.catch(() => undefined);
+  return next;
+}
+
 export interface TerminalPanelProps {
   height?: number;
   onHeightChange?: (height: number) => void;
@@ -17,6 +27,8 @@ export function TerminalPanel({
 }: TerminalPanelProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<MountedTerminal | null>(null);
+  // Events from a replaced shell (its exit above all) must not reach the screen.
+  const channelRef = useRef<Channel<TerminalEvent> | null>(null);
   const [isExited, setIsExited] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -26,7 +38,9 @@ export function TerminalPanel({
     setIsExited(false);
     setError(null);
     const channel = new Channel<TerminalEvent>();
+    channelRef.current = channel;
     channel.onmessage = (ev: TerminalEvent) => {
+      if (channelRef.current !== channel) return;
       if (ev.event === "output") {
         termRef.current?.write(ev.data);
       } else if (ev.event === "exit") {
@@ -34,12 +48,9 @@ export function TerminalPanel({
         setIsExited(true);
       }
     };
-    const res = await commands.terminalOpen(
-      termRef.current.cols,
-      termRef.current.rows,
-      channel,
-    );
-    if (res.status === "error") {
+    const { cols, rows } = termRef.current;
+    const res = await inOrder(() => commands.terminalOpen(cols, rows, channel));
+    if (res.status === "error" && channelRef.current === channel) {
       setError(workspaceErrorText(res.error));
     }
   }, []);
@@ -71,7 +82,8 @@ export function TerminalPanel({
       ro?.disconnect();
       term.dispose();
       termRef.current = null;
-      void commands.terminalClose();
+      channelRef.current = null;
+      void inOrder(() => commands.terminalClose());
     };
   }, [startTerminal]);
 
