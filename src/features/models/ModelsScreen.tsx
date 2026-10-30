@@ -3,6 +3,7 @@ import { commands, type ModelInfo } from "../../lib/bindings";
 import { appErrorText } from "../chat/appErrorText";
 import { AddConnectionDialog } from "./AddConnectionDialog";
 import { ChooseModels } from "./ChooseModels";
+import { LocalPanel } from "./LocalPanel";
 import { useModelsStore } from "./store";
 
 export interface ModelsScreenProps {
@@ -17,6 +18,7 @@ export function ModelsScreen({
   onAddFinished,
 }: ModelsScreenProps) {
   const { connections, chatModels, loadError, refresh } = useModelsStore();
+  const cloudConnections = connections.filter((c) => c.kind !== "ollama");
   const [internalAdding, setInternalAdding] = useState(false);
   const [testingId, setTestingId] = useState<number | null>(null);
   const [testResult, setTestResult] = useState<{
@@ -155,22 +157,26 @@ export function ModelsScreen({
             </p>
           </div>
         </div>
-      ) : connections.length === 0 ? (
-        <div className="flex-1 flex flex-col items-center justify-center py-16 text-center">
-          <div className="text-neutral-400 text-sm font-medium mb-3">
-            No models yet
-          </div>
-          <button
-            type="button"
-            onClick={handleOpenAdd}
-            className="px-4 py-2 text-xs font-semibold text-neutral-900 bg-neutral-100 hover:bg-white rounded-lg transition-colors cursor-pointer"
-          >
-            Add a model
-          </button>
-        </div>
       ) : (
-        <div className="space-y-4">
-          {connections.map((c) => {
+        <div className="space-y-6">
+          <LocalPanel />
+
+          {cloudConnections.length === 0 ? (
+            <div className="flex-1 flex flex-col items-center justify-center py-12 text-center bg-neutral-900/40 border border-neutral-800 rounded-xl">
+              <div className="text-neutral-400 text-sm font-medium mb-3">
+                No cloud models yet
+              </div>
+              <button
+                type="button"
+                onClick={handleOpenAdd}
+                className="px-4 py-2 text-xs font-semibold text-neutral-900 bg-neutral-100 hover:bg-white rounded-lg transition-colors cursor-pointer"
+              >
+                Add a model
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {cloudConnections.map((c) => {
             const maskedKey = c.keyHint ? `••••••••${c.keyHint}` : "••••••••";
 
             let testStatusText = "Never tested";
@@ -335,6 +341,8 @@ export function ModelsScreen({
               </div>
             );
           })}
+            </div>
+          )}
         </div>
       )}
 

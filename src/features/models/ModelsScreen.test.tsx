@@ -309,4 +309,37 @@ describe("ModelsScreen", () => {
       ).toBeDefined();
     });
   });
+
+  it("hides Ollama from cloud connections", () => {
+    useModelsStore.setState({
+      connections: [
+        {
+          id: 1,
+          kind: "ollama",
+          label: "Ollama (local)",
+          baseUrl: "http://127.0.0.1:11434",
+          keyHint: "",
+          lastTestedAt: 100,
+          lastTestOk: true,
+        },
+        {
+          id: 2,
+          kind: "openaiCompat",
+          label: "Cloud OpenAI",
+          baseUrl: "https://api.openai.com/v1",
+          keyHint: "9999",
+          lastTestedAt: 100,
+          lastTestOk: true,
+        },
+      ],
+      chatModels: [],
+      selected: null,
+      loaded: true,
+    });
+
+    render(<ModelsScreen onAddClick={vi.fn()} />);
+
+    expect(screen.getByText("Cloud OpenAI")).toBeDefined();
+    expect(screen.queryByText("Ollama (local)")).toBeNull();
+  });
 });
