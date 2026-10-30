@@ -4,7 +4,7 @@ Updated: 2026-10-30 by Claude Code (Opus 5.5)
 
 ## Current milestone: M4 Agent tools and terminal
 
-Not started. The plan is written first, by Claude Code, then approved by the human before any code.
+Planned, not started. Plan: `docs/superpowers/plans/2026-10-30-m4-agent-tools.md` (12 tasks; stop for review after Task 7). Phase doc: `docs/phases/M4.md`. No code until the human approves the plan and answers D1 to D3.
 
 - [ ] `ChatEvent::ToolCall` and tool calling in the OpenAI-compatible and Anthropic adapters
 - [ ] `list_files`, `read_file`, `search`, `edit_file`, `create_file`, and `run_command` work inside the folder
@@ -39,11 +39,11 @@ Carry-overs from M3 are in `docs/phases/M3.md` under "What's left": M4 reuses `w
 
 ## In progress
 
-Nothing in progress. M3 is closed (Claude Code, Opus 5.5, 2026-10-30).
-Next step: write the M4 plan (`docs/superpowers/plans/`), then the human's OK.
+M4 plan written (Claude Code, Opus 5.5, 2026-10-30). Not executed.
+Next step: the human reviews `docs/superpowers/plans/2026-10-30-m4-agent-tools.md` and answers D1 (widen the secret-file list in rule 6), D2 (limits) and D3 (shells); then M4 Task 1 (capability column, migration 3).
 
 ## Next 3 tasks
 
-1. Write the M4 plan: tool calling in both adapters, the six tools on top of `resolve` and `is_secret`, approvals, terminal.
-2. In that plan, a decision for the human: widen the secret-file list (AGENTS.md security rule 6). A push security review on 2026-10-30 flagged it as incomplete: `id_ecdsa`/`id_dsa`, `.npmrc`, `.pypirc`, `.netrc`, `.git-credentials`, `*.p12`, `*.pfx`, `*.jks`, `*.keystore`, `*.tfvars`, plus a content check for `-----BEGIN ... PRIVATE KEY-----`. It matters most once the model reads files on its own.
-3. Human review and approval of the M4 plan.
+1. Human review of the M4 plan, with answers to D1 to D3.
+2. M4 Tasks 1 to 7 (capability, both adapters, workspace helpers, file tools, command runner, the loop); stop for review after Task 7.
+3. M4 Tasks 8 to 12 (agent UI, terminal backend and panel, docs, live check and close).
