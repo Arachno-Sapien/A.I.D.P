@@ -4,7 +4,8 @@ use crate::db::connections::{
 };
 use crate::gateway::url::check_base_url;
 use crate::gateway::{
-    provider, ChatEvent, ChatMessage, ChatRequest, ConnectionKind, ModelInfo, ProviderError, Usage,
+    provider, ChatEvent, ChatMessage, ChatRequest, ConnectionKind, ModelInfo, ModelProvider,
+    ProviderError, Usage,
 };
 use crate::secrets::{key_hint, SecretError, SecretStore};
 use rusqlite::Connection;
@@ -391,14 +392,7 @@ impl Services {
         crate::db::settings::set(&conn, key, value).map_err(AppError::from)
     }
 
-    pub async fn stream(
-        &self,
-        connection_id: u32,
-        model_id: String,
-        messages: Vec<ChatMessage>,
-        out: Channel<ChatEvent>,
-        cancel: CancellationToken,
-    ) -> Result<Usage, AppError> {
+    pub fn provider_for(&self, connection_id: u32) -> Result<Box<dyn ModelProvider>, AppError> {
         let row = {
             let db = self.db.lock().map_err(|e| AppError::Storage {
                 message: e.to_string(),
@@ -412,7 +406,18 @@ impl Services {
             Err(SecretError::Unavailable(m)) => return Err(AppError::Keychain { message: m }),
         };
 
-        let prov = provider(row.kind, self.http.clone(), row.base_url, key);
+        Ok(provider(row.kind, self.http.clone(), row.base_url, key))
+    }
+
+    pub async fn stream(
+        &self,
+        connection_id: u32,
+        model_id: String,
+        messages: Vec<ChatMessage>,
+        out: Channel<ChatEvent>,
+        cancel: CancellationToken,
+    ) -> Result<Usage, AppError> {
+        let prov = self.provider_for(connection_id)?;
         let reply = prov
             .stream_chat(
                 ChatRequest {

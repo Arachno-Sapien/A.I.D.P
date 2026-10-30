@@ -1,5 +1,7 @@
 use crate::connections::{AppError, Services};
 use crate::gateway::{ChatEvent, ChatMessage};
+use crate::tools::approvals::Approvals;
+use crate::workspace::WorkspaceState;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Mutex, PoisonError};
@@ -73,6 +75,55 @@ pub async fn send_message(
 #[specta::specta]
 pub fn stop_reply(state: State<'_, ChatState>, surface: ChatSurface) {
     state.stop(surface);
+}
+
+#[tauri::command]
+#[specta::specta]
+#[allow(clippy::too_many_arguments)]
+pub async fn run_agent(
+    chat: State<'_, ChatState>,
+    services: State<'_, Services>,
+    workspace: State<'_, WorkspaceState>,
+    approvals: State<'_, Approvals>,
+    connection_id: u32,
+    model_id: String,
+    messages: Vec<ChatMessage>,
+    on_event: Channel<ChatEvent>,
+) -> Result<(), AppError> {
+    let root = match workspace.root() {
+        Ok(r) => r,
+        Err(_) => {
+            return Err(AppError::InvalidInput {
+                message: "Open a folder first.".to_string(),
+            })
+        }
+    };
+
+    let provider = services.provider_for(connection_id)?;
+    let cancel = chat.begin(ChatSurface::Workspace);
+
+    let result = crate::tools::agent::run(crate::tools::agent::AgentRun {
+        provider: provider.as_ref(),
+        model: model_id,
+        messages,
+        root,
+        approvals: &approvals,
+        out: on_event.clone(),
+        cancel,
+        command_timeout: crate::tools::COMMAND_TIMEOUT,
+    })
+    .await;
+
+    match result {
+        Ok(usage) => {
+            let _ = on_event.send(ChatEvent::Done(usage));
+            Ok(())
+        }
+        Err(err) => {
+            let _ = on_event.send(ChatEvent::Error(err));
+            Ok(())
+        }
+    }
 }
 
 #[cfg(test)]

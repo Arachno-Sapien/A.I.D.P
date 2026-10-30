@@ -4,6 +4,8 @@ use serde_json::json;
 use specta::Type;
 use std::time::Duration;
 
+pub mod agent;
+pub mod approvals;
 pub mod command;
 pub mod run;
 

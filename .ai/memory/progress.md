@@ -39,10 +39,10 @@ Carry-overs from M3 are in `docs/phases/M3.md` under "What's left": M4 reuses `w
 
 ## In progress
 
-Task: M4 Task 7: Approvals, the loop, and the commands
+Task: M4 Review of Tasks 1 to 7 (Backend agent tools and loop)
 Tool + model: Antigravity (Gemini 3.8 Flash)
 Date: 2026-10-30
-Next step: Step 1 of Task 7: implement approvals.rs, agent.rs, factor out provider_for, add run_agent and answer_tool commands, add loop tests in tests/agent.rs.
+Next step: Human / Claude Code review of Tasks 1 to 7 before starting Task 8 (Agent mode in the AI panel).
 
 ## Next 3 tasks
 

@@ -105,4 +105,23 @@ describe("generated IPC bindings", () => {
       },
     });
   });
+
+  it("runAgent sends connectionId, modelId, messages, onEvent", async () => {
+    const channel = new Channel();
+    await commands.runAgent(1, "model-x", [], channel);
+    expect(invoke).toHaveBeenCalledWith("run_agent", {
+      connectionId: 1,
+      modelId: "model-x",
+      messages: [],
+      onEvent: channel,
+    });
+  });
+
+  it("answerTool sends id and approve", async () => {
+    await commands.answerTool(42, true);
+    expect(invoke).toHaveBeenCalledWith("answer_tool", {
+      id: 42,
+      approve: true,
+    });
+  });
 });
