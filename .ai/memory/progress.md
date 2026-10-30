@@ -40,8 +40,8 @@ Carry-overs: `docs/phases/M4.md` and `docs/phases/M5.md`, "What's left → To M6
 
 M6 Task 1 done 2026-10-31 by Claude Code (Opus 5.5): CI run 41112982172 green on Windows, macOS and Linux, with 211 Rust tests (1 ignored) and 187 Vitest tests on each; nothing needed fixing.
 M6 Task 2 done 2026-10-31 by Claude Code (Opus 5.5) in `dada40c`: login-shell PATH on macOS and Linux (`login_path.rs`, called first in `main.rs`), Ollama paths on macOS, macOS login terminal. CI run 41115631396 green (214 Rust tests on Windows and Linux, 215 on macOS). Still assumed until a Mac user confirms: Finder's minimal PATH and the Ollama.app path.
-M6 Task 3 (job object, full-width refusal), claimed by Claude Code (Opus 5.5) on 2026-10-31.
-Next step: test `stop_ends_a_detached_process` in `tests/tools.rs` first and watch it fail on Windows; then the job object in `tools/command.rs` and the full-width refusal in `tools/run.rs`.
+M6 Task 3 done 2026-10-31 by Claude Code (Opus 5.5): job object for Stop on Windows (`dc84d24`); model commands refused for full-width characters everywhere and, on Windows, for any character the ANSI code page doesn't hold exactly or that gets an ASCII trail byte (three automated security reviews: `61a9ca4`, `9f2aa6a`, `b9ccfd3`). CI run 41121384526 green (217 Rust tests on Windows and macOS, 216 on Linux).
+Next step: M6 Task 4 (Agent label `shrink-0` in `AiPanel.tsx`, model select `min-w-0 truncate` in `ModelPicker.tsx`; partial reply saved to the conversation it was sent in, `workspace/chatStore.ts`), then stop for review.
 
 ## Next 3 tasks
 
