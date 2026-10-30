@@ -102,6 +102,7 @@ async fn streams_text_deltas_and_usage() {
         ],
         tools: vec![],
         rounds: vec![],
+        local: Default::default(),
     };
 
     let reply = p.stream_chat(request, channel, cancel).await.unwrap();
@@ -595,10 +596,15 @@ fn factory_builds_the_right_adapter() {
         ConnectionKind::from_db("anthropic"),
         Some(ConnectionKind::Anthropic)
     );
-    assert_eq!(ConnectionKind::from_db("ollama"), None);
+    assert_eq!(
+        ConnectionKind::from_db("ollama"),
+        Some(ConnectionKind::Ollama)
+    );
+    assert_eq!(ConnectionKind::from_db("unknown"), None);
 
     assert_eq!(ConnectionKind::OpenaiCompat.as_db(), "openai_compat");
     assert_eq!(ConnectionKind::Anthropic.as_db(), "anthropic");
+    assert_eq!(ConnectionKind::Ollama.as_db(), "ollama");
 
     let client = reqwest::Client::new();
     let key = SecretString::from("sk-test".to_string());

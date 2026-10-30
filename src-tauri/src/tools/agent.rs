@@ -40,6 +40,7 @@ pub async fn run(args: AgentRun<'_>) -> Result<Usage, ProviderError> {
             messages: full_messages.clone(),
             tools: specs_list.clone(),
             rounds: rounds.clone(),
+            local: Default::default(),
         };
 
         let reply = args

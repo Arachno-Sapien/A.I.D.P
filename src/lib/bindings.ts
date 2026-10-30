@@ -104,7 +104,7 @@ export type ChatModel_Serialize = {
 
 export type ChatSurface = "chat" | "workspace";
 
-export type ConnectionKind = "openaiCompat" | "anthropic";
+export type ConnectionKind = "openaiCompat" | "anthropic" | "ollama";
 
 export type ConnectionView = ConnectionView_Serialize | ConnectionView_Deserialize;
 

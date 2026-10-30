@@ -6,6 +6,7 @@ use tokio_util::sync::CancellationToken;
 
 pub mod anthropic;
 pub mod http;
+pub mod ollama_chat;
 pub mod openai_compat;
 pub mod sse;
 pub mod url;
@@ -24,6 +25,7 @@ pub mod url;
 pub enum ConnectionKind {
     OpenaiCompat,
     Anthropic,
+    Ollama,
 }
 
 impl ConnectionKind {
@@ -31,6 +33,7 @@ impl ConnectionKind {
         match self {
             Self::OpenaiCompat => "openai_compat",
             Self::Anthropic => "anthropic",
+            Self::Ollama => "ollama",
         }
     }
 
@@ -38,6 +41,7 @@ impl ConnectionKind {
         match s {
             "openai_compat" => Some(Self::OpenaiCompat),
             "anthropic" => Some(Self::Anthropic),
+            "ollama" => Some(Self::Ollama),
             _ => None,
         }
     }
@@ -55,6 +59,9 @@ pub fn provider(
         }
         ConnectionKind::Anthropic => {
             Box::new(anthropic::Anthropic::new(client, base_url, key))
+        }
+        ConnectionKind::Ollama => {
+            Box::new(ollama_chat::OllamaChat::new(client, base_url))
         }
     }
 }
@@ -138,12 +145,20 @@ pub struct Reply {
     pub assistant: serde_json::Value,
 }
 
+#[derive(Serialize, Deserialize, Type, Clone, Debug, Default, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct LocalOptions {
+    pub num_ctx: Option<u32>,
+    pub keep_alive: Option<i32>,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct ChatRequest {
     pub model: String,
     pub messages: Vec<ChatMessage>,
     pub tools: Vec<ToolSpec>,
     pub rounds: Vec<ToolRound>,
+    pub local: LocalOptions,
 }
 
 #[derive(Serialize, Deserialize, Type, Clone, Debug, Default, PartialEq)]

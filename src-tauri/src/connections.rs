@@ -425,6 +425,7 @@ impl Services {
                     messages,
                     tools: vec![],
                     rounds: vec![],
+                    local: Default::default(),
                 },
                 out,
                 cancel,

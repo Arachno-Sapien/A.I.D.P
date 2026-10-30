@@ -39,8 +39,8 @@ Carry-overs: `docs/phases/M3.md` and `docs/phases/M4.md`, "What's left → To M5
 ## In progress
 
 Claimed by Antigravity (Gemini 2.5 Pro), 2026-10-30.
-Task: M5 Task 3 - Ollama chat adapter (src-tauri/src/gateway/ollama_chat.rs, ConnectionKind::Ollama, ChatRequest.local).
-Next step: Step 1 - write failing tests in `tests/ollama_chat.rs`.
+Task: M5 Task 4 - Ollama in the app (ensure_ollama_connection, model sync, LocalModelView, commands/ollama.rs).
+Next step: Step 1 - write failing tests in `tests/connections.rs`.
 
 ## Next 3 tasks
 
