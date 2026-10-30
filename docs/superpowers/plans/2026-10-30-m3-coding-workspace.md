@@ -1,6 +1,6 @@
 # M3 Coding Workspace Implementation Plan
 
-> **Status: approved by the human on 2026-10-30** with the defaults for D1 (dialog plugin from Rust only), D2 (recent folders now) and D3 (Apply needs a saved file). Execute from Task 1. After Task 4, stop for a review before starting Task 5.
+> **Status: done, M3 closed 2026-10-30** (summary in `docs/phases/M3.md`). Approved by the human on 2026-10-30 with the defaults for D1 (dialog plugin from Rust only), D2 (recent folders now) and D3 (Apply needs a saved file). Execute from Task 1. After Task 4, stop for a review before starting Task 5.
 
 > **For agentic workers:** execute task by task, in order, inline in one session (the tasks share files). In Claude Code, `superpowers:executing-plans` fits; in other tools, follow the steps directly. Steps use checkbox (`- [ ]`) syntax. **Do not tick any milestone box, in any file, until the human confirms the live check in Task 12. Do not push; the human decides.**
 

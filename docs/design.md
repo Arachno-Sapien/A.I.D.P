@@ -422,13 +422,13 @@ For M1 only, the key comes from a git-ignored local config file. M2 replaces it 
 
 **M3 Coding workspace**
 
-- [ ] Open a folder; the file tree respects .gitignore and stays responsive on a 10,000-file folder
-- [ ] Open, edit, and save files in CodeMirror 6 tabs, with unsaved changes marked
-- [ ] The AI panel sends the open file and selection as context, streams replies, and Stop works
-- [ ] Apply shows a diff; the file changes only after Accept
-- [ ] Tests prove that `..`, absolute paths, and symlinks pointing outside the folder are refused
-- [ ] A warning appears before the first AI edit in a folder without git
-- [ ] RAM with a mid-sized repo open is measured and the workspace budget recorded in the phase doc
+- [x] Open a folder; the file tree respects .gitignore and stays responsive on a 10,000-file folder
+- [x] Open, edit, and save files in CodeMirror 6 tabs, with unsaved changes marked
+- [x] The AI panel sends the open file and selection as context, streams replies, and Stop works
+- [x] Apply shows a diff; the file changes only after Accept
+- [x] Tests prove that `..`, absolute paths, and symlinks pointing outside the folder are refused
+- [x] A warning appears before the first AI edit in a folder without git
+- [x] RAM with a mid-sized repo open is measured and the workspace budget recorded in the phase doc (127 MB idle, 155 MB measured, budget 200 MB; see docs/phases/M3.md)
 
 **M4 Agent tools and terminal**
 
