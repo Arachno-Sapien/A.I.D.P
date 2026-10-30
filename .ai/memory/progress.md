@@ -1,10 +1,10 @@
 # Progress
 
-Updated: 2026-10-30 by Claude Code (Opus 5.5)
+Updated: 2026-10-31 by Claude Code (Opus 5.5)
 
 ## Current milestone: M6 v0.1 release
 
-Planned 2026-10-30: phase doc `docs/phases/M6.md`, plan `docs/superpowers/plans/2026-10-30-m6-release.md`. Waiting for the human's review and answers to D1 to D6. Before Task 5 the human also creates the update signing key (D4).
+Plan approved by the human on 2026-10-31 with the defaults for D1 to D6: phase doc `docs/phases/M6.md`, plan `docs/superpowers/plans/2026-10-30-m6-release.md`. Stop for review after Task 4. Before Task 5 the human creates the update signing key and hands over only the public key (D4).
 
 - [ ] Idle RAM (no folder open) under 150 MB; workspace RAM within the budget set in M3 and M4
 - [ ] Installers for Windows, macOS and Linux built by CI and published as a GitHub release
@@ -38,11 +38,11 @@ Carry-overs: `docs/phases/M4.md` and `docs/phases/M5.md`, "What's left → To M6
 
 ## In progress
 
-Nothing claimed. Claude Code (Opus 5.5) wrote the M6 plan on 2026-10-30.
-Next step: the human reviews the M6 plan and answers D1 to D6; then an agent starts Task 1 (the gate on three OSes in `.github/workflows/ci.yml`).
+Nothing claimed. Claude Code (Opus 5.5) wrote the M6 plan on 2026-10-30; the human approved it on 2026-10-31.
+Next step: an agent claims and starts M6 Task 1 (the gate on three OSes in `.github/workflows/ci.yml`).
 
 ## Next 3 tasks
 
-1. The human approves the M6 plan (D1 to D6) and creates the update signing key.
-2. M6 Tasks 1 to 4: the gate on three OSes, macOS and Linux fixes, the carry-overs; then a review.
+1. M6 Tasks 1 to 4: the gate on three OSes, macOS and Linux fixes, the carry-overs; then a review.
+2. The human creates the update signing key (D4) before Task 5.
 3. M6 Tasks 5 to 8: updates, the Release workflow, docs, release candidates and v0.1.0.
