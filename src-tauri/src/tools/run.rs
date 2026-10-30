@@ -123,7 +123,10 @@ pub fn parse(name: &str, input: &serde_json::Value) -> Result<ToolInput, String>
         "run_command" => {
             let args: RunCommandArgs = serde_json::from_value(input.clone())
                 .map_err(|e| format!("Invalid arguments for {name}: {e}."))?;
-            if let Some(c) = args.command.chars().find(|&c| is_hidden(c)) {
+            // A carriage return is allowed only as part of CRLF.
+            let lone_cr = args.command.replace("\r\n", "").contains('\r');
+            let hidden = args.command.chars().find(|&c| is_hidden(c));
+            if let Some(c) = hidden.or(lone_cr.then_some('\r')) {
                 return Err(format!(
                     "Invalid arguments for {name}: the command contains a hidden or control character (U+{:04X}), which would make the approval card differ from what runs. Use plain characters.",
                     c as u32
@@ -137,21 +140,38 @@ pub fn parse(name: &str, input: &serde_json::Value) -> Result<ToolInput, String>
     }
 }
 
-/// Characters that hide or reorder text on screen: controls (tab and line
-/// breaks are visible and allowed), bidi overrides and isolates, zero-width
-/// and other invisible format characters. The user must see exactly what runs.
+/// Characters that hide or reorder text on screen, so the user must see exactly
+/// what runs: controls (tab and line breaks are visible and allowed), every
+/// Default_Ignorable_Code_Point of Unicode 15 (bidi controls, zero-width,
+/// variation selectors, tags, Hangul fillers, ...), the line and paragraph
+/// separators, the other format controls, and private use. Unassigned code
+/// points are left out: they render as visible boxes.
 fn is_hidden(c: char) -> bool {
     (c.is_control() && !matches!(c, '\t' | '\n' | '\r'))
         || matches!(
             c,
             '\u{00AD}'
+                | '\u{034F}'
                 | '\u{061C}'
-                | '\u{180E}'
+                | '\u{115F}'..='\u{1160}'
+                | '\u{17B4}'..='\u{17B5}'
+                | '\u{180B}'..='\u{180F}'
                 | '\u{200B}'..='\u{200F}'
                 | '\u{2028}'..='\u{202E}'
-                | '\u{2060}'..='\u{2064}'
-                | '\u{2066}'..='\u{2069}'
+                | '\u{2060}'..='\u{206F}'
+                | '\u{3164}'
+                | '\u{E000}'..='\u{F8FF}'
+                | '\u{FE00}'..='\u{FE0F}'
                 | '\u{FEFF}'
+                | '\u{FFA0}'
+                | '\u{FFF0}'..='\u{FFFB}'
+                | '\u{110BD}'
+                | '\u{110CD}'
+                | '\u{13430}'..='\u{1343F}'
+                | '\u{1BCA0}'..='\u{1BCA3}'
+                | '\u{1D173}'..='\u{1D17A}'
+                | '\u{E0000}'..='\u{E0FFF}'
+                | '\u{F0000}'..='\u{10FFFF}'
         )
 }
 

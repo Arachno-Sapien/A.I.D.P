@@ -113,6 +113,15 @@ fn command_with_hidden_characters_is_refused() {
         ("echo a\u{200B}b", "U+200B"),
         ("echo \u{2066}x\u{2069}", "U+2066"),
         ("echo a\u{1b}[2Kb", "U+001B"),
+        // Other invisible characters: a Hangul filler, a variation selector, a
+        // tag character, the combining grapheme joiner, private use.
+        ("echo a\u{3164}b", "U+3164"),
+        ("echo a\u{FE0F}b", "U+FE0F"),
+        ("echo a\u{E0041}b", "U+E0041"),
+        ("echo a\u{034F}b", "U+034F"),
+        ("echo a\u{E000}b", "U+E000"),
+        // A carriage return that is not part of a line break.
+        ("echo safe\rdel x", "U+000D"),
     ] {
         let err = parse("run_command", &json!({ "command": command })).unwrap_err();
         assert!(
@@ -121,8 +130,10 @@ fn command_with_hidden_characters_is_refused() {
             "{command:?}: {err}"
         );
     }
-    // Tabs and line breaks are visible in the card and stay allowed.
+    // Tabs and line breaks are visible in the card and stay allowed, and so is
+    // ordinary non-ASCII text.
     assert!(parse("run_command", &json!({ "command": "echo a\tb\r\necho c" })).is_ok());
+    assert!(parse("run_command", &json!({ "command": "echo héllo 日本 > ñ.txt" })).is_ok());
 }
 
 #[test]
