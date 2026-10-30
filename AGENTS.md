@@ -348,6 +348,7 @@ If your tool doesn't load skills automatically (or looks in a different folder),
 | `test-driven-development` | obra/superpowers | Adapters, db, anything with logic: test first, watch it fail, then implement |
 | `systematic-debugging` | obra/superpowers | Any bug or failing test, before proposing a fix |
 | `verification-before-completion` | obra/superpowers | Before saying a task is done: run the gate, show the output |
+| `unlazy` | Leonxlnx/unlazy | Enforcing completion discipline for substantial autonomous work |
 
 **Managing skills**
 

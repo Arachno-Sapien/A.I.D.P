@@ -25,6 +25,12 @@
       "skillPath": "skills/test-driven-development/SKILL.md",
       "computedHash": "3cfe4ebb6fa7288f668d87880d279c8e48f7a92b63415e296857060f5ce22e05"
     },
+    "unlazy": {
+      "source": "Leonxlnx/unlazy",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "a1bf30a55d48d779db99b45d5b89004dd5eab0a0a4fe2b952188aae45c9d486b"
+    },
     "vercel-react-best-practices": {
       "source": "vercel-labs/agent-skills",
       "sourceType": "github",
