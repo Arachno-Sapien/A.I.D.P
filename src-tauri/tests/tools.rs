@@ -1,5 +1,6 @@
 mod common;
 
+use aidp_lib::tools::command::{run_command, tail, CommandEnd};
 use aidp_lib::tools::run::{
     apply_create, apply_edit, list_files, parse, prepare_create, prepare_edit, read_file, search,
     ToolInput,
@@ -8,6 +9,8 @@ use aidp_lib::tools::specs;
 use common::{link_dir, link_file, TempDir};
 use serde_json::json;
 use std::fs;
+use std::time::{Duration, Instant};
+use tokio_util::sync::CancellationToken;
 
 #[test]
 fn parse_table() {
@@ -425,4 +428,173 @@ fn declined_outcomes() {
         cmd_declined.for_model,
         "The user denied this command. Do not run it again unless they ask."
     );
+}
+
+#[tokio::test]
+async fn command_output_and_exit_code() {
+    let dir = TempDir::new();
+    let root = dir.path();
+    let cancel = CancellationToken::new();
+
+    let end = run_command(root, "echo hello", Duration::from_secs(5), &cancel)
+        .await
+        .unwrap();
+    match end {
+        CommandEnd::Finished(res) => {
+            assert!(res.output.contains("hello"));
+            assert_eq!(res.exit_code, Some(0));
+            assert!(!res.timed_out);
+        }
+        CommandEnd::Stopped => panic!("Command should not be stopped"),
+    }
+
+    let pwd_cmd = if cfg!(windows) { "cd" } else { "pwd" };
+    let end_pwd = run_command(root, pwd_cmd, Duration::from_secs(5), &cancel)
+        .await
+        .unwrap();
+    match end_pwd {
+        CommandEnd::Finished(res) => {
+            let canon_root = root.canonicalize().unwrap();
+            let root_str = canon_root.to_string_lossy();
+            let cleaned_output = res.output.trim().replace("\\\\?\\", "");
+            let cleaned_root = root_str.replace("\\\\?\\", "");
+            assert!(
+                cleaned_output.to_lowercase().contains(&cleaned_root.to_lowercase())
+                    || cleaned_root.to_lowercase().contains(&cleaned_output.to_lowercase()),
+                "Expected output '{}' to contain root '{}'",
+                res.output,
+                root_str
+            );
+        }
+        CommandEnd::Stopped => panic!("Command should not be stopped"),
+    }
+}
+
+#[tokio::test]
+async fn command_nonzero_exit() {
+    let dir = TempDir::new();
+    let root = dir.path();
+    let cancel = CancellationToken::new();
+
+    let end = run_command(root, "exit 3", Duration::from_secs(5), &cancel)
+        .await
+        .unwrap();
+    match end {
+        CommandEnd::Finished(res) => {
+            assert_eq!(res.exit_code, Some(3));
+        }
+        CommandEnd::Stopped => panic!("Command should not be stopped"),
+    }
+}
+
+#[tokio::test]
+async fn command_gets_no_input() {
+    let dir = TempDir::new();
+    let root = dir.path();
+    let cancel = CancellationToken::new();
+
+    let cmd = if cfg!(windows) { "set /p X=" } else { "read X" };
+    let start = Instant::now();
+    let end = run_command(root, cmd, Duration::from_secs(5), &cancel)
+        .await
+        .unwrap();
+    assert!(start.elapsed() < Duration::from_secs(5));
+    match end {
+        CommandEnd::Finished(res) => {
+            assert!(!res.timed_out);
+        }
+        CommandEnd::Stopped => panic!("Command should not be stopped"),
+    }
+}
+
+#[tokio::test]
+async fn timeout_kills_the_whole_tree() {
+    let dir = TempDir::new();
+    let root = dir.path();
+    let cancel = CancellationToken::new();
+
+    let cmd = if cfg!(windows) {
+        "cmd /C \"ping -n 4 127.0.0.1 > nul & echo late > marker.txt\""
+    } else {
+        "sh -c 'sleep 3; echo late > marker.txt'"
+    };
+
+    let end = run_command(root, cmd, Duration::from_secs(1), &cancel)
+        .await
+        .unwrap();
+    match end {
+        CommandEnd::Finished(res) => {
+            assert!(res.timed_out);
+        }
+        CommandEnd::Stopped => panic!("Expected timed_out, got stopped"),
+    }
+
+    tokio::time::sleep(Duration::from_millis(5000)).await;
+    assert!(!root.join("marker.txt").exists());
+}
+
+#[tokio::test]
+async fn stop_kills_the_command() {
+    let dir = TempDir::new();
+    let root = dir.path();
+    let cancel = CancellationToken::new();
+
+    let cmd = if cfg!(windows) {
+        "cmd /C \"ping -n 4 127.0.0.1 > nul & echo late > marker.txt\""
+    } else {
+        "sh -c 'sleep 3; echo late > marker.txt'"
+    };
+
+    let cancel_clone = cancel.clone();
+    tokio::spawn(async move {
+        tokio::time::sleep(Duration::from_millis(500)).await;
+        cancel_clone.cancel();
+    });
+
+    let start = Instant::now();
+    let end = run_command(root, cmd, Duration::from_secs(10), &cancel)
+        .await
+        .unwrap();
+    assert!(start.elapsed() < Duration::from_secs(3));
+    match end {
+        CommandEnd::Stopped => {}
+        CommandEnd::Finished(_) => panic!("Expected Stopped"),
+    }
+
+    tokio::time::sleep(Duration::from_millis(5000)).await;
+    assert!(!root.join("marker.txt").exists());
+}
+
+#[tokio::test]
+async fn output_keeps_the_tail() {
+    let dir = TempDir::new();
+    let root = dir.path();
+    let cancel = CancellationToken::new();
+
+    let script = if cfg!(windows) {
+        let line = "0123456789".repeat(10);
+        format!("cmd /C \"for /L %i in (1,1,400) do @echo {line}\" & echo END")
+    } else {
+        "sh -c 'for i in $(seq 1 400); do printf \"%0100d\\n\" 0; done; echo END'".to_string()
+    };
+
+    let end = run_command(root, &script, Duration::from_secs(10), &cancel)
+        .await
+        .unwrap();
+    match end {
+        CommandEnd::Finished(res) => {
+            assert!(res.output.starts_with("[earlier output cut]\n"));
+            assert!(res.output.trim_end().ends_with("END"));
+            let after_note = &res.output["[earlier output cut]\n".len()..];
+            assert!(after_note.chars().count() <= aidp_lib::tools::OUTPUT_LIMIT);
+        }
+        CommandEnd::Stopped => panic!("Command should not be stopped"),
+    }
+}
+
+#[test]
+fn tail_cuts_on_char_boundaries() {
+    let text = "hello 😊 world 🚀";
+    let cut = tail(text, 5);
+    assert_eq!(cut, "[earlier output cut]\nrld 🚀");
 }

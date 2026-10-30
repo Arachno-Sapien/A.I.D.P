@@ -39,10 +39,10 @@ Carry-overs from M3 are in `docs/phases/M3.md` under "What's left": M4 reuses `w
 
 ## In progress
 
-Task: M4 Task 6: The command runner
+Task: M4 Task 7: Approvals, the loop, and the commands
 Tool + model: Antigravity (Gemini 3.8 Flash)
 Date: 2026-10-30
-Next step: Step 1 of Task 6: add tokio features to Cargo.toml, write failing tests in tests/tools.rs for command execution, exit codes, timeout, cancellation, tree termination, tail cutting.
+Next step: Step 1 of Task 7: implement approvals.rs, agent.rs, factor out provider_for, add run_agent and answer_tool commands, add loop tests in tests/agent.rs.
 
 ## Next 3 tasks
 

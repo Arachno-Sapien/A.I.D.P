@@ -4,6 +4,7 @@ use serde_json::json;
 use specta::Type;
 use std::time::Duration;
 
+pub mod command;
 pub mod run;
 
 pub const COMMAND_TIMEOUT: Duration = Duration::from_secs(120);
