@@ -1,8 +1,19 @@
 use super::WorkspaceError;
 use std::path::{Component, Path, PathBuf};
 
+/// The `.git` folder is refused like a path outside the folder: its config can
+/// hold credentials and its hooks run code. Case-insensitive, as on Windows.
+fn has_git_part(p: &Path) -> bool {
+    p.components()
+        .any(|c| matches!(c, Component::Normal(n) if n.eq_ignore_ascii_case(".git")))
+}
+
+pub fn in_git_dir(rel: &str) -> bool {
+    has_git_part(Path::new(rel))
+}
+
 fn check_components(rel: &str) -> Result<Vec<Component<'_>>, WorkspaceError> {
-    if rel.contains(':') || rel.contains('\0') {
+    if rel.contains(':') || rel.contains('\0') || in_git_dir(rel) {
         return Err(WorkspaceError::OutsideFolder);
     }
 
@@ -46,7 +57,8 @@ pub fn resolve(root: &Path, rel: &str) -> Result<PathBuf, WorkspaceError> {
         }
     };
 
-    if !canonical.starts_with(root) {
+    // A link may land in .git under another name.
+    if !canonical.starts_with(root) || canonical.strip_prefix(root).is_ok_and(has_git_part) {
         return Err(WorkspaceError::OutsideFolder);
     }
 
@@ -96,7 +108,9 @@ pub fn resolve_new(root: &Path, rel: &str) -> Result<PathBuf, WorkspaceError> {
         message: e.to_string(),
     })?;
 
-    if !canon_ancestor.starts_with(&canon_root) {
+    if !canon_ancestor.starts_with(&canon_root)
+        || canon_ancestor.strip_prefix(&canon_root).is_ok_and(has_git_part)
+    {
         return Err(WorkspaceError::OutsideFolder);
     }
 

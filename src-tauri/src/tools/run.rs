@@ -140,6 +140,9 @@ pub struct ToolRun {
 
 pub fn refused(err: &WorkspaceError, path: &str) -> ToolRun {
     let for_model = match err {
+        WorkspaceError::OutsideFolder if paths::in_git_dir(path) => {
+            "Refused: tools cannot use the .git folder. To see history or status, ask to run a git command.".to_string()
+        }
         WorkspaceError::OutsideFolder => {
             "Refused: paths must be relative to the project folder (like src/main.rs) and stay inside it.".to_string()
         }

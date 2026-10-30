@@ -24,23 +24,26 @@ pub fn is_secret(rel: &str) -> bool {
         || filename.ends_with(".jks")
         || filename.ends_with(".keystore")
         || filename.ends_with(".tfvars")
+        || filename.ends_with(".ppk")
 }
 
+/// PEM (`-----BEGIN ... PRIVATE KEY-----`), PGP (`... PRIVATE KEY BLOCK-----`)
+/// and PuTTY (`PuTTY-User-Key-File-`) private keys.
 pub fn has_private_key(text: &str) -> bool {
+    let is_key_header = |h: &str| h.contains("PRIVATE KEY-----") || h.contains("PRIVATE KEY BLOCK-----");
+    if text.lines().any(|l| l.starts_with("PuTTY-User-Key-File-")) {
+        return true;
+    }
     let mut remainder = text;
     while let Some(pos) = remainder.find("-----BEGIN ") {
         let after_begin = &remainder[pos + "-----BEGIN ".len()..];
         if let Some(line_end) = after_begin.find('\n') {
-            let header = &after_begin[..line_end];
-            if header.contains("PRIVATE KEY-----") {
+            if is_key_header(&after_begin[..line_end]) {
                 return true;
             }
             remainder = &after_begin[line_end..];
         } else {
-            if after_begin.contains("PRIVATE KEY-----") {
-                return true;
-            }
-            break;
+            return is_key_header(after_begin);
         }
     }
     false
@@ -63,6 +66,7 @@ mod tests {
             "id_ed25519",
             "id_ecdsa",
             "KEYS.P12",
+            "server.ppk",
             "cert.pfx",
             "a.jks",
             "release.keystore",
@@ -98,6 +102,9 @@ mod tests {
         assert!(has_private_key("-----BEGIN OPENSSH PRIVATE KEY-----\nb3B...\n-----END OPENSSH PRIVATE KEY-----"));
         assert!(has_private_key("-----BEGIN PRIVATE KEY-----\nMIIE...\n-----END PRIVATE KEY-----"));
         assert!(!has_private_key("-----BEGIN CERTIFICATE-----\nMIID...\n-----END CERTIFICATE-----"));
+        assert!(has_private_key("-----BEGIN PGP PRIVATE KEY BLOCK-----\n\nlQOY...\n-----END PGP PRIVATE KEY BLOCK-----"));
+        assert!(has_private_key("PuTTY-User-Key-File-3: ssh-ed25519\nEncryption: none\n"));
+        assert!(!has_private_key("-----BEGIN PGP PUBLIC KEY BLOCK-----\n\nmQIN...\n-----END PGP PUBLIC KEY BLOCK-----"));
         assert!(!has_private_key("This document discusses how a private key should be managed securely."));
     }
 }

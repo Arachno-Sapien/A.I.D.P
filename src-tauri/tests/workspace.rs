@@ -402,6 +402,36 @@ fn resolve_new_table() {
 }
 
 #[test]
+fn git_folder_is_refused() {
+    let temp = TempDir::new();
+    let root = temp.path();
+    fs::create_dir_all(root.join(".git/hooks")).unwrap();
+    fs::write(root.join(".git/config"), "[core]\n").unwrap();
+    fs::create_dir_all(root.join(".github")).unwrap();
+    fs::write(root.join(".gitignore"), "target/\n").unwrap();
+
+    for p in [".git", ".git/config", ".GIT/config", "sub/.git"] {
+        assert_eq!(resolve(root, p), Err(WorkspaceError::OutsideFolder), "{p}");
+    }
+    assert_eq!(
+        resolve_new(root, ".git/hooks/pre-commit"),
+        Err(WorkspaceError::OutsideFolder)
+    );
+
+    // Names that only start with .git stay allowed.
+    assert!(resolve(root, ".gitignore").is_ok());
+    assert!(resolve(root, ".github").is_ok());
+
+    // A link into .git is refused where it lands.
+    link_dir(&root.join("g"), &root.join(".git"));
+    assert_eq!(resolve(root, "g/config"), Err(WorkspaceError::OutsideFolder));
+    assert_eq!(
+        resolve_new(root, "g/hooks/pre-commit"),
+        Err(WorkspaceError::OutsideFolder)
+    );
+}
+
+#[test]
 fn search_skips_links() {
     let temp = TempDir::new();
     let root = temp.path();

@@ -228,6 +228,35 @@ fn read_file_refuses_secrets() {
 }
 
 #[test]
+fn git_folder_is_off_limits() {
+    // .git/config can hold a token in a remote URL, and hooks run code.
+    let dir = TempDir::new();
+    let root = dir.path();
+    fs::create_dir_all(root.join(".git/hooks")).unwrap();
+    fs::write(
+        root.join(".git/config"),
+        "[remote \"origin\"]\n\turl = https://x-access-token:placeholder-789@example.com/r.git\n",
+    )
+    .unwrap();
+    let refusal = "Refused: tools cannot use the .git folder. To see history or status, ask to run a git command.";
+
+    assert_eq!(read_file(root, ".git/config", None, None).for_model, refusal);
+    assert_eq!(list_files(root, ".git").for_model, refusal);
+    assert_eq!(search(root, "placeholder", ".git").for_model, refusal);
+    assert_eq!(
+        prepare_edit(root, ".git/config", "url", "x").unwrap_err().for_model,
+        refusal
+    );
+    assert_eq!(
+        prepare_create(root, ".git/hooks/pre-commit", "echo hi")
+            .unwrap_err()
+            .for_model,
+        refusal
+    );
+    assert!(!search(root, "placeholder", "").for_model.contains("placeholder-789"));
+}
+
+#[test]
 fn read_file_ranges_and_cut() {
     let dir = TempDir::new();
     let root = dir.path();

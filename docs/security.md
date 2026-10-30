@@ -85,9 +85,10 @@ Every file read, file write, and directory listing operation is governed by `wor
 - **Component-by-component construction:** Paths are broken into normalized components (`Normal`) and pushed onto the canonical root directory.
 - **Canonicalization & Boundary Check:** The resolved path is canonicalized following symlinks and junctions, then verified with `resolved.starts_with(&canonical_root)`. If a symlink or junction leads outside the opened workspace folder, the request is rejected with `WorkspaceError::OutsideFolder`.
 - **Tested boundary conditions:** 21 automated integration tests in `tests/workspace.rs` prove that `..`, absolute paths, Windows drive letters, directory junctions pointing outside the workspace, and symlinks escaping the folder are rejected.
+- **The `.git` folder is off limits** (decision 0012): a path with a `.git` component (any case) is refused, and so is a path whose canonical form lands in `.git` through a link. `.git/config` can hold a token in a remote URL, and a file written to `.git/hooks` runs on the user's next git command. The agent gets "tools cannot use the .git folder" and can ask to run a git command instead.
 
 ### Secret File Shielding
-Files containing sensitive credentials (`.env*`, `*.pem`, `*.key`, `id_rsa*`, `id_ed25519*`) are automatically protected:
+Files that look like secrets are protected; the full list is security rule 6 in `AGENTS.md` (decisions 0010 and 0012). Files whose content holds a PEM, PGP or PuTTY private key are treated the same way.
 - **Detection:** `workspace::secret_files::is_secret` identifies sensitive file names and extensions. `read_file` checks both the requested name and the name of the file a link points to. Names are only a convention: a hard link can give a secret file any name, so this keeps accidental sends out rather than stopping a deliberate one.
 - **Marked on read:** `read_file` returns `is_secret: true`.
 - **AI Context Exclusion:** Secret files are automatically excluded from AI context chips (`chipsFor` initializes with `enabled: false, reason: "secret"`). They cannot be sent to cloud models unless the user explicitly and intentionally clicks `+ Add {filename}` in the UI.
