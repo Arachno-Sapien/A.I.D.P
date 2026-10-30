@@ -49,23 +49,55 @@ async fn read_capped<R: tokio::io::AsyncRead + Unpin>(mut reader: R) -> Vec<u8> 
     out
 }
 
-fn kill_tree(child: &tokio::process::Child) {
-    if let Some(pid) = child.id() {
-        #[cfg(windows)]
-        {
-            use std::os::windows::process::CommandExt;
-            let mut tk = std::process::Command::new("taskkill");
-            tk.args(["/T", "/F", "/PID", &pid.to_string()]);
-            tk.creation_flags(0x0800_0000);
-            let _ = tk.status();
-        }
-        #[cfg(not(windows))]
-        {
-            let _ = std::process::Command::new("kill")
-                .args(["-KILL", &format!("-{}", pid)])
-                .status();
+/// How long the output readers get after a kill to reach the end of the output.
+const KILL_GRACE: Duration = Duration::from_secs(2);
+
+async fn kill_tree(pid: Option<u32>) {
+    let Some(pid) = pid else { return };
+    #[cfg(windows)]
+    let mut killer = {
+        let mut c = tokio::process::Command::new("taskkill");
+        c.args(["/T", "/F", "/PID", &pid.to_string()]);
+        c.creation_flags(0x0800_0000);
+        c
+    };
+    #[cfg(not(windows))]
+    let mut killer = {
+        let mut c = tokio::process::Command::new("kill");
+        c.args(["-KILL", "--", &format!("-{pid}")]);
+        c
+    };
+    killer
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null());
+    let _ = killer.status().await;
+}
+
+/// The output a reader has once it ends. A reader still blocked after the grace
+/// period (a process outside the killed tree holds the output) is dropped.
+async fn collect(mut task: tokio::task::JoinHandle<Vec<u8>>) -> Vec<u8> {
+    match tokio::time::timeout(KILL_GRACE, &mut task).await {
+        Ok(Ok(bytes)) => bytes,
+        _ => {
+            task.abort();
+            Vec::new()
         }
     }
+}
+
+fn finished(exit_code: Option<i32>, stdout: &[u8], stderr: &[u8], timed_out: bool) -> CommandEnd {
+    let mut combined = String::from_utf8_lossy(stdout).into_owned();
+    let stderr = String::from_utf8_lossy(stderr);
+    if !stderr.is_empty() {
+        combined.push_str("\n--- stderr ---\n");
+        combined.push_str(&stderr);
+    }
+    CommandEnd::Finished(CommandResult {
+        exit_code,
+        output: tail(&combined, OUTPUT_LIMIT),
+        timed_out,
+    })
 }
 
 pub async fn run_command(
@@ -111,10 +143,11 @@ pub async fn run_command(
         message: e.to_string(),
     })?;
 
+    let pid = spawned.id();
     let stdout = spawned.stdout.take();
     let stderr = spawned.stderr.take();
 
-    let stdout_task = tokio::spawn(async move {
+    let mut stdout_task = tokio::spawn(async move {
         if let Some(reader) = stdout {
             read_capped(reader).await
         } else {
@@ -122,7 +155,7 @@ pub async fn run_command(
         }
     });
 
-    let stderr_task = tokio::spawn(async move {
+    let mut stderr_task = tokio::spawn(async move {
         if let Some(reader) = stderr {
             read_capped(reader).await
         } else {
@@ -130,53 +163,39 @@ pub async fn run_command(
         }
     });
 
-    tokio::select! {
-        _ = cancel.cancelled() => {
-            kill_tree(&spawned);
-            let _ = spawned.wait().await;
-            let _ = stdout_task.await;
-            let _ = stderr_task.await;
-            Ok(CommandEnd::Stopped)
-        }
-        _ = tokio::time::sleep(timeout) => {
-            kill_tree(&spawned);
-            let _ = spawned.wait().await;
-            let stdout_bytes = stdout_task.await.unwrap_or_default();
-            let stderr_bytes = stderr_task.await.unwrap_or_default();
-            let stdout_str = String::from_utf8_lossy(&stdout_bytes);
-            let stderr_str = String::from_utf8_lossy(&stderr_bytes);
-            let mut combined = stdout_str.into_owned();
-            if !stderr_str.is_empty() {
-                combined.push_str("\n--- stderr ---\n");
-                combined.push_str(&stderr_str);
-            }
-            let output = tail(&combined, OUTPUT_LIMIT);
-            Ok(CommandEnd::Finished(CommandResult {
-                exit_code: None,
-                output,
-                timed_out: true,
-            }))
-        }
-        status_res = spawned.wait() => {
-            let status = status_res.map_err(|e| WorkspaceError::Io {
+    // The shell can exit while a process it started still holds the output
+    // open (`start /b`, `&`), so reading to the end is part of the race too.
+    let mut done = Box::pin(async {
+        let status = spawned.wait().await;
+        let out = (&mut stdout_task).await.unwrap_or_default();
+        let err = (&mut stderr_task).await.unwrap_or_default();
+        (status, out, err)
+    });
+
+    let timed_out = tokio::select! {
+        (status, out, err) = &mut done => {
+            let status = status.map_err(|e| WorkspaceError::Io {
                 message: e.to_string(),
             })?;
-            let stdout_bytes = stdout_task.await.unwrap_or_default();
-            let stderr_bytes = stderr_task.await.unwrap_or_default();
-            let stdout_str = String::from_utf8_lossy(&stdout_bytes);
-            let stderr_str = String::from_utf8_lossy(&stderr_bytes);
-            let mut combined = stdout_str.into_owned();
-            if !stderr_str.is_empty() {
-                combined.push_str("\n--- stderr ---\n");
-                combined.push_str(&stderr_str);
-            }
-            let output = tail(&combined, OUTPUT_LIMIT);
-            Ok(CommandEnd::Finished(CommandResult {
-                exit_code: status.code(),
-                output,
-                timed_out: false,
-            }))
+            return Ok(finished(status.code(), &out, &err, false));
         }
+        _ = tokio::time::sleep(timeout) => true,
+        _ = cancel.cancelled() => false,
+    };
+    drop(done);
+
+    // ponytail: on Windows a process whose parent already exited is outside
+    // the tree taskkill sees and keeps running; a job object would catch it.
+    kill_tree(pid).await;
+    let _ = spawned.start_kill();
+    let _ = spawned.wait().await;
+
+    if !timed_out {
+        stdout_task.abort();
+        stderr_task.abort();
+        return Ok(CommandEnd::Stopped);
     }
+    let (out, err) = tokio::join!(collect(stdout_task), collect(stderr_task));
+    Ok(finished(None, &out, &err, true))
 }
 

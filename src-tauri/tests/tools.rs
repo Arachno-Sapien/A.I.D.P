@@ -586,6 +586,49 @@ async fn stop_kills_the_command() {
     assert!(!root.join("marker.txt").exists());
 }
 
+/// The shell exits at once, but the process it started keeps the output open.
+fn background_command() -> &'static str {
+    if cfg!(windows) {
+        "start /b ping -n 8 127.0.0.1 > nul"
+    } else {
+        "sleep 8 &"
+    }
+}
+
+#[tokio::test]
+async fn stop_works_with_a_background_process() {
+    let dir = TempDir::new();
+    let cancel = CancellationToken::new();
+    let cancel_clone = cancel.clone();
+    tokio::spawn(async move {
+        tokio::time::sleep(Duration::from_millis(500)).await;
+        cancel_clone.cancel();
+    });
+
+    let start = Instant::now();
+    let end = run_command(dir.path(), background_command(), Duration::from_secs(60), &cancel)
+        .await
+        .unwrap();
+    assert!(start.elapsed() < Duration::from_secs(3), "took {:?}", start.elapsed());
+    assert_eq!(end, CommandEnd::Stopped);
+}
+
+#[tokio::test]
+async fn timeout_works_with_a_background_process() {
+    let dir = TempDir::new();
+    let cancel = CancellationToken::new();
+
+    let start = Instant::now();
+    let end = run_command(dir.path(), background_command(), Duration::from_secs(1), &cancel)
+        .await
+        .unwrap();
+    assert!(start.elapsed() < Duration::from_secs(5), "took {:?}", start.elapsed());
+    match end {
+        CommandEnd::Finished(res) => assert!(res.timed_out),
+        CommandEnd::Stopped => panic!("Expected timed_out, got stopped"),
+    }
+}
+
 #[tokio::test]
 async fn output_keeps_the_tail() {
     let dir = TempDir::new();
