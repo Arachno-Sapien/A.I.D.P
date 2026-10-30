@@ -3,6 +3,7 @@ pub mod commands;
 pub mod connections;
 pub mod db;
 pub mod gateway;
+pub mod history;
 pub mod secrets;
 pub mod tools;
 pub mod workspace;
@@ -57,6 +58,11 @@ fn specta_builder() -> Builder<tauri::Wry> {
         commands::terminal::terminal_write,
         commands::terminal::terminal_resize,
         commands::terminal::terminal_close,
+        commands::history::list_conversations,
+        commands::history::create_conversation,
+        commands::history::delete_conversation,
+        commands::history::load_messages,
+        commands::history::append_message,
         close_guard::set_unsaved,
         close_guard::watch_close,
         close_guard::quit_app,

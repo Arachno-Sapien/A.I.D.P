@@ -144,6 +144,21 @@ pub fn set_models(
         |row| row.get(0),
     )?;
 
+    let mut prev_num_ctx = std::collections::HashMap::<String, Option<u32>>::new();
+    {
+        let mut prev_stmt =
+            tx.prepare("SELECT model_id, num_ctx FROM models WHERE connection_id = ?1")?;
+        let prev_rows = prev_stmt.query_map(params![connection_id], |row| {
+            let mid: String = row.get(0)?;
+            let nctx: Option<u32> = row.get(1)?;
+            Ok((mid, nctx))
+        })?;
+        for r in prev_rows {
+            let (mid, nctx) = r?;
+            prev_num_ctx.insert(mid, nctx);
+        }
+    }
+
     tx.execute(
         "DELETE FROM models WHERE connection_id = ?1",
         params![connection_id],
@@ -160,11 +175,12 @@ pub fn set_models(
     };
 
     let mut stmt = tx.prepare(
-        "INSERT INTO models (connection_id, model_id, display_name, context_window, is_default, supports_tools) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        "INSERT INTO models (connection_id, model_id, display_name, context_window, is_default, supports_tools, num_ctx) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
     )?;
 
     for model in models {
         let is_default = target_default_model_id.as_deref() == Some(&model.id);
+        let num_ctx = prev_num_ctx.remove(&model.id).flatten();
         stmt.execute(params![
             connection_id,
             model.id,
@@ -172,6 +188,7 @@ pub fn set_models(
             model.context_window,
             if is_default { 1 } else { 0 },
             model.supports_tools.map(|b| if b { 1i64 } else { 0i64 }),
+            num_ctx,
         ])?;
     }
     drop(stmt);

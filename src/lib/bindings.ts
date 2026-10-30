@@ -28,6 +28,11 @@ export const commands = {
 	terminalWrite: (data: string) => typedError<null, WorkspaceError>(__TAURI_INVOKE("terminal_write", { data })),
 	terminalResize: (cols: number, rows: number) => typedError<null, WorkspaceError>(__TAURI_INVOKE("terminal_resize", { cols, rows })),
 	terminalClose: () => typedError<null, WorkspaceError>(__TAURI_INVOKE("terminal_close")),
+	listConversations: (workspacePath: string | null) => typedError<Conversation_Serialize[], AppError_Serialize>(__TAURI_INVOKE("list_conversations", { workspacePath })),
+	createConversation: (firstText: string, workspacePath: string | null) => typedError<Conversation_Serialize, AppError_Serialize>(__TAURI_INVOKE("create_conversation", { firstText, workspacePath })),
+	deleteConversation: (id: number) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("delete_conversation", { id })),
+	loadMessages: (conversationId: number) => typedError<StoredMessage_Serialize[], AppError_Serialize>(__TAURI_INVOKE("load_messages", { conversationId })),
+	appendMessage: (conversationId: number, message: NewMessage_Deserialize) => typedError<number, AppError_Serialize>(__TAURI_INVOKE("append_message", { conversationId, message })),
 	setUnsaved: (unsaved: boolean) => __TAURI_INVOKE<void>("set_unsaved", { unsaved }),
 	watchClose: (onClose: Channel<boolean>) => __TAURI_INVOKE<void>("watch_close", { onClose }),
 	quitApp: () => __TAURI_INVOKE<void>("quit_app"),
@@ -123,6 +128,22 @@ export type ConnectionView_Serialize = {
 	lastTestOk: boolean | null,
 };
 
+export type Conversation = Conversation_Serialize | Conversation_Deserialize;
+
+export type Conversation_Deserialize = {
+	id: number,
+	title: string,
+	workspacePath?: string | null,
+	updatedAt: number,
+};
+
+export type Conversation_Serialize = {
+	id: number,
+	title: string,
+	workspacePath: string | null,
+	updatedAt: number,
+};
+
 export type DirEntry = {
 	name: string,
 	path: string,
@@ -163,6 +184,30 @@ export type NewConnection = {
 	apiKey: string,
 };
 
+export type NewMessage = NewMessage_Serialize | NewMessage_Deserialize;
+
+export type NewMessage_Deserialize = {
+	role: Role,
+	contentParts: string,
+	modelRef?: string | null,
+	modelName?: string | null,
+	status: string,
+	errorKind?: string | null,
+	tokensIn?: number | null,
+	tokensOut?: number | null,
+};
+
+export type NewMessage_Serialize = {
+	role: Role,
+	contentParts: string,
+	modelRef: string | null,
+	modelName: string | null,
+	status: string,
+	errorKind: string | null,
+	tokensIn: number | null,
+	tokensOut: number | null,
+};
+
 export type ProviderError = ProviderError_Serialize | ProviderError_Deserialize;
 
 export type ProviderError_Deserialize = { kind: "invalidKey" } | { kind: "rateLimited"; retryAfterSecs?: number | null } | { kind: "modelNotFound" } | { kind: "contextTooLong" } | { kind: "offline" } | { kind: "provider"; message: string } | { kind: "cancelled" };
@@ -170,6 +215,34 @@ export type ProviderError_Deserialize = { kind: "invalidKey" } | { kind: "rateLi
 export type ProviderError_Serialize = { kind: "invalidKey" } | { kind: "rateLimited"; retryAfterSecs: number | null } | { kind: "modelNotFound" } | { kind: "contextTooLong" } | { kind: "offline" } | { kind: "provider"; message: string } | { kind: "cancelled" };
 
 export type Role = "system" | "user" | "assistant";
+
+export type StoredMessage = StoredMessage_Serialize | StoredMessage_Deserialize;
+
+export type StoredMessage_Deserialize = {
+	id: number,
+	role: Role,
+	contentParts: string,
+	modelRef?: string | null,
+	modelName?: string | null,
+	status: string,
+	errorKind?: string | null,
+	tokensIn?: number | null,
+	tokensOut?: number | null,
+	createdAt: number,
+};
+
+export type StoredMessage_Serialize = {
+	id: number,
+	role: Role,
+	contentParts: string,
+	modelRef: string | null,
+	modelName: string | null,
+	status: string,
+	errorKind: string | null,
+	tokensIn: number | null,
+	tokensOut: number | null,
+	createdAt: number,
+};
 
 export type TerminalEvent = { event: "output"; data: string } | { event: "exit" };
 

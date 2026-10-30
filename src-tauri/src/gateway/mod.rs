@@ -76,6 +76,25 @@ pub enum Role {
     Assistant,
 }
 
+impl Role {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::System => "system",
+            Self::User => "user",
+            Self::Assistant => "assistant",
+        }
+    }
+
+    pub fn from_db(s: &str) -> Option<Self> {
+        match s {
+            "system" => Some(Self::System),
+            "user" => Some(Self::User),
+            "assistant" => Some(Self::Assistant),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Type, Clone, Debug, PartialEq)]
 pub struct ChatMessage {
     pub role: Role,

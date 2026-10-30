@@ -1,4 +1,5 @@
 pub mod connections;
+pub mod conversations;
 pub mod settings;
 
 use rusqlite::Connection;
@@ -30,6 +31,30 @@ CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 "#,
     r#"
 ALTER TABLE models ADD COLUMN supports_tools INTEGER;
+"#,
+    r#"
+CREATE TABLE conversations (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT NOT NULL,
+  workspace_path TEXT,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE TABLE messages (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  conversation_id INTEGER NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+  role TEXT NOT NULL,
+  content_parts TEXT NOT NULL,
+  model_ref TEXT,
+  model_name TEXT,
+  status TEXT NOT NULL,
+  error_kind TEXT,
+  tokens_in INTEGER,
+  tokens_out INTEGER,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX messages_by_conversation ON messages (conversation_id, id);
+ALTER TABLE models ADD COLUMN num_ctx INTEGER;
 "#,
 ];
 
@@ -73,13 +98,13 @@ mod tests {
         let version: i32 = conn
             .query_row("PRAGMA user_version;", [], |row| row.get(0))
             .unwrap();
-        assert_eq!(version, 3);
+        assert_eq!(version, 4);
 
         migrate(&mut conn).unwrap();
         let version_after: i32 = conn
             .query_row("PRAGMA user_version;", [], |row| row.get(0))
             .unwrap();
-        assert_eq!(version_after, 3);
+        assert_eq!(version_after, 4);
     }
 
     #[test]
@@ -123,6 +148,71 @@ mod tests {
         assert_eq!(r1.supports_tools, Some(true));
         assert_eq!(r2.supports_tools, Some(false));
         assert_eq!(r3.supports_tools, None);
+    }
+
+    #[test]
+    fn set_models_preserves_num_ctx() {
+        let mut conn = open_in_memory().unwrap();
+        let id = insert_connection(
+            &conn,
+            ConnectionKind::OpenaiCompat,
+            "OpenRouter",
+            "https://openrouter.ai/api/v1",
+            "1234",
+            100,
+        )
+        .unwrap();
+
+        let m1 = ModelInfo {
+            id: "m1".to_string(),
+            display_name: "M1".to_string(),
+            context_window: Some(32768),
+            supports_tools: Some(true),
+        };
+        let m2 = ModelInfo {
+            id: "m2".to_string(),
+            display_name: "M2".to_string(),
+            context_window: Some(8192),
+            supports_tools: Some(true),
+        };
+
+        set_models(&mut conn, id, &[m1.clone(), m2.clone()]).unwrap();
+
+        // Directly set num_ctx for m1 in models table
+        conn.execute(
+            "UPDATE models SET num_ctx = 4096 WHERE connection_id = ?1 AND model_id = 'm1'",
+            rusqlite::params![id],
+        )
+        .unwrap();
+
+        // Call set_models again with updated display names
+        let m1_updated = ModelInfo {
+            id: "m1".to_string(),
+            display_name: "M1 (Renamed)".to_string(),
+            context_window: Some(32768),
+            supports_tools: Some(true),
+        };
+        set_models(&mut conn, id, &[m1_updated, m2]).unwrap();
+
+        // Verify num_ctx is preserved for m1
+        let num_ctx_m1: Option<u32> = conn
+            .query_row(
+                "SELECT num_ctx FROM models WHERE connection_id = ?1 AND model_id = 'm1'",
+                rusqlite::params![id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(num_ctx_m1, Some(4096));
+
+        // Verify m2 has no num_ctx
+        let num_ctx_m2: Option<u32> = conn
+            .query_row(
+                "SELECT num_ctx FROM models WHERE connection_id = ?1 AND model_id = 'm2'",
+                rusqlite::params![id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(num_ctx_m2, None);
     }
 
     #[test]

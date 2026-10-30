@@ -107,7 +107,7 @@ impl From<ProviderError> for AppError {
     }
 }
 
-fn now_secs() -> u32 {
+pub(crate) fn now_secs() -> u32 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_secs() as u32)
@@ -115,7 +115,7 @@ fn now_secs() -> u32 {
 }
 
 pub struct Services {
-    db: Mutex<Connection>,
+    pub(crate) db: Mutex<Connection>,
     secrets: Arc<dyn SecretStore>,
     http: reqwest::Client,
 }

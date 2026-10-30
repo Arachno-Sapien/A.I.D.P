@@ -38,8 +38,9 @@ Carry-overs: `docs/phases/M3.md` and `docs/phases/M4.md`, "What's left → To M5
 
 ## In progress
 
-Nothing claimed. The M5 plan is approved (defaults for D1 to D5) and not started.
-Next step: M5 Task 1, migration 4 (`conversations`, `messages`, `models.num_ctx`) in `src-tauri/src/db/mod.rs` with `db/conversations.rs`, `history.rs` and `commands/history.rs`.
+Claimed by Antigravity (Gemini 2.5 Pro), 2026-10-30.
+Task: M5 Task 2 - Ollama API client (src-tauri/src/ollama/{mod.rs, process.rs}, gateway JSON-lines reader).
+Next step: Step 1 - write failing tests in `tests/ollama.rs` and `gateway/sse.rs`.
 
 ## Next 3 tasks
 
