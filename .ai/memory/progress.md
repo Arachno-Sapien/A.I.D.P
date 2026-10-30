@@ -20,7 +20,7 @@ Carry-overs from M3 are in `docs/phases/M3.md` under "What's left": M4 reuses `w
 
 | | |
 | --- | --- |
-| Repo | https://github.com/Arachno-Sapien/A.I.D.P (public), branch `main`. M2 pushed 2026-10-30, CI green (run 40949860167); M3 committed locally, waiting for the human's OK to push |
+| Repo | https://github.com/Arachno-Sapien/A.I.D.P (public), branch `main`. M3 pushed 2026-10-30, CI green on the Windows runner (run 40977017456) |
 | Node / npm | v22.22.2 / 12.0.1 |
 | git / gh | 2.51.2 / 2.98.0 (gh logged in as Arachno-Sapien) |
 | Rust | rustc 1.99.1, cargo 1.99.1, stable-msvc |
@@ -44,6 +44,6 @@ Next step: write the M4 plan (`docs/superpowers/plans/`), then the human's OK.
 
 ## Next 3 tasks
 
-1. Push M3 with the human's OK and confirm CI is green.
-2. Write the M4 plan: tool calling in both adapters, the six tools on top of `resolve` and `is_secret`, approvals, terminal.
+1. Write the M4 plan: tool calling in both adapters, the six tools on top of `resolve` and `is_secret`, approvals, terminal.
+2. In that plan, a decision for the human: widen the secret-file list (AGENTS.md security rule 6). A push security review on 2026-10-30 flagged it as incomplete: `id_ecdsa`/`id_dsa`, `.npmrc`, `.pypirc`, `.netrc`, `.git-credentials`, `*.p12`, `*.pfx`, `*.jks`, `*.keystore`, `*.tfvars`, plus a content check for `-----BEGIN ... PRIVATE KEY-----`. It matters most once the model reads files on its own.
 3. Human review and approval of the M4 plan.
