@@ -11,6 +11,8 @@ pub struct Conversation {
     pub title: String,
     pub workspace_path: Option<String>,
     pub updated_at: u32,
+    pub pinned: bool,
+    pub archived: bool,
 }
 
 #[derive(Serialize, Deserialize, Type, Clone, Debug, PartialEq)]
@@ -72,6 +74,8 @@ impl Services {
             title,
             workspace_path,
             updated_at: now,
+            pinned: false,
+            archived: false,
         })
     }
 
@@ -90,8 +94,32 @@ impl Services {
                 title: r.title,
                 workspace_path: r.workspace_path,
                 updated_at: r.updated_at,
+                pinned: r.pinned,
+                archived: r.archived,
             })
             .collect())
+    }
+
+    pub fn set_conversation_pinned(&self, id: u32, pinned: bool) -> Result<(), AppError> {
+        let conn = self.db.lock().map_err(|_| AppError::Storage {
+            message: "database lock poisoned".to_string(),
+        })?;
+        let updated = db::conversations::set_pinned(&conn, id, pinned)?;
+        if !updated {
+            return Err(AppError::NotFound);
+        }
+        Ok(())
+    }
+
+    pub fn set_conversation_archived(&self, id: u32, archived: bool) -> Result<(), AppError> {
+        let conn = self.db.lock().map_err(|_| AppError::Storage {
+            message: "database lock poisoned".to_string(),
+        })?;
+        let updated = db::conversations::set_archived(&conn, id, archived)?;
+        if !updated {
+            return Err(AppError::NotFound);
+        }
+        Ok(())
     }
 
     pub fn delete_conversation(&self, id: u32) -> Result<(), AppError> {

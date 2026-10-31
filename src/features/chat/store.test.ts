@@ -9,11 +9,13 @@ vi.mock("../../lib/bindings", () => ({
     listConversations: vi.fn().mockResolvedValue({ status: "ok", data: [] }),
     createConversation: vi.fn().mockResolvedValue({
       status: "ok",
-      data: { id: 1, title: "test", workspacePath: null, updatedAt: 100 },
+      data: { id: 1, title: "test", workspacePath: null, updatedAt: 100, pinned: false, archived: false },
     }),
     deleteConversation: vi.fn().mockResolvedValue({ status: "ok", data: null }),
     loadMessages: vi.fn().mockResolvedValue({ status: "ok", data: [] }),
     appendMessage: vi.fn().mockResolvedValue({ status: "ok", data: 1 }),
+    setConversationPinned: vi.fn().mockResolvedValue({ status: "ok", data: null }),
+    setConversationArchived: vi.fn().mockResolvedValue({ status: "ok", data: null }),
   },
 }));
 
@@ -371,7 +373,7 @@ describe("useChatStore", () => {
   it("saves the user message then the reply", async () => {
     vi.mocked(commands.createConversation).mockResolvedValueOnce({
       status: "ok",
-      data: { id: 123, title: "hello", workspacePath: null, updatedAt: 1000 },
+      data: { id: 123, title: "hello", workspacePath: null, updatedAt: 1000, pinned: false, archived: false },
     });
     vi.mocked(commands.appendMessage).mockResolvedValue({
       status: "ok",
@@ -487,7 +489,7 @@ describe("useChatStore", () => {
       conversationId: 7,
       place: "/folder-a",
       conversations: [
-        { id: 7, title: "Chat 7", workspacePath: "/folder-a", updatedAt: 100 },
+        { id: 7, title: "Chat 7", workspacePath: "/folder-a", updatedAt: 100, pinned: false, archived: false },
       ],
     });
     vi.mocked(commands.appendMessage).mockResolvedValue({
@@ -534,8 +536,8 @@ describe("useChatStore", () => {
     vi.mocked(commands.listConversations).mockResolvedValueOnce({
       status: "ok",
       data: [
-        { id: 10, title: "Chat Ten", workspacePath: null, updatedAt: 200 },
-        { id: 9, title: "Chat Nine", workspacePath: null, updatedAt: 100 },
+        { id: 10, title: "Chat Ten", workspacePath: null, updatedAt: 200, pinned: false, archived: false },
+        { id: 9, title: "Chat Nine", workspacePath: null, updatedAt: 100, pinned: false, archived: false },
       ],
     });
     vi.mocked(commands.loadMessages).mockResolvedValueOnce({
@@ -562,5 +564,99 @@ describe("useChatStore", () => {
     expect(commands.loadMessages).toHaveBeenCalledWith(10);
     expect(useChatStore.getState().conversationId).toBe(10);
     expect(useChatStore.getState().messages[0].modelName).toBe("Model One");
+  });
+
+  it("openPlace opens the newest unarchived chat", async () => {
+    vi.mocked(commands.listConversations).mockResolvedValueOnce({
+      status: "ok",
+      data: [
+        { id: 3, title: "Chat Three", workspacePath: null, updatedAt: 300, pinned: false, archived: true },
+        { id: 2, title: "Chat Two", workspacePath: null, updatedAt: 200, pinned: false, archived: false },
+        { id: 1, title: "Chat One", workspacePath: null, updatedAt: 100, pinned: false, archived: false },
+      ],
+    });
+
+    await useChatStore.getState().openPlace(null);
+
+    expect(commands.loadMessages).toHaveBeenCalledWith(2);
+    expect(useChatStore.getState().conversationId).toBe(2);
+  });
+
+  it("archiving the open chat opens the next one", async () => {
+    useChatStore.setState({
+      conversationId: 2,
+      conversations: [
+        { id: 2, title: "Chat Two", workspacePath: null, updatedAt: 200, pinned: false, archived: false },
+        { id: 1, title: "Chat One", workspacePath: null, updatedAt: 100, pinned: false, archived: false },
+      ],
+    });
+
+    await (useChatStore.getState() as any).setArchived?.(2, true);
+
+    expect(commands.setConversationArchived).toHaveBeenCalledWith(2, true);
+    expect(useChatStore.getState().conversationId).toBe(1);
+
+    // Archiving the last remaining opens startNew
+    await (useChatStore.getState() as any).setArchived?.(1, true);
+    expect(useChatStore.getState().conversationId).toBeNull();
+  });
+
+  it("pinning keeps the open chat", async () => {
+    useChatStore.setState({
+      conversationId: 1,
+      conversations: [
+        { id: 1, title: "Chat One", workspacePath: null, updatedAt: 100, pinned: false, archived: false },
+      ],
+    });
+
+    await (useChatStore.getState() as any).setPinned?.(1, true);
+
+    expect(commands.setConversationPinned).toHaveBeenCalledWith(1, true);
+    expect(useChatStore.getState().conversationId).toBe(1);
+    expect(useChatStore.getState().conversations[0].pinned).toBe(true);
+  });
+
+  it("sending in an archived chat un-archives it in the list", async () => {
+    useChatStore.setState({
+      conversationId: 1,
+      conversations: [
+        { id: 1, title: "Archived Chat", workspacePath: null, updatedAt: 100, pinned: false, archived: true },
+      ],
+    });
+    useModelsStore.setState({
+      chatModels: [
+        {
+          connectionId: 1,
+          connectionLabel: "OpenRouter",
+          modelId: "m1",
+          displayName: "Model 1",
+          isDefault: true,
+          supportsTools: null,
+          isLocal: false,
+          contextTokens: null,
+        },
+      ],
+    });
+
+    await useChatStore.getState().send("hello again", { connectionId: 1, modelId: "m1" });
+
+    expect(useChatStore.getState().conversations[0].archived).toBe(false);
+  });
+
+  it("remove skips archived chats when choosing the next one", async () => {
+    useChatStore.setState({
+      conversationId: 3,
+      conversations: [
+        { id: 3, title: "Chat Three", workspacePath: null, updatedAt: 300, pinned: false, archived: false },
+        { id: 2, title: "Chat Two", workspacePath: null, updatedAt: 200, pinned: false, archived: true },
+        { id: 1, title: "Chat One", workspacePath: null, updatedAt: 100, pinned: false, archived: false },
+      ],
+      place: null,
+    });
+
+    await useChatStore.getState().remove(3);
+
+    expect(commands.deleteConversation).toHaveBeenCalledWith(3);
+    expect(useChatStore.getState().conversationId).toBe(1);
   });
 });

@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Lucide icons for top navigation (Chat, Workspace, Models, Settings), workspace toolbar actions (Files, AI, Terminal, Refresh, Close folder), and the conversation list.
 - Hideable and resizable chat list: toggle via the top bar button or `Ctrl+B`, and resize by dragging the splitter between the list and chat column.
+- Pin and archive chats (SQLite migration 5): pin active chats to the top of the sidebar, archive older chats into a collapsible group, and automatically unarchive when a new message is sent.
 
 ### Fixed
 - Streaming a reply no longer renders every earlier message again on each chunk. In a 20-message chat each chunk took about a tenth of the time and made about a fifth of the short-lived memory, which had pushed the app over its 200 MB workspace budget after a long local-model reply.

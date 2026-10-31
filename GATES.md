@@ -14,15 +14,15 @@ Scope: Add lucide-react icons to top nav, workspace bar, and chat list; make cha
   EXPECT: 2 passed
   EVIDENCE: automatic-evidence=v1; definition-sha256=d84b6dbaaa657fd722845a62bbc69fc83645cc7edc7d56b791422945c97d6534; exit=0; EXPECT=matched; output-sha256=ee766580e30a90443c2ffb51864c8489fb228eb0a3b917ed14518ce4d71b230d; output-bytes=707; shell=C:\WINDOWS\system32\cmd.exe; cwd=C:\Users\SYED\Documents\Junaid\A.I.D.P; path=116b443f33f6/54 entries
 
-- [ ] G3: migration 5 applies and Rust db/history pin and archive operations pass
+- [x] G3: migration 5 applies and Rust db/history pin and archive operations pass
   CHECK: cargo test --manifest-path src-tauri/Cargo.toml pin_and_archive_round_trip
   EXPECT: test pin_and_archive_round_trip ... ok
-  EVIDENCE: pending
+  EVIDENCE: automatic-evidence=v1; definition-sha256=91dae737be0e5c03b683a45ac407ed017a8022ad30641cbc145bb9a39e45b7e3; exit=0; EXPECT=matched; output-sha256=bf2eec133871fae0ae5e954e430a3292861d5d22cc23de28d20476efa90401e9; output-bytes=2782; shell=C:\WINDOWS\system32\cmd.exe; cwd=C:\Users\SYED\Documents\Junaid\A.I.D.P; path=116b443f33f6/54 entries
 
-- [ ] G4: frontend chat store and conversation list support pin, archive, and filter groups
+- [x] G4: frontend chat store and conversation list support pin, archive, and filter groups
   CHECK: npx vitest run -t "pinned chats sit above recent ones|Archive moves a chat into Archived" src/features/chat/store.test.ts src/features/chat/ConversationList.test.tsx
   EXPECT: 2 passed
-  EVIDENCE: pending
+  EVIDENCE: automatic-evidence=v1; definition-sha256=8791df14535d4b179e6746f3f596e521a3a94221b3ac4ac953cc24a326300b3b; exit=0; EXPECT=matched; output-sha256=9a56c02199c4b42563a0b0f2cac9852e347ab1470947384f749141c377d773c0; output-bytes=919; shell=C:\WINDOWS\system32\cmd.exe; cwd=C:\Users\SYED\Documents\Junaid\A.I.D.P; path=116b443f33f6/54 entries
 
 - [ ] G5: web-design-guidelines skill is installed and mirrored identically across agent directories
   CHECK: node -e "const fs = require('fs'); const a = fs.readFileSync('.claude/skills/web-design-guidelines/SKILL.md'); const b = fs.readFileSync('.agents/skills/web-design-guidelines/SKILL.md'); if (Buffer.compare(a, b) === 0) console.log('SKILLS_IDENTICAL');"

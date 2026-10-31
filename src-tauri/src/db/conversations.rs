@@ -7,6 +7,8 @@ pub struct ConversationRow {
     pub workspace_path: Option<String>,
     pub created_at: u32,
     pub updated_at: u32,
+    pub pinned: bool,
+    pub archived: bool,
 }
 
 pub struct MessageRow {
@@ -44,7 +46,7 @@ pub fn list_conversations(
     let mut rows = Vec::new();
     if let Some(path) = workspace_path {
         let mut stmt = conn.prepare(
-            "SELECT id, title, workspace_path, created_at, updated_at
+            "SELECT id, title, workspace_path, created_at, updated_at, pinned, archived
              FROM conversations
              WHERE workspace_path = ?1
              ORDER BY updated_at DESC, id DESC",
@@ -55,7 +57,7 @@ pub fn list_conversations(
         }
     } else {
         let mut stmt = conn.prepare(
-            "SELECT id, title, workspace_path, created_at, updated_at
+            "SELECT id, title, workspace_path, created_at, updated_at, pinned, archived
              FROM conversations
              WHERE workspace_path IS NULL
              ORDER BY updated_at DESC, id DESC",
@@ -79,12 +81,18 @@ fn map_conversation_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Conversatio
     let updated_at_i64: i64 = row.get(4)?;
     let updated_at = u32::try_from(updated_at_i64)
         .map_err(|_| rusqlite::Error::IntegralValueOutOfRange(4, updated_at_i64))?;
+    let pinned_i64: i64 = row.get(5)?;
+    let pinned = pinned_i64 != 0;
+    let archived_i64: i64 = row.get(6)?;
+    let archived = archived_i64 != 0;
     Ok(ConversationRow {
         id,
         title,
         workspace_path,
         created_at,
         updated_at,
+        pinned,
+        archived,
     })
 }
 
@@ -93,6 +101,29 @@ pub fn delete_conversation(conn: &Connection, id: u32) -> rusqlite::Result<bool>
         "DELETE FROM conversations WHERE id = ?1",
         params![id],
     )?;
+    Ok(affected > 0)
+}
+
+pub fn set_pinned(conn: &Connection, id: u32, pinned: bool) -> rusqlite::Result<bool> {
+    let affected = conn.execute(
+        "UPDATE conversations SET pinned = ?1 WHERE id = ?2",
+        params![if pinned { 1 } else { 0 }, id],
+    )?;
+    Ok(affected > 0)
+}
+
+pub fn set_archived(conn: &Connection, id: u32, archived: bool) -> rusqlite::Result<bool> {
+    let affected = if archived {
+        conn.execute(
+            "UPDATE conversations SET archived = 1, pinned = 0 WHERE id = ?1",
+            params![id],
+        )?
+    } else {
+        conn.execute(
+            "UPDATE conversations SET archived = 0 WHERE id = ?1",
+            params![id],
+        )?
+    };
     Ok(affected > 0)
 }
 
@@ -123,7 +154,7 @@ pub fn insert_message(
         u32::try_from(row_id).map_err(|_| rusqlite::Error::IntegralValueOutOfRange(0, row_id))?;
 
     conn.execute(
-        "UPDATE conversations SET updated_at = CASE WHEN updated_at >= ?1 THEN updated_at + 1 ELSE ?1 END WHERE id = ?2",
+        "UPDATE conversations SET updated_at = CASE WHEN updated_at >= ?1 THEN updated_at + 1 ELSE ?1 END, archived = 0 WHERE id = ?2",
         params![now, conversation_id],
     )?;
 

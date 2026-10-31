@@ -76,6 +76,8 @@ export interface ChatStore {
   load(id: number): Promise<void>;
   startNew(): void;
   remove(id: number): Promise<void>;
+  setPinned(id: number, pinned: boolean): Promise<void>;
+  setArchived(id: number, archived: boolean): Promise<void>;
 
   send(
     text: string,
@@ -109,8 +111,9 @@ export const createChatStore = (surface: ChatSurface, hooks?: ChatHooks) => {
       if (res.status === "ok") {
         const conversations = res.data;
         set({ conversations });
-        if (conversations.length > 0) {
-          await get().load(conversations[0].id);
+        const unarchived = conversations.filter((c) => !c.archived);
+        if (unarchived.length > 0) {
+          await get().load(unarchived[0].id);
         } else {
           get().startNew();
         }
@@ -138,13 +141,39 @@ export const createChatStore = (surface: ChatSurface, hooks?: ChatHooks) => {
       });
     },
 
+    setPinned: async (id: number, pinned: boolean) => {
+      await commands.setConversationPinned(id, pinned);
+      set((state) => ({
+        conversations: state.conversations.map((c) =>
+          c.id === id ? { ...c, pinned } : c,
+        ),
+      }));
+    },
+
+    setArchived: async (id: number, archived: boolean) => {
+      await commands.setConversationArchived(id, archived);
+      const updated = get().conversations.map((c) =>
+        c.id === id ? { ...c, archived, pinned: archived ? false : c.pinned } : c,
+      );
+      set({ conversations: updated });
+      if (archived && get().conversationId === id) {
+        const nextUnarchived = updated.filter((c) => !c.archived);
+        if (nextUnarchived.length > 0) {
+          await get().load(nextUnarchived[0].id);
+        } else {
+          get().startNew();
+        }
+      }
+    },
+
     remove: async (id: number) => {
       await commands.deleteConversation(id);
       const remaining = get().conversations.filter((c) => c.id !== id);
       set({ conversations: remaining });
       if (get().conversationId === id) {
-        if (remaining.length > 0 && get().place === null) {
-          await get().load(remaining[0].id);
+        const nextUnarchived = remaining.filter((c) => !c.archived);
+        if (nextUnarchived.length > 0 && get().place === null) {
+          await get().load(nextUnarchived[0].id);
         } else {
           get().startNew();
         }
@@ -248,6 +277,9 @@ export const createChatStore = (surface: ChatSurface, hooks?: ChatHooks) => {
       });
 
       set((state) => ({
+        conversations: state.conversations.map((c) =>
+          c.id === activeConvId ? { ...c, archived: false } : c,
+        ),
         messages: [...state.messages, userMessage, assistantPlaceholder],
         streaming: true,
       }));

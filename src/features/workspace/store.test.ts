@@ -680,6 +680,8 @@ describe("useWorkspaceStore", () => {
           title: "Project chat",
           workspacePath: "/path/to/my-project",
           updatedAt: 500,
+          pinned: false,
+          archived: false,
         },
       ],
     });

@@ -29,6 +29,26 @@ pub fn delete_conversation(services: State<'_, Services>, id: u32) -> Result<(),
 
 #[tauri::command]
 #[specta::specta]
+pub fn set_conversation_pinned(
+    services: State<'_, Services>,
+    id: u32,
+    pinned: bool,
+) -> Result<(), AppError> {
+    services.set_conversation_pinned(id, pinned)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn set_conversation_archived(
+    services: State<'_, Services>,
+    id: u32,
+    archived: bool,
+) -> Result<(), AppError> {
+    services.set_conversation_archived(id, archived)
+}
+
+#[tauri::command]
+#[specta::specta]
 pub fn load_messages(
     services: State<'_, Services>,
     conversation_id: u32,

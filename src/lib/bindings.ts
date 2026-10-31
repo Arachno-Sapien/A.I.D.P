@@ -31,6 +31,8 @@ export const commands = {
 	listConversations: (workspacePath: string | null) => typedError<Conversation_Serialize[], AppError_Serialize>(__TAURI_INVOKE("list_conversations", { workspacePath })),
 	createConversation: (firstText: string, workspacePath: string | null) => typedError<Conversation_Serialize, AppError_Serialize>(__TAURI_INVOKE("create_conversation", { firstText, workspacePath })),
 	deleteConversation: (id: number) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("delete_conversation", { id })),
+	setConversationPinned: (id: number, pinned: boolean) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("set_conversation_pinned", { id, pinned })),
+	setConversationArchived: (id: number, archived: boolean) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("set_conversation_archived", { id, archived })),
 	loadMessages: (conversationId: number) => typedError<StoredMessage_Serialize[], AppError_Serialize>(__TAURI_INVOKE("load_messages", { conversationId })),
 	appendMessage: (conversationId: number, message: NewMessage_Deserialize) => typedError<number, AppError_Serialize>(__TAURI_INVOKE("append_message", { conversationId, message })),
 	ollamaStatus: () => typedError<OllamaStatus, AppError_Serialize>(__TAURI_INVOKE("ollama_status")),
@@ -165,6 +167,8 @@ export type Conversation_Deserialize = {
 	title: string,
 	workspacePath?: string | null,
 	updatedAt: number,
+	pinned: boolean,
+	archived: boolean,
 };
 
 export type Conversation_Serialize = {
@@ -172,6 +176,8 @@ export type Conversation_Serialize = {
 	title: string,
 	workspacePath: string | null,
 	updatedAt: number,
+	pinned: boolean,
+	archived: boolean,
 };
 
 export type DirEntry = {

@@ -383,7 +383,7 @@ describe("AiPanel", () => {
       conversationId: 55,
       place: "/workspace",
       conversations: [
-        { id: 55, title: "Chat", workspacePath: "/workspace", updatedAt: 100 },
+        { id: 55, title: "Chat", workspacePath: "/workspace", updatedAt: 100, pinned: false, archived: false },
       ],
       messages: [
         { id: "u1", role: "user", text: "hi", status: "complete" },

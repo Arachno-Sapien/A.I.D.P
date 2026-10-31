@@ -75,7 +75,7 @@ A.I.D.P supports both cloud providers (OpenAI, Anthropic, OpenRouter, Groq, Deep
 
 ### Chat Screen
 - **Model picker:** Select any cloud or local model from the top dropdown. Local models are grouped under `Local · Ollama`. If Ollama is stopped, local models appear greyed out with `(Ollama stopped)`.
-- **Sidebar history:** Click **"+ New chat"** to start a fresh thread. Use the filter box to search chats by title. Delete chats with the inline confirmation trash icon. Toggle the chat list using the sidebar icon or `Ctrl+B`, and resize it by dragging the border.
+- **Sidebar history:** Click **"+ New chat"** to start a fresh thread. Use the filter box to search chats by title. Delete chats with the inline confirmation trash icon. Toggle the chat list using the sidebar icon or `Ctrl+B`, and resize it by dragging the border. Pin important chats to keep them at the top, or archive finished ones into a collapsible Archived section.
 - **Model tag:** Assistant replies display the specific model name used above the reply block.
 - **Markdown & Code:** Replies render formatted tables, lists, blockquotes, and syntax-highlighted code blocks with one-click **Copy**.
 

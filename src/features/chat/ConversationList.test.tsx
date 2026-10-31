@@ -26,8 +26,8 @@ describe("ConversationList", () => {
     useChatStore.setState({
       conversationId: 1,
       conversations: [
-        { id: 1, title: "Rust questions", updatedAt: 100 },
-        { id: 2, title: "React notes", updatedAt: 90 },
+        { id: 1, title: "Rust questions", updatedAt: 100, pinned: false, archived: false },
+        { id: 2, title: "React notes", updatedAt: 90, pinned: false, archived: false },
       ],
       messages: [],
       streaming: false,
@@ -77,6 +77,97 @@ describe("ConversationList", () => {
 
     expect(commands.deleteConversation).toHaveBeenCalledWith(2);
   });
+
+  it("pinned chats sit above recent ones", () => {
+    useChatStore.setState({
+      conversationId: 2,
+      conversations: [
+        { id: 1, title: "Pinned Chat", updatedAt: 100, pinned: true, archived: false },
+        { id: 2, title: "Recent Chat", updatedAt: 200, pinned: false, archived: false },
+      ],
+    });
+    render(<ConversationList />);
+
+    const headings = screen.getAllByRole("heading").map((h) => h.textContent);
+    expect(headings).toEqual(["Pinned", "Recent"]);
+
+    const pinnedEl = screen.getByText("Pinned Chat");
+    const recentEl = screen.getByText("Recent Chat");
+    expect(pinnedEl.compareDocumentPosition(recentEl) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("Archive moves a chat into Archived", async () => {
+    const setArchived = vi.fn();
+    useChatStore.setState({
+      conversationId: 1,
+      conversations: [
+        { id: 1, title: "My Chat", updatedAt: 100, pinned: false, archived: false },
+      ],
+      setArchived,
+    });
+    const { rerender } = render(<ConversationList />);
+
+    const archiveBtn = screen.getByLabelText("Archive My Chat");
+    fireEvent.click(archiveBtn);
+    expect(setArchived).toHaveBeenCalledWith(1, true);
+
+    useChatStore.setState({
+      conversations: [
+        { id: 1, title: "My Chat", updatedAt: 100, pinned: false, archived: true },
+      ],
+    });
+    rerender(<ConversationList />);
+
+    expect(screen.queryByText("My Chat")).toBeNull();
+    const toggleArchived = screen.getByRole("button", { name: /archived \(1\)/i });
+    expect(toggleArchived).toBeDefined();
+
+    fireEvent.click(toggleArchived);
+    expect(screen.getByText("My Chat")).toBeDefined();
+    expect(screen.getByLabelText("Unarchive My Chat")).toBeDefined();
+    expect(screen.getByLabelText("Delete My Chat")).toBeDefined();
+  });
+
+  it("the filter applies to pinned, recent and archived chats", () => {
+    useChatStore.setState({
+      conversationId: 1,
+      conversations: [
+        { id: 1, title: "Pin Apple", updatedAt: 100, pinned: true, archived: false },
+        { id: 2, title: "Recent Banana", updatedAt: 90, pinned: false, archived: false },
+        { id: 3, title: "Archived Apricot", updatedAt: 80, pinned: false, archived: true },
+      ],
+    });
+    render(<ConversationList />);
+
+    const filterInput = screen.getByPlaceholderText(/filter/i);
+    fireEvent.change(filterInput, { target: { value: "ap" } });
+
+    expect(screen.getByText("Pin Apple")).toBeDefined();
+    expect(screen.queryByText("Recent Banana")).toBeNull();
+    const archivedBtn = screen.getByRole("button", { name: /archived \(1\)/i });
+    fireEvent.click(archivedBtn);
+    expect(screen.getByText("Archived Apricot")).toBeDefined();
+  });
+
+  it("while a reply streams, archive and delete are disabled and pin is not", () => {
+    useChatStore.setState({
+      conversationId: 1,
+      conversations: [
+        { id: 1, title: "Chat One", updatedAt: 100, pinned: false, archived: false },
+      ],
+      streaming: true,
+    });
+    render(<ConversationList />);
+
+    const pinBtn = screen.getByLabelText("Pin Chat One") as HTMLButtonElement;
+    expect(pinBtn.disabled).toBe(false);
+
+    const archiveBtn = screen.getByLabelText("Archive Chat One") as HTMLButtonElement;
+    expect(archiveBtn.disabled).toBe(true);
+
+    const deleteBtn = screen.getByLabelText("Delete Chat One") as HTMLButtonElement;
+    expect(deleteBtn.disabled).toBe(true);
+  });
 });
 
 describe("ConversationList while a reply streams", () => {
@@ -87,8 +178,8 @@ describe("ConversationList while a reply streams", () => {
     useChatStore.setState({
       conversationId: 1,
       conversations: [
-        { id: 1, title: "Rust questions", updatedAt: 100 },
-        { id: 2, title: "React notes", updatedAt: 90 },
+        { id: 1, title: "Rust questions", updatedAt: 100, pinned: false, archived: false },
+        { id: 2, title: "React notes", updatedAt: 90, pinned: false, archived: false },
       ],
       messages: [],
       streaming: true,

@@ -196,7 +196,7 @@ Five SQLite tables in one local file, read and written only by Rust. No table ev
 | --- | --- | --- |
 | connections | One row per provider setup | id, kind (openai\_compat / anthropic / ollama), label, base\_url, key\_hint (last 4), last\_tested\_at, last\_test\_ok |
 | models | Models the user chose to show | id, connection\_id, model\_id, display\_name, context\_window, supports\_tools, num\_ctx, is\_default, hidden |
-| conversations | One row per chat | id, title, workspace\_path (null for plain chats), created\_at, updated\_at |
+| conversations | One row per chat | id, title, workspace\_path (null for plain chats), created\_at, updated\_at, pinned, archived |
 | messages | Every message in a chat | id, conversation\_id, role, content\_parts (JSON: text, chips, target, tool\_call and tool\_result), model\_name, model\_ref, status (complete / stopped / error), error\_kind, tokens\_in, tokens\_out, created\_at |
 | settings | App preferences | key, value (theme, default model, keep\_alive, recent workspaces) |
 
@@ -218,7 +218,7 @@ Four screens: Chat, Workspace, Models, and Settings. A first-time user lands on 
 
 **Chat**
 
-- Left sidebar: conversation list with search and new chat. Can be hidden (`PanelLeft` button in the model row, `Ctrl+B`) and resized by dragging the splitter between the list and the chat column.
+- Left sidebar: conversation list with search and new chat, grouped into Pinned, Recent, and collapsible Archived sections. Can be hidden (`PanelLeft` button in the model row, `Ctrl+B`) and resized by dragging the splitter between the list and the chat column.
 - Top: model picker, grouped into Cloud and Local, with a status dot per model. Unavailable models stay visible but greyed out, with the reason (key invalid, Ollama stopped, model not downloaded).
 - Messages with Markdown and code blocks (copy button on each). Long chats render only what is on screen.
 - Composer with Send and Stop. A stopped or failed reply stays in the chat with its status.

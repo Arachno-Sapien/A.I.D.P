@@ -64,6 +64,8 @@ fn specta_builder() -> Builder<tauri::Wry> {
         commands::history::list_conversations,
         commands::history::create_conversation,
         commands::history::delete_conversation,
+        commands::history::set_conversation_pinned,
+        commands::history::set_conversation_archived,
         commands::history::load_messages,
         commands::history::append_message,
         commands::ollama::ollama_status,

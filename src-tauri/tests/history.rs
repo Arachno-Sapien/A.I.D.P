@@ -267,3 +267,66 @@ async fn append_checks_status_and_conversation() {
         .expect_err("unknown conversation cannot be deleted");
     assert_eq!(err_del, AppError::NotFound);
 }
+
+#[tokio::test]
+async fn pin_and_archive_round_trip() {
+    let store = Arc::new(MemoryStore::default());
+    let services = create_services(store);
+
+    let conv = services.create_conversation("My chat", None).unwrap();
+    assert!(!conv.pinned);
+    assert!(!conv.archived);
+
+    // set_pinned(true)
+    services.set_conversation_pinned(conv.id, true).unwrap();
+    let list = services.conversations(None).unwrap();
+    assert_eq!(list.len(), 1);
+    assert!(list[0].pinned);
+    assert!(!list[0].archived);
+
+    // set_archived(true) -> archived becomes true, pinned becomes false
+    services.set_conversation_archived(conv.id, true).unwrap();
+    let list = services.conversations(None).unwrap();
+    assert_eq!(list.len(), 1);
+    assert!(!list[0].pinned);
+    assert!(list[0].archived);
+}
+
+#[tokio::test]
+async fn a_new_message_unarchives() {
+    let store = Arc::new(MemoryStore::default());
+    let services = create_services(store);
+
+    let conv = services.create_conversation("Archived chat", None).unwrap();
+    services.set_conversation_archived(conv.id, true).unwrap();
+    let list = services.conversations(None).unwrap();
+    assert!(list[0].archived);
+
+    let msg = NewMessage {
+        role: Role::User,
+        content_parts: r#"[{"type":"text","text":"hello"}]"#.to_string(),
+        model_ref: None,
+        model_name: None,
+        status: "complete".to_string(),
+        error_kind: None,
+        tokens_in: None,
+        tokens_out: None,
+    };
+    services.append_message(conv.id, msg).unwrap();
+
+    let list = services.conversations(None).unwrap();
+    assert_eq!(list.len(), 1);
+    assert!(!list[0].archived);
+}
+
+#[tokio::test]
+async fn pin_or_archive_a_missing_chat() {
+    let store = Arc::new(MemoryStore::default());
+    let services = create_services(store);
+
+    let err_pin = services.set_conversation_pinned(999, true).unwrap_err();
+    assert_eq!(err_pin, AppError::NotFound);
+
+    let err_arch = services.set_conversation_archived(999, true).unwrap_err();
+    assert_eq!(err_arch, AppError::NotFound);
+}
