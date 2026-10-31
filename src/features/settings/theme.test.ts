@@ -2,6 +2,39 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { applyTheme, resolveTheme } from "./theme";
+import { THEMES } from "./themes";
+
+describe("theme table", () => {
+  beforeEach(() => {
+    delete document.documentElement.dataset.theme;
+    delete document.documentElement.dataset.base;
+  });
+
+  it("applies a theme's variables, its name and its base", () => {
+    const root = document.documentElement;
+    applyTheme("cyber");
+    expect(root.dataset.theme).toBe("cyber");
+    expect(root.dataset.base).toBe("dark");
+    expect(root.style.getPropertyValue("--color-accent")).toBe(
+      THEMES.cyber.vars["--color-accent"],
+    );
+
+    // Light swaps white and black; a theme without that override clears it.
+    applyTheme("light");
+    expect(root.style.getPropertyValue("--color-white")).not.toBe("");
+    applyTheme("dark");
+    expect(root.style.getPropertyValue("--color-white")).toBe("");
+    expect(root.dataset.base).toBe("dark");
+  });
+
+  it("Cyber resolves to dark and Elegant to light", () => {
+    expect(resolveTheme("cyber", false)).toBe("dark");
+    expect(resolveTheme("glass", false)).toBe("dark");
+    expect(resolveTheme("elegant", true)).toBe("light");
+    expect(applyTheme("elegant")).toBe("light");
+    expect(applyTheme("soft")).toBe("dark");
+  });
+});
 
 describe("theme", () => {
   beforeEach(() => {

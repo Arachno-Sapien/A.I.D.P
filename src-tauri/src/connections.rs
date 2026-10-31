@@ -94,6 +94,11 @@ pub enum Theme {
     Dark,
     Light,
     System,
+    // Decision 0020: each one's colours live in src/features/settings/themes.ts.
+    Glass,
+    Soft,
+    Cyber,
+    Elegant,
 }
 
 impl Theme {
@@ -102,13 +107,22 @@ impl Theme {
             Self::Dark => "dark",
             Self::Light => "light",
             Self::System => "system",
+            Self::Glass => "glass",
+            Self::Soft => "soft",
+            Self::Cyber => "cyber",
+            Self::Elegant => "elegant",
         }
     }
 
+    /// The stored setting; anything unknown (a typo, a newer version's theme) is Dark.
     pub fn from_str_opt(s: Option<&str>) -> Self {
         match s {
             Some("light") => Self::Light,
             Some("system") => Self::System,
+            Some("glass") => Self::Glass,
+            Some("soft") => Self::Soft,
+            Some("cyber") => Self::Cyber,
+            Some("elegant") => Self::Elegant,
             _ => Self::Dark,
         }
     }
@@ -846,6 +860,24 @@ impl Services {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn themes_round_trip_and_an_unknown_one_is_dark() {
+        for theme in [
+            Theme::Dark,
+            Theme::Light,
+            Theme::System,
+            Theme::Glass,
+            Theme::Soft,
+            Theme::Cyber,
+            Theme::Elegant,
+        ] {
+            assert_eq!(Theme::from_str_opt(Some(theme.as_str())), theme);
+        }
+        // A name from a newer version, or a typo, starts the app in Dark.
+        assert_eq!(Theme::from_str_opt(Some("neon")), Theme::Dark);
+        assert_eq!(Theme::from_str_opt(None), Theme::Dark);
+    }
 
     #[test]
     fn keep_alive_seconds_table() {

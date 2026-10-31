@@ -1,12 +1,34 @@
 import type { Theme } from "../../lib/bindings";
+import { THEMES, type ThemeId } from "./themes";
 
+/** The theme shown: System follows the OS between Dark and Light; an unknown name is Dark. */
+export function themeId(theme: Theme, prefersDark: boolean): ThemeId {
+  if (theme === "system") return prefersDark ? "dark" : "light";
+  return theme in THEMES ? theme : "dark";
+}
+
+/** The base the editor and terminal follow. */
 export function resolveTheme(
   theme: Theme,
   prefersDark: boolean,
 ): "dark" | "light" {
-  if (theme === "dark") return "dark";
-  if (theme === "light") return "light";
-  return prefersDark ? "dark" : "light";
+  return THEMES[themeId(theme, prefersDark)].base;
+}
+
+/** Every variable any theme sets, so a switch clears what the next one doesn't. */
+const ALL_VARS = [...new Set(Object.values(THEMES).flatMap((t) => Object.keys(t.vars)))];
+
+function paint(id: ThemeId) {
+  if (typeof document === "undefined" || !document.documentElement) return;
+  const root = document.documentElement;
+  const spec = THEMES[id];
+  for (const name of ALL_VARS) {
+    const value = spec.vars[name];
+    if (value) root.style.setProperty(name, value);
+    else root.style.removeProperty(name);
+  }
+  root.dataset.theme = id;
+  root.dataset.base = spec.base;
 }
 
 let activeMediaQuery: MediaQueryList | null = null;
@@ -36,17 +58,13 @@ export function applyTheme(theme: Theme): "dark" | "light" {
   const prefersDark = mq ? mq.matches : true;
   const resolved = resolveTheme(theme, prefersDark);
 
-  if (typeof document !== "undefined" && document.documentElement) {
-    document.documentElement.dataset.theme = resolved;
-  }
+  paint(themeId(theme, prefersDark));
 
   if (theme === "system" && mq) {
     activeMediaQuery = mq;
     activeListener = (e: MediaQueryListEvent) => {
       const nextResolved = resolveTheme("system", e.matches);
-      if (typeof document !== "undefined" && document.documentElement) {
-        document.documentElement.dataset.theme = nextResolved;
-      }
+      paint(themeId("system", e.matches));
       onSystemChangeCallback?.(nextResolved);
     };
     mq.addEventListener?.("change", activeListener);

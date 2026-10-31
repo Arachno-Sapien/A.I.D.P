@@ -389,7 +389,7 @@ export type StoredMessage_Serialize = {
 
 export type TerminalEvent = { event: "output"; data: string } | { event: "exit" };
 
-export type Theme = "dark" | "light" | "system";
+export type Theme = "dark" | "light" | "system" | "glass" | "soft" | "cyber" | "elegant";
 
 export type ToolAction = { tool: "listFiles"; path: string } | { tool: "readFile"; path: string } | { tool: "search"; query: string; path: string } | { tool: "editFile"; path: string; before: string; after: string } | { tool: "createFile"; path: string; text: string } | { tool: "runCommand"; command: string; folder: string } | { tool: "invalid"; name: string };
 
