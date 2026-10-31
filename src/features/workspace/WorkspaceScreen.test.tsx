@@ -172,4 +172,18 @@ describe("WorkspaceScreen", () => {
     });
     expect(screen.getByTestId("ai-panel").hidden).toBe(false);
   });
+
+  it("bar buttons are icons with names and tooltips", () => {
+    useWorkspaceStore.setState({
+      info: { name: "my-app", path: "/projects/my-app", isGit: true },
+    });
+    render(<WorkspaceScreen />);
+    const buttons = ["Files", "AI", "Terminal", "Refresh", "Close folder"];
+    for (const name of buttons) {
+      const btn = screen.getByRole("button", { name });
+      expect(btn.querySelector("svg")).not.toBeNull();
+      expect(btn.getAttribute("title")).toBeTruthy();
+      expect(btn.textContent).toBe("");
+    }
+  });
 });

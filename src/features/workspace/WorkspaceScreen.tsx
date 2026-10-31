@@ -1,4 +1,5 @@
 import React, { Suspense, useEffect, useRef, useState } from "react";
+import { FolderX, MessagesSquare, PanelLeft, RotateCw, SquareTerminal } from "lucide-react";
 import { AiPanel } from "./AiPanel";
 import { useWorkspaceChatStore } from "./chatStore";
 import { DiffView } from "./DiffView";
@@ -152,47 +153,54 @@ export function WorkspaceScreen({ active = true }: WorkspaceScreenProps) {
             {info.path}
           </span>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-1 shrink-0">
           <button
             type="button"
+            aria-label="Files"
             aria-pressed={filesOpen}
             title="Show or hide the file tree (Ctrl+B)"
             onClick={() => setFilesOpen((open) => !open)}
             className={toggleClass(filesOpen)}
           >
-            Files
+            <PanelLeft size={16} aria-hidden="true" />
           </button>
           <button
             type="button"
+            aria-label="AI"
             aria-pressed={aiOpen}
             title="Show or hide the AI panel (Ctrl+Alt+B)"
             onClick={() => setAiOpen((open) => !open)}
             className={toggleClass(aiOpen)}
           >
-            AI
+            <MessagesSquare size={16} aria-hidden="true" />
           </button>
           <button
             type="button"
+            aria-label="Terminal"
             aria-pressed={terminalOpen}
             title="Show or hide the terminal (Ctrl+\)"
             onClick={() => setTerminalOpen((open) => !open)}
             className={toggleClass(terminalOpen)}
           >
-            Terminal
+            <SquareTerminal size={16} aria-hidden="true" />
           </button>
           <button
             type="button"
+            aria-label="Refresh"
+            title="Refresh the file tree"
             onClick={() => void refreshTree()}
-            className="text-xs text-neutral-400 hover:text-neutral-200 px-2 py-1 rounded hover:bg-neutral-800 transition-colors cursor-pointer"
+            className="text-xs text-neutral-400 hover:text-neutral-200 p-1 rounded hover:bg-neutral-800 transition-colors cursor-pointer"
           >
-            Refresh
+            <RotateCw size={16} aria-hidden="true" />
           </button>
           <button
             type="button"
+            aria-label="Close folder"
+            title="Close folder"
             onClick={() => void closeFolder()}
-            className="text-xs text-neutral-400 hover:text-neutral-200 px-2 py-1 rounded hover:bg-neutral-800 transition-colors cursor-pointer"
+            className="text-xs text-neutral-400 hover:text-neutral-200 p-1 rounded hover:bg-neutral-800 transition-colors cursor-pointer"
           >
-            Close folder
+            <FolderX size={16} aria-hidden="true" />
           </button>
         </div>
       </div>

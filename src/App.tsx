@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Channel } from "@tauri-apps/api/core";
+import { Boxes, FolderCode, MessageSquare, Settings } from "lucide-react";
 import { commands } from "./lib/bindings";
 import { ChatScreen } from "./features/chat/ChatScreen";
 import { ModelsScreen } from "./features/models/ModelsScreen";
@@ -71,49 +72,53 @@ function App() {
             type="button"
             aria-current={screen === "chat" ? "page" : undefined}
             onClick={() => handleSelectScreen("chat")}
-            className={`px-3 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer ${
+            className={`flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer ${
               screen === "chat"
                 ? "bg-neutral-800 text-white"
                 : "text-neutral-400 hover:text-neutral-200"
             }`}
           >
-            Chat
+            <MessageSquare size={16} aria-hidden="true" />
+            <span>Chat</span>
           </button>
           <button
             type="button"
             aria-current={screen === "workspace" ? "page" : undefined}
             onClick={() => handleSelectScreen("workspace")}
-            className={`px-3 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer ${
+            className={`flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer ${
               screen === "workspace"
                 ? "bg-neutral-800 text-white"
                 : "text-neutral-400 hover:text-neutral-200"
             }`}
           >
-            Workspace
+            <FolderCode size={16} aria-hidden="true" />
+            <span>Workspace</span>
           </button>
           <button
             type="button"
             aria-current={screen === "models" ? "page" : undefined}
             onClick={() => handleSelectScreen("models")}
-            className={`px-3 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer ${
+            className={`flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer ${
               screen === "models"
                 ? "bg-neutral-800 text-white"
                 : "text-neutral-400 hover:text-neutral-200"
             }`}
           >
-            Models
+            <Boxes size={16} aria-hidden="true" />
+            <span>Models</span>
           </button>
           <button
             type="button"
             aria-current={screen === "settings" ? "page" : undefined}
             onClick={() => handleSelectScreen("settings")}
-            className={`px-3 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer ${
+            className={`flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer ${
               screen === "settings"
                 ? "bg-neutral-800 text-white"
                 : "text-neutral-400 hover:text-neutral-200"
             }`}
           >
-            Settings
+            <Settings size={16} aria-hidden="true" />
+            <span>Settings</span>
           </button>
         </nav>
       </header>

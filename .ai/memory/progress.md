@@ -53,10 +53,14 @@ RAM of the installed rc.1 (2026-10-31, `docs/dev/measure-ram.md`): idle 127 MB; 
 The human chose to virtualize first: done 2026-10-31 by Claude Code (Opus 5.5). `MessageList` uses react-virtual with measured rows and follows the end with `scrollToIndex`; `src/lib/virtual.ts` holds the zero-size fallback shared with `FileTree`. Browser measurement (dev build): a 200-message chat 1,571 page elements instead of 50,744; streaming into 100 messages 12 ms per chunk and +16 MB heap. 208 Vitest, 220 Rust.
 The human checked chat scrolling, following the end while streaming, switching chats and Apply in the dev app on 2026-10-31: "All fine". Version set to `0.1.0-rc.2` (three files, CHANGELOG section).
 The human asked when code files get coloured; it was a bug since M3 (grammars load lazily and the editor was created before they arrived). Fixed for rc.2 on 2026-10-31 by Claude Code (Opus 5.5): `loadLanguage` in `cm.ts`, awaited by the store's `editorState` and by `DiffView` before mounting; `mountDiff` takes the filename. 213 Vitest, 220 Rust. Not yet seen in the app.
-Next step: push; the human runs the Release workflow and publishes rc.2 (normal release); the installed rc.1 should offer the update (the update test), and rc.2 should colour code files; then RAM again after a local-model reply, and the Linux/8 GB VM.
+
+Claimed by Antigravity (Gemini 2.5 Pro), 2026-10-31:
+Task: Chat list (hide/resize), pin and archive (migration 5), icons (lucide-react), and web-design-guidelines UI review (docs/superpowers/plans/2026-10-31-m6-chat-list-and-icons.md).
+Next step: Author GATES.md with unlazy, lint with gate-lint.mjs, execute Task 1 (Icons).
 
 ## Next 3 tasks
 
-1. Push; the human runs the Release workflow for `0.1.0-rc.2` and publishes it (Task 8).
+1. M6 plan 2026-10-31-m6-chat-list-and-icons.md: Task 1 (icons), Task 2 (chat list resize/hide), Task 3 (pin and archive), Task 4 (UI skill and review).
+2. Push; the human runs the Release workflow for `0.1.0-rc.2` and publishes it (Task 8).
 2. The update test from the installed rc.1; RAM again after a local-model reply; the Linux and 8 GB check in an Ubuntu VM (Task 8).
 3. Review the whole M6 diff, then `0.1.0` and close M6 with the human (Task 8).

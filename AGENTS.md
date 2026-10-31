@@ -81,6 +81,7 @@ Chosen for low memory use and tools agents know well. **No new dependency withou
 | Tests | `cargo test` + wiremock (fake provider servers), Vitest |
 | Builds | GitHub Actions + tauri-action |
 | Updates (M6) | tauri-plugin-updater (native-tls), called from Rust only; signed with a key only the human holds |
+| Icons | lucide-react (decision 0018) |
 
 Package manager: **npm**.
 

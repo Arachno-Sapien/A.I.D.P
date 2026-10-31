@@ -226,6 +226,15 @@ describe("App", () => {
     expect(screen.getByRole("heading", { name: "Settings" })).toBeDefined();
   });
 
+  it("each screen button shows an icon and keeps its name", () => {
+    render(<App />);
+    const screens = [/^chat$/i, /^workspace$/i, /^models$/i, /^settings$/i];
+    for (const name of screens) {
+      const btn = screen.getByRole("button", { name });
+      expect(btn.querySelector("svg")).not.toBeNull();
+    }
+  });
+
   it.each([
     [true, 1],
     [false, 0],

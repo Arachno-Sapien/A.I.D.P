@@ -1,0 +1,35 @@
+# Gates: chat list, pin/archive, icons, and UI review
+
+OWNS: package.json, package-lock.json, docs/decisions/0018-icons-lucide.md, docs/design.md, docs/user-guide.md, CHANGELOG.md, AGENTS.md, src/App.tsx, src/App.test.tsx, src/features/workspace/WorkspaceScreen.tsx, src/features/workspace/WorkspaceScreen.test.tsx, src/features/chat/ConversationList.tsx, src/features/chat/ConversationList.test.tsx, src/features/chat/ChatScreen.tsx, src/features/chat/ChatScreen.test.tsx, src/features/chat/store.ts, src/features/chat/store.test.ts, src-tauri/src/db/mod.rs, src-tauri/src/db/conversations.rs, src-tauri/src/history.rs, src-tauri/src/commands/history.rs, src-tauri/src/lib.rs, src/lib/bindings.ts, .claude/skills/web-design-guidelines/**, .agents/skills/web-design-guidelines/**, skills-lock.json, .ai/memory/**
+
+Scope: Add lucide-react icons to top nav, workspace bar, and chat list; make chat list hideable (Ctrl+B) and resizable; add migration 5 for pinning and archiving chats; add web-design-guidelines skill and apply UI polish.
+
+- [x] G1: top nav and workspace bar buttons render icons and retain accessible names
+  CHECK: npx vitest run -t "shows an icon|bar buttons are icons" src/App.test.tsx src/features/workspace/WorkspaceScreen.test.tsx
+  EXPECT: 2 passed
+  EVIDENCE: automatic-evidence=v1; definition-sha256=5038bb58bdce0071dcdee2f70315950d8f35c1c9d1480c54ef0990980e985ad1; exit=0; EXPECT=matched; output-sha256=ff371b977f785d07d989fb9a05ebd8fcaf9a96b21a405b6d05a184ef4236970b; output-bytes=835; shell=C:\WINDOWS\system32\cmd.exe; cwd=C:\Users\SYED\Documents\Junaid\A.I.D.P; path=116b443f33f6/54 entries
+
+- [ ] G2: chat list hides with button and Ctrl+B and resizes within width limits
+  CHECK: npx vitest run -t "chat list hides and shows from its button|Ctrl\+B toggles the chat list" src/features/chat/ChatScreen.test.tsx
+  EXPECT: 2 passed
+  EVIDENCE: pending
+
+- [ ] G3: migration 5 applies and Rust db/history pin and archive operations pass
+  CHECK: cargo test --manifest-path src-tauri/Cargo.toml pin_and_archive_round_trip
+  EXPECT: test pin_and_archive_round_trip ... ok
+  EVIDENCE: pending
+
+- [ ] G4: frontend chat store and conversation list support pin, archive, and filter groups
+  CHECK: npx vitest run -t "pinned chats sit above recent ones|Archive moves a chat into Archived" src/features/chat/store.test.ts src/features/chat/ConversationList.test.tsx
+  EXPECT: 2 passed
+  EVIDENCE: pending
+
+- [ ] G5: web-design-guidelines skill is installed and mirrored identically across agent directories
+  CHECK: node -e "const fs = require('fs'); const a = fs.readFileSync('.claude/skills/web-design-guidelines/SKILL.md'); const b = fs.readFileSync('.agents/skills/web-design-guidelines/SKILL.md'); if (Buffer.compare(a, b) === 0) console.log('SKILLS_IDENTICAL');"
+  EXPECT: SKILLS_IDENTICAL
+  EVIDENCE: pending
+
+- [x] G6: typescript typecheck passes without errors
+  CHECK: npm run typecheck
+  EXPECT: tsc --noEmit
+  EVIDENCE: automatic-evidence=v1; definition-sha256=f3a9f72cca7186327f0d2cf2bb0c6765c563f0877f0c6b6c7f2096788006be4d; exit=0; EXPECT=matched; output-sha256=feeeae77409f668073004c2cfdc8fff8c7dbbbeb7b3afd94be75a1d406f025d2; output-bytes=69; shell=C:\WINDOWS\system32\cmd.exe; cwd=C:\Users\SYED\Documents\Junaid\A.I.D.P; path=116b443f33f6/54 entries

@@ -48,6 +48,7 @@ Tauri 2 with a React frontend and a Rust core. Every choice below favours low me
 | Tests | cargo test + wiremock, Vitest | Fake provider servers for adapter tests |
 | Builds | GitHub Actions + tauri-action | Windows, macOS, Linux installers from one push |
 | Updates (M6) | tauri-plugin-updater (native-tls), driven from Rust | Signed updates from GitHub Releases; no plugin permission reaches the window |
+| Icons | lucide-react (decision 0018) | Small, tree-shaken icon library with accessible labels and tooltips |
 
 ## Architecture
 

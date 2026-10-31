@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { SquarePen, Trash2 } from "lucide-react";
 import { useChatStore } from "./store";
 
 export function ConversationList() {
@@ -35,7 +36,7 @@ export function ConversationList() {
           }}
           className="w-full py-1.5 px-3 bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 hover:border-neutral-700 text-neutral-200 hover:text-white rounded-lg transition-colors font-medium flex items-center justify-center gap-1.5 cursor-pointer"
         >
-          <span>+</span>
+          <SquarePen size={14} aria-hidden="true" />
           <span>New chat</span>
         </button>
 
@@ -122,19 +123,7 @@ export function ConversationList() {
                   }}
                   className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400 text-neutral-500 transition-opacity cursor-pointer rounded"
                 >
-                  <svg
-                    className="w-3.5 h-3.5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                    />
-                  </svg>
+                  <Trash2 size={14} aria-hidden="true" />
                 </button>
               </div>
             );
