@@ -24,10 +24,10 @@ Scope: Add lucide-react icons to top nav, workspace bar, and chat list; make cha
   EXPECT: 2 passed
   EVIDENCE: automatic-evidence=v1; definition-sha256=8791df14535d4b179e6746f3f596e521a3a94221b3ac4ac953cc24a326300b3b; exit=0; EXPECT=matched; output-sha256=9a56c02199c4b42563a0b0f2cac9852e347ab1470947384f749141c377d773c0; output-bytes=919; shell=C:\WINDOWS\system32\cmd.exe; cwd=C:\Users\SYED\Documents\Junaid\A.I.D.P; path=116b443f33f6/54 entries
 
-- [ ] G5: web-design-guidelines skill is installed and mirrored identically across agent directories
+- [x] G5: web-design-guidelines skill is installed and mirrored identically across agent directories
   CHECK: node -e "const fs = require('fs'); const a = fs.readFileSync('.claude/skills/web-design-guidelines/SKILL.md'); const b = fs.readFileSync('.agents/skills/web-design-guidelines/SKILL.md'); if (Buffer.compare(a, b) === 0) console.log('SKILLS_IDENTICAL');"
   EXPECT: SKILLS_IDENTICAL
-  EVIDENCE: pending
+  EVIDENCE: automatic-evidence=v1; definition-sha256=200e65dbb41a00137bdbb0e179833755203bf0b7a126b65da065023aa723175e; exit=0; EXPECT=matched; output-sha256=5f6c4666e4468c2166a2aada0c4a15dc3687d9bdbee078400cacb4edc0011c94; output-bytes=17; shell=C:\WINDOWS\system32\cmd.exe; cwd=C:\Users\SYED\Documents\Junaid\A.I.D.P; path=116b443f33f6/54 entries
 
 - [x] G6: typescript typecheck passes without errors
   CHECK: npm run typecheck

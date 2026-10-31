@@ -87,7 +87,7 @@ export function ChatScreen({
             aria-pressed={listOpen}
             title="Show or hide the chat list (Ctrl+B)"
             onClick={() => setListOpen((open) => !open)}
-            className="text-xs text-neutral-400 hover:text-neutral-200 p-1 rounded hover:bg-neutral-800 transition-colors cursor-pointer"
+            className="text-xs text-neutral-400 hover:text-neutral-200 p-1 rounded hover:bg-neutral-800 transition-colors cursor-pointer focus-visible:ring-1 focus-visible:ring-neutral-400 focus-visible:outline-none"
           >
             <PanelLeft size={16} aria-hidden="true" />
           </button>

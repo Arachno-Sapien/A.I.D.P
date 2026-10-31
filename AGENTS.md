@@ -353,6 +353,7 @@ If your tool doesn't load skills automatically (or looks in a different folder),
 | `systematic-debugging` | obra/superpowers | Any bug or failing test, before proposing a fix |
 | `verification-before-completion` | obra/superpowers | Before saying a task is done: run the gate, show the output |
 | `unlazy` | Leonxlnx/unlazy | Enforcing completion discipline for substantial autonomous work |
+| `web-design-guidelines` | vercel-labs/agent-skills | Reviewing UI code for accessibility, design and UX compliance |
 
 **Managing skills**
 

@@ -19,7 +19,7 @@ const AI_MIN = 280;
 const EDITOR_MIN = 200;
 
 const toggleClass = (on: boolean) =>
-  `text-xs px-2 py-1 rounded transition-colors cursor-pointer ${
+  `text-xs px-2 py-1 rounded transition-colors cursor-pointer focus-visible:ring-1 focus-visible:ring-neutral-400 focus-visible:outline-none ${
     on
       ? "bg-neutral-800 text-neutral-100"
       : "text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800"
@@ -189,7 +189,7 @@ export function WorkspaceScreen({ active = true }: WorkspaceScreenProps) {
             aria-label="Refresh"
             title="Refresh the file tree"
             onClick={() => void refreshTree()}
-            className="text-xs text-neutral-400 hover:text-neutral-200 p-1 rounded hover:bg-neutral-800 transition-colors cursor-pointer"
+            className="text-xs text-neutral-400 hover:text-neutral-200 p-1 rounded hover:bg-neutral-800 transition-colors cursor-pointer focus-visible:ring-1 focus-visible:ring-neutral-400 focus-visible:outline-none"
           >
             <RotateCw size={16} aria-hidden="true" />
           </button>
@@ -198,7 +198,7 @@ export function WorkspaceScreen({ active = true }: WorkspaceScreenProps) {
             aria-label="Close folder"
             title="Close folder"
             onClick={() => void closeFolder()}
-            className="text-xs text-neutral-400 hover:text-neutral-200 p-1 rounded hover:bg-neutral-800 transition-colors cursor-pointer"
+            className="text-xs text-neutral-400 hover:text-neutral-200 p-1 rounded hover:bg-neutral-800 transition-colors cursor-pointer focus-visible:ring-1 focus-visible:ring-neutral-400 focus-visible:outline-none"
           >
             <FolderX size={16} aria-hidden="true" />
           </button>

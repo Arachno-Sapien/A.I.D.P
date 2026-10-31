@@ -49,6 +49,12 @@
       "skillPath": "skills/vitest/SKILL.md",
       "computedHash": "b26b7f8d10e860e944e0334c003207771707c4906514cb96c971faae13fba875"
     },
+    "web-design-guidelines": {
+      "source": "vercel-labs/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/web-design-guidelines/SKILL.md",
+      "computedHash": "f3bc47f890f42a44db1007ab390709ec368e4b8c089baee6b0007182236ac474"
+    },
     "writing-plans": {
       "source": "obra/superpowers",
       "sourceType": "github",

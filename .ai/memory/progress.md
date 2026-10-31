@@ -54,13 +54,14 @@ The human chose to virtualize first: done 2026-10-31 by Claude Code (Opus 5.5). 
 The human checked chat scrolling, following the end while streaming, switching chats and Apply in the dev app on 2026-10-31: "All fine". Version set to `0.1.0-rc.2` (three files, CHANGELOG section).
 The human asked when code files get coloured; it was a bug since M3 (grammars load lazily and the editor was created before they arrived). Fixed for rc.2 on 2026-10-31 by Claude Code (Opus 5.5): `loadLanguage` in `cm.ts`, awaited by the store's `editorState` and by `DiffView` before mounting; `mountDiff` takes the filename. 213 Vitest, 220 Rust. Not yet seen in the app.
 
-Claimed by Antigravity (Gemini 2.5 Pro), 2026-10-31:
-Task: Chat list (hide/resize), pin and archive (migration 5), icons (lucide-react), and web-design-guidelines UI review (docs/superpowers/plans/2026-10-31-m6-chat-list-and-icons.md).
-Next step: Task 4 (UI review skill: web-design-guidelines and polish).
+M6 chat list, pin/archive, icons, and UI review done 2026-10-31 by Antigravity (Gemini 2.5 Pro):
+- Task 1: `lucide-react` icons for nav, workspace toolbar, and conversation list; accessible names retained; bundle size verified (`38a9192`).
+- Task 2: Chat list toggle via top bar button and `Ctrl+B`, resize with `Splitter` within limits (`7365acf`).
+- Task 3: Pin and archive chats with SQLite migration 5, history commands, store methods, and grouped list (`beaeecd`).
+- Task 4: `web-design-guidelines` skill installed and mirrored; UI review polish applied (focus rings, accessible labels, keyboard handlers); all 6 acceptance gates in `GATES.md` verified and met. 228 Vitest, 220 Rust tests passing.
 
 ## Next 3 tasks
 
-1. M6 plan 2026-10-31-m6-chat-list-and-icons.md: Task 1 (icons), Task 2 (chat list resize/hide), Task 3 (pin and archive), Task 4 (UI skill and review).
-2. Push; the human runs the Release workflow for `0.1.0-rc.2` and publishes it (Task 8).
+1. Push commits; the human runs the Release workflow for `0.1.0-rc.2` and publishes it (Task 8).
 2. The update test from the installed rc.1; RAM again after a local-model reply; the Linux and 8 GB check in an Ubuntu VM (Task 8).
 3. Review the whole M6 diff, then `0.1.0` and close M6 with the human (Task 8).

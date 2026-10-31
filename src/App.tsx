@@ -72,7 +72,7 @@ function App() {
             type="button"
             aria-current={screen === "chat" ? "page" : undefined}
             onClick={() => handleSelectScreen("chat")}
-            className={`flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer ${
+            className={`flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer focus-visible:ring-1 focus-visible:ring-neutral-400 focus-visible:outline-none ${
               screen === "chat"
                 ? "bg-neutral-800 text-white"
                 : "text-neutral-400 hover:text-neutral-200"
@@ -85,7 +85,7 @@ function App() {
             type="button"
             aria-current={screen === "workspace" ? "page" : undefined}
             onClick={() => handleSelectScreen("workspace")}
-            className={`flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer ${
+            className={`flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer focus-visible:ring-1 focus-visible:ring-neutral-400 focus-visible:outline-none ${
               screen === "workspace"
                 ? "bg-neutral-800 text-white"
                 : "text-neutral-400 hover:text-neutral-200"
@@ -98,7 +98,7 @@ function App() {
             type="button"
             aria-current={screen === "models" ? "page" : undefined}
             onClick={() => handleSelectScreen("models")}
-            className={`flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer ${
+            className={`flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer focus-visible:ring-1 focus-visible:ring-neutral-400 focus-visible:outline-none ${
               screen === "models"
                 ? "bg-neutral-800 text-white"
                 : "text-neutral-400 hover:text-neutral-200"
@@ -111,7 +111,7 @@ function App() {
             type="button"
             aria-current={screen === "settings" ? "page" : undefined}
             onClick={() => handleSelectScreen("settings")}
-            className={`flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer ${
+            className={`flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer focus-visible:ring-1 focus-visible:ring-neutral-400 focus-visible:outline-none ${
               screen === "settings"
                 ? "bg-neutral-800 text-white"
                 : "text-neutral-400 hover:text-neutral-200"

@@ -85,12 +85,23 @@ export function ConversationList({ width }: { width?: number } = {}) {
     return (
       <div
         key={c.id}
+        tabIndex={0}
+        role="button"
+        onKeyDown={(e) => {
+          if (e.target !== e.currentTarget) return;
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            if (!streaming && c.id !== conversationId) {
+              void load(c.id);
+            }
+          }
+        }}
         onClick={() => {
           if (!streaming && c.id !== conversationId) {
             void load(c.id);
           }
         }}
-        className={`group flex items-center justify-between px-2.5 py-2 rounded-lg cursor-pointer transition-colors ${
+        className={`group flex items-center justify-between px-2.5 py-2 rounded-lg cursor-pointer transition-colors focus-visible:ring-1 focus-visible:ring-neutral-400 focus-visible:outline-none ${
           isActive
             ? "bg-neutral-800/90 text-white font-medium"
             : "text-neutral-400 hover:bg-neutral-900/80 hover:text-neutral-200"
@@ -103,7 +114,7 @@ export function ConversationList({ width }: { width?: number } = {}) {
           </div>
         </div>
 
-        <div className="opacity-0 group-hover:opacity-100 flex items-center gap-0.5 shrink-0">
+        <div className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 flex items-center gap-0.5 shrink-0">
           {!c.archived && (
             <button
               type="button"
@@ -113,7 +124,7 @@ export function ConversationList({ width }: { width?: number } = {}) {
                 e.stopPropagation();
                 void setPinned(c.id, !c.pinned);
               }}
-              className={`p-1 hover:text-neutral-200 transition-opacity cursor-pointer rounded ${
+              className={`p-1 hover:text-neutral-200 transition-opacity cursor-pointer rounded focus-visible:ring-1 focus-visible:ring-neutral-400 focus-visible:outline-none ${
                 c.pinned ? "text-amber-400" : "text-neutral-500"
               }`}
             >
@@ -142,7 +153,7 @@ export function ConversationList({ width }: { width?: number } = {}) {
               e.stopPropagation();
               void setArchived(c.id, !c.archived);
             }}
-            className="p-1 hover:text-neutral-200 text-neutral-500 transition-opacity cursor-pointer rounded disabled:cursor-not-allowed"
+            className="p-1 hover:text-neutral-200 text-neutral-500 transition-opacity cursor-pointer rounded disabled:cursor-not-allowed focus-visible:ring-1 focus-visible:ring-neutral-400 focus-visible:outline-none"
           >
             {c.archived ? (
               <ArchiveRestore size={14} aria-hidden="true" />
@@ -160,7 +171,7 @@ export function ConversationList({ width }: { width?: number } = {}) {
               e.stopPropagation();
               setConfirmDeleteId(c.id);
             }}
-            className="p-1 hover:text-red-400 text-neutral-500 transition-opacity cursor-pointer rounded disabled:cursor-not-allowed"
+            className="p-1 hover:text-red-400 text-neutral-500 transition-opacity cursor-pointer rounded disabled:cursor-not-allowed focus-visible:ring-1 focus-visible:ring-neutral-400 focus-visible:outline-none"
           >
             <Trash2 size={14} aria-hidden="true" />
           </button>
@@ -183,7 +194,7 @@ export function ConversationList({ width }: { width?: number } = {}) {
             setConfirmDeleteId(null);
             startNew();
           }}
-          className="w-full py-1.5 px-3 bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 hover:border-neutral-700 text-neutral-200 hover:text-white rounded-lg transition-colors font-medium flex items-center justify-center gap-1.5 cursor-pointer"
+          className="w-full py-1.5 px-3 bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 hover:border-neutral-700 text-neutral-200 hover:text-white rounded-lg transition-colors font-medium flex items-center justify-center gap-1.5 cursor-pointer focus-visible:ring-1 focus-visible:ring-neutral-400 focus-visible:outline-none"
         >
           <SquarePen size={14} aria-hidden="true" />
           <span>New chat</span>
@@ -191,10 +202,11 @@ export function ConversationList({ width }: { width?: number } = {}) {
 
         <input
           type="text"
+          aria-label="Filter chats"
           placeholder="Filter chats…"
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          className="w-full px-2.5 py-1 bg-neutral-900 border border-neutral-800 rounded-md text-neutral-100 placeholder-neutral-500 text-xs focus:outline-none focus:border-neutral-700"
+          className="w-full px-2.5 py-1 bg-neutral-900 border border-neutral-800 rounded-md text-neutral-100 placeholder-neutral-500 text-xs focus:outline-none focus:border-neutral-700 focus-visible:ring-1 focus-visible:ring-neutral-400"
         />
       </div>
 
