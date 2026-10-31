@@ -80,6 +80,7 @@ A.I.D.P supports both cloud providers (OpenAI, Anthropic, OpenRouter, Groq, Deep
 - **Markdown & Code:** Replies render formatted tables, lists, blockquotes, and syntax-highlighted code blocks with one-click **Copy**.
 
 ---
+- **Attachments:** Click the paperclip, drop files on the window, or paste a screenshot to attach up to 5 files to a message: images (PNG, JPEG, WebP, GIF, up to 5 MB), text or code files (up to 512 KB), and PDFs (up to 20 MB). A PDF is read as text, so a scanned PDF without text can't be attached. Models that can't see images (some local models) refuse images before anything is sent. Attachments also work in the workspace's side chat.
 
 ## 4. Coding Workspace
 

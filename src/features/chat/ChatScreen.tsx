@@ -182,6 +182,7 @@ export function ChatScreen({
           )}
 
           <Composer
+            store={useChatStore}
             onSend={(text) => {
               if (selected) {
                 void send(text, selected);

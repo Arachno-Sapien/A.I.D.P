@@ -9,6 +9,7 @@ vi.mock("./lib/bindings", () => ({
     chatModels: vi.fn().mockResolvedValue({ status: "ok", data: [] }),
     recentFolders: vi.fn().mockResolvedValue({ status: "ok", data: [] }),
     watchClose: vi.fn().mockResolvedValue(undefined),
+    watchDrops: vi.fn().mockResolvedValue(undefined),
     quitApp: vi.fn().mockResolvedValue(undefined),
     setUnsaved: vi.fn().mockResolvedValue(undefined),
     listConversations: vi.fn().mockResolvedValue({ status: "ok", data: [] }),
@@ -42,6 +43,8 @@ import App from "./App";
 import { commands } from "./lib/bindings";
 import { useModelsStore } from "./features/models/store";
 import { useWorkspaceStore } from "./features/workspace/store";
+import { useChatStore } from "./features/chat/store";
+import { useWorkspaceChatStore } from "./features/workspace/chatStore";
 
 describe("App", () => {
   beforeEach(() => {
@@ -213,6 +216,26 @@ describe("App", () => {
       ).toBeNull();
     });
     expect(commands.quitApp).not.toHaveBeenCalled();
+  });
+
+  it("a dropped file goes to the chat on screen only", async () => {
+    let drop: ((v: unknown) => void) | undefined;
+    vi.mocked(commands.watchDrops).mockImplementation((channel: any) => {
+      drop = (v) => channel.onmessage(v);
+      return Promise.resolve();
+    });
+    useChatStore.setState({ pending: [], attachNotice: null });
+    useWorkspaceChatStore.setState({ pending: [], attachNotice: null });
+    const notes = { id: "b".repeat(64), name: "notes.md", mime: "text/plain", size: 5, kind: "text" as const, warning: null };
+    render(<App />);
+
+    await act(async () => drop?.({ added: [notes], refused: [] }));
+    expect(useChatStore.getState().pending.map((a) => a.name)).toEqual(["notes.md"]);
+
+    fireEvent.click(screen.getByRole("button", { name: /^models$/i }));
+    await act(async () => drop?.({ added: [{ ...notes, id: "c".repeat(64) }], refused: [] }));
+    expect(useChatStore.getState().pending).toHaveLength(1);
+    expect(useWorkspaceChatStore.getState().pending).toHaveLength(0);
   });
 
   it("shows Settings in the nav", () => {

@@ -210,7 +210,7 @@ Four screens: Chat, Workspace, Models, and Settings. A first-time user lands on 
 
 - Left: file tree for the open folder, with Open folder and a recent-folders list.
 - Centre: editor tabs.
-- Right: AI panel with the model picker, context chips (open file, selection), and the same message list and composer as Chat.
+- Right: AI panel with the model picker, context chips (open file, selection), and the same message list and composer as Chat, attachments included.
 - Bottom (M4): terminal panel.
 - The file tree and the AI panel can be hidden (Files and AI buttons, `Ctrl+B` and `Ctrl+Alt+B`) and resized by dragging the line beside them; they shrink before the editor does, and the AI panel reopens when a command waits for approval (M6).
 - Every AI edit opens a diff over the editor with Accept and Reject.
@@ -222,6 +222,7 @@ Four screens: Chat, Workspace, Models, and Settings. A first-time user lands on 
 - Top: model picker, grouped into Cloud and Local, with a status dot per model. Unavailable models stay visible but greyed out, with the reason (key invalid, Ollama stopped, model not downloaded).
 - Messages with Markdown and code blocks (copy button on each). Long chats render only what is on screen.
 - Composer with Send and Stop. A stopped or failed reply stays in the chat with its status.
+- Attachments (M6, decision 0019): the paperclip, dropping files on the window, or pasting adds images, text or code files and PDFs, up to 5 per message, as chips with a thumbnail or name and size. Rust reads and checks every file. A model known not to read images blocks Send with "This model can't read images". Sent messages keep their chips.
 
 **Models**
 

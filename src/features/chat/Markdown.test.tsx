@@ -5,6 +5,16 @@ import { describe, expect, it, vi } from "vitest";
 import { Markdown } from "./Markdown";
 
 describe("Markdown", () => {
+  it("a reply's image never gets a data: source", () => {
+    // The CSP allows data: images for attachment thumbnails; a model's reply
+    // must not use that to show images of its own.
+    const { container } = render(
+      <Markdown text={"![x](data:image/png;base64,iVBORw0KGgo=)"} />,
+    );
+    const img = container.querySelector("img");
+    expect(img?.getAttribute("src") ?? "").not.toMatch(/^data:/);
+  });
+
   it("copies a code block's exact text", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", {

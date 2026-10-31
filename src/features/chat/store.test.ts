@@ -16,6 +16,8 @@ vi.mock("../../lib/bindings", () => ({
     appendMessage: vi.fn().mockResolvedValue({ status: "ok", data: 1 }),
     setConversationPinned: vi.fn().mockResolvedValue({ status: "ok", data: null }),
     setConversationArchived: vi.fn().mockResolvedValue({ status: "ok", data: null }),
+    pickAttachments: vi.fn(),
+    attachBytes: vi.fn(),
   },
 }));
 
@@ -681,5 +683,91 @@ describe("useChatStore", () => {
 
     expect(commands.deleteConversation).toHaveBeenCalledWith(3);
     expect(useChatStore.getState().conversationId).toBe(1);
+  });
+});
+
+describe("attachments", () => {
+  const png = { id: "a".repeat(64), name: "shot.png", mime: "image/png", size: 2048, kind: "image" as const, warning: null };
+  const notes = { id: "b".repeat(64), name: "notes.md", mime: "text/plain", size: 5, kind: "text" as const, warning: null };
+  const model = { connectionId: 1, modelId: "m" };
+  const chatModel = (supportsVision?: boolean) => ({
+    connectionId: 1, connectionLabel: "Local", modelId: "m", displayName: "M", isDefault: true,
+    supportsTools: null, supportsVision, isLocal: true, contextTokens: null,
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useChatStore.setState({ messages: [], streaming: false, conversationId: null, conversations: [], pending: [], attachNotice: null });
+    useModelsStore.setState({ chatModels: [chatModel()] });
+  });
+
+  it("keeps at most five and says why", () => {
+    const six = Array.from({ length: 6 }, (_, i) => ({ ...notes, id: String(i).repeat(64), name: `f${i}.md` }));
+    useChatStore.getState().addAttachments(six);
+    expect(useChatStore.getState().pending).toHaveLength(5);
+    expect(useChatStore.getState().attachNotice).toContain("5");
+  });
+
+  it("the same file twice is kept once", () => {
+    useChatStore.getState().addAttachments([notes]);
+    useChatStore.getState().addAttachments([notes]);
+    expect(useChatStore.getState().pending).toHaveLength(1);
+  });
+
+  it("the paperclip adds what Rust returns and reports what it refused", async () => {
+    vi.mocked(commands.pickAttachments).mockResolvedValue({
+      status: "ok",
+      data: { added: [png], refused: ["tool.bin isn't an image, a PDF or a text file"] },
+    });
+    await useChatStore.getState().pickAttachments();
+    expect(useChatStore.getState().pending.map((a) => a.name)).toEqual(["shot.png"]);
+    expect(useChatStore.getState().attachNotice).toContain("tool.bin");
+  });
+
+  it("a pasted file is sent to Rust as base64", async () => {
+    vi.mocked(commands.attachBytes).mockResolvedValue({ status: "ok", data: png });
+    const file = new File([new Uint8Array([137, 80, 78, 71])], "shot.png", { type: "image/png" });
+    await useChatStore.getState().pasteFiles([file]);
+    expect(commands.attachBytes).toHaveBeenCalledWith("shot.png", "iVBORw==");
+    expect(useChatStore.getState().pending.map((a) => a.id)).toEqual([png.id]);
+  });
+
+  it("Send carries the attachments and clears them", async () => {
+    useChatStore.getState().addAttachments([notes, png]);
+    await useChatStore.getState().send("look", model);
+    const history = vi.mocked(commands.sendMessage).mock.calls[0][3];
+    expect(history[history.length - 1]).toEqual({
+      role: "user",
+      content: "look",
+      attachments: [{ id: notes.id, name: "notes.md" }, { id: png.id, name: "shot.png" }],
+    });
+    expect(useChatStore.getState().pending).toEqual([]);
+    const sent = useChatStore.getState().messages.find((m) => m.role === "user");
+    expect(sent?.attachments?.map((a) => a.name)).toEqual(["notes.md", "shot.png"]);
+  });
+
+  it("a message with only an attachment is sent, titled by the file", async () => {
+    useChatStore.getState().addAttachments([notes]);
+    await useChatStore.getState().send("", model);
+    expect(commands.createConversation).toHaveBeenCalledWith("notes.md", null);
+    expect(commands.sendMessage).toHaveBeenCalled();
+  });
+
+  it("earlier messages keep their attachments in the history", async () => {
+    useChatStore.setState({
+      messages: [{ id: "u1", role: "user", text: "first", status: "complete", attachments: [notes] }],
+    });
+    await useChatStore.getState().send("again", model);
+    const history = vi.mocked(commands.sendMessage).mock.calls[0][3];
+    expect(history[0]).toEqual({ role: "user", content: "first", attachments: [{ id: notes.id, name: "notes.md" }] });
+  });
+
+  it("an image is not sent to a model that can't see", async () => {
+    useModelsStore.setState({ chatModels: [chatModel(false)] });
+    useChatStore.getState().addAttachments([png]);
+    await useChatStore.getState().send("look", model);
+    expect(commands.sendMessage).not.toHaveBeenCalled();
+    expect(useChatStore.getState().attachNotice).toBe("This model can't read images");
+    expect(useChatStore.getState().pending).toHaveLength(1);
   });
 });

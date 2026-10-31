@@ -2,6 +2,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { memo, useEffect, useRef, type ReactNode } from "react";
 import { observeRectOrInitial } from "../../lib/virtual";
 import { appErrorText } from "./appErrorText";
+import { AttachmentChip } from "./AttachmentChip";
 import { errorText } from "./errorText";
 import { Markdown } from "./Markdown";
 import type { ToolStep, UiMessage } from "./store";
@@ -124,7 +125,14 @@ const MessageItem = memo(function MessageItem({
                     ))}
                   </div>
                 )}
-                <div>{msg.text}</div>
+                {msg.attachments && msg.attachments.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mb-2 whitespace-normal">
+                    {msg.attachments.map((a) => (
+                      <AttachmentChip key={a.id} attachment={a} />
+                    ))}
+                  </div>
+                )}
+                {msg.text && <div>{msg.text}</div>}
               </div>
             ) : (
               <>

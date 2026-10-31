@@ -1,7 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Channel } from "@tauri-apps/api/core";
 import { Boxes, FolderCode, MessageSquare, Settings } from "lucide-react";
-import { commands } from "./lib/bindings";
+import { commands, type Attachments_Deserialize } from "./lib/bindings";
+import { useChatStore } from "./features/chat/store";
+import { useWorkspaceChatStore } from "./features/workspace/chatStore";
 import { ChatScreen } from "./features/chat/ChatScreen";
 import { ModelsScreen } from "./features/models/ModelsScreen";
 import { useModelsStore } from "./features/models/store";
@@ -18,6 +20,10 @@ function App() {
     "chat" | "workspace" | "models" | "settings"
   >("chat");
   const [hasVisitedWorkspace, setHasVisitedWorkspace] = useState(false);
+  const screenRef = useRef(screen);
+  useEffect(() => {
+    screenRef.current = screen;
+  }, [screen]);
   const [startAdding, setStartAdding] = useState(false);
   const [quitPrompt, setQuitPrompt] = useState(false);
 
@@ -46,6 +52,18 @@ function App() {
       }
     };
     void commands.watchClose(channel);
+    // Files dropped on the window are read by Rust; they join the chat on screen.
+    const drops = new Channel<Attachments_Deserialize>();
+    drops.onmessage = ({ added, refused }) => {
+      const target =
+        screenRef.current === "chat"
+          ? useChatStore
+          : screenRef.current === "workspace"
+            ? useWorkspaceChatStore
+            : null;
+      target?.getState().addAttachments(added, refused);
+    };
+    void commands.watchDrops(drops);
     return () => {
       stopped = true;
       clearTimeout(timer);

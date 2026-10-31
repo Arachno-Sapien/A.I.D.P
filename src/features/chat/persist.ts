@@ -8,6 +8,7 @@ export interface StoredEnvelope {
   chips?: string[];
   target?: UiMessage["target"];
   parts?: UiMessage["parts"];
+  attachments?: UiMessage["attachments"];
   /** The whole error, so a provider error keeps its message after a restart. */
   error?: UiMessage["error"];
 }
@@ -20,6 +21,7 @@ export function toStored(m: UiMessage): string {
     chips: m.chips,
     target: m.target,
     parts: m.parts,
+    attachments: m.attachments,
     error: m.error,
   };
   return JSON.stringify(envelope);
@@ -73,6 +75,7 @@ export function fromStored(rowOrJson: StoredMessage | string): UiMessage {
     chips: parsed?.chips,
     target: parsed?.target,
     parts: parsed?.parts,
+    attachments: parsed?.attachments,
     status,
     modelName,
     error,

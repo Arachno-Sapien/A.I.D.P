@@ -100,7 +100,7 @@ Folder selection uses `tauri-plugin-dialog` v2:
 - **Recent folder validation:** `open_recent` verifies that any requested path matches an entry in the SQLite `settings` table before opening, preventing arbitrary path opening via forged IPC calls.
 
 ### Release CSP and the editor
-- The release CSP is `default-src 'self' ipc: http://ipc.localhost; style-src 'self' 'unsafe-inline'` (decision 0009). Scripts are still limited to the app's own files: `script-src` falls back to `default-src 'self'`.
+- The release CSP is `default-src 'self' ipc: http://ipc.localhost; style-src 'self' 'unsafe-inline'; img-src 'self' data:` (decision 0009; `img-src` since decision 0019). Scripts are still limited to the app's own files: `script-src` falls back to `default-src 'self'`.
 - Why inline styles are allowed: CodeMirror creates a `<style>` element at runtime. Under the earlier policy (no inline styles) the M3 live check showed the release editor without its layout (2026-10-30). Dev already allowed inline styles, which is why only the release build was affected.
 - Keep `index.html` free of `<style>` tags: if one appears, Tauri adds a nonce to `style-src`, browsers then ignore `'unsafe-inline'`, and the editor breaks again.
 
@@ -181,4 +181,5 @@ Milestone 5 introduces local model support via Ollama and persistent chat histor
 - **Stored by hash.** Files live in `<app data>/attachments/` under their SHA-256. Every command that takes an ID checks for 64 lowercase hex characters before building a path, so an ID can't climb out of that folder.
 - **PDFs are parsed in a child process.** The parser can panic or hang on a malformed file, and the release build aborts on panic. So the app runs its own executable as `aidp --pdf-text <pdf> <out>`, with no window and nothing inherited, and kills it after 20 seconds. Only that child can die.
 - **Secret-looking files** picked by hand are allowed (rule 6 covers what the user adds by hand) and carry the warning "Looks like a secret file".
+- **Thumbnails.** An attached image's thumbnail is a `data:` URL built from the bytes `read_attachment` returns, so the CSP allows `img-src 'self' data:`. Remote images stay blocked. Model replies can't use the allowance: react-markdown's URL check drops `data:` sources, which a test in `Markdown.test.tsx` pins.
 - Attachment contents are never logged.

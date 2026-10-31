@@ -346,6 +346,7 @@ export function AiPanel({ onApply }: AiPanelProps) {
 
       {/* Composer */}
       <Composer
+        store={useWorkspaceChatStore}
         onSend={handleSend}
         onStop={stop}
         streaming={streaming}

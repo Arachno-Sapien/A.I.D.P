@@ -18,6 +18,15 @@ afterEach(() => {
 });
 
 describe("MessageList", () => {
+  it("a sent message shows its attachments", () => {
+    const sent: UiMessage = {
+      id: "u1", role: "user", text: "", status: "complete",
+      attachments: [{ id: "b".repeat(64), name: "notes.md", mime: "text/plain", size: 5, kind: "text", warning: null }],
+    };
+    const { getByText } = render(<MessageList messages={[sent]} />);
+    expect(getByText("notes.md")).toBeDefined();
+  });
+
   it("re-renders only the message that changed", () => {
     // Every streamed chunk makes a new messages array in which only the
     // streaming message is a new object; the others must not parse again.

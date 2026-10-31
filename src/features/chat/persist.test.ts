@@ -118,3 +118,9 @@ it("keeps a provider error's message", () => {
 
   expect(fromStored(row).error).toEqual({ kind: "provider", message: "upstream failed" });
 });
+
+it("keeps a message's attachments", () => {
+  const attachments = [{ id: "c".repeat(64), name: "a.pdf", mime: "application/pdf", size: 9, kind: "pdf" as const, warning: null }];
+  const back = fromStored(toStored({ id: "1", role: "user", text: "", status: "complete", attachments }));
+  expect(back.attachments).toEqual(attachments);
+});

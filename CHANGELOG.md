@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Attachments in Chat and the workspace side chat: images, text or code files and PDFs, up to 5 per message, from the paperclip, a drop on the window, or a paste. Images go to models that can read them; text and a PDF's text are added to the message. Local models that Ollama reports can't see refuse images before anything is sent (decision 0019).
+
 ## [0.1.0-rc.2] - 2026-10-31
 
 ### Added

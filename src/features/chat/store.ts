@@ -3,6 +3,7 @@ import { create } from "zustand";
 import {
   commands,
   type AppError,
+  type Attachment_Deserialize,
   type ChatEvent,
   type ChatEvent_Deserialize,
   type ChatInput_Deserialize,
@@ -16,6 +17,29 @@ import { useModelsStore } from "../models/store";
 import { fromStored, toStored } from "./persist";
 
 export type MessageStatus = "streaming" | "complete" | "stopped" | "error";
+
+/** A file attached to a message; Rust holds the bytes (decision 0019). */
+export type MessageAttachment = Attachment_Deserialize;
+
+export const MAX_ATTACHMENTS = 5;
+export const NO_VISION = "This model can't read images";
+
+/** A file's bytes as base64, for `attach_bytes`. */
+async function toBase64(file: Blob): Promise<string> {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  }
+  return btoa(binary);
+}
+
+/** What the model gets of a message's attachments: their IDs and names. */
+function attachmentRefs(list?: MessageAttachment[]) {
+  return list && list.length > 0
+    ? { attachments: list.map(({ id, name }) => ({ id, name })) }
+    : {};
+}
 
 export interface ApplyTarget {
   path: string;
@@ -50,6 +74,7 @@ export interface UiMessage {
   chips?: string[];
   target?: ApplyTarget;
   parts?: MessagePart[];
+  attachments?: MessageAttachment[];
   status: MessageStatus;
   modelRef?: string;
   modelName?: string;
@@ -71,7 +96,15 @@ export interface ChatStore {
   place: string | null;
   conversations: Conversation[];
   saveError: string | null;
+  /** Files attached to the message being written. */
+  pending: MessageAttachment[];
+  /** Why a file wasn't attached, or why the message can't be sent. */
+  attachNotice: string | null;
 
+  addAttachments(list: MessageAttachment[], refused?: string[]): void;
+  removeAttachment(id: string): void;
+  pickAttachments(): Promise<void>;
+  pasteFiles(files: File[]): Promise<void>;
   openPlace(place: string | null): Promise<void>;
   load(id: number): Promise<void>;
   startNew(): void;
@@ -104,6 +137,55 @@ export const createChatStore = (surface: ChatSurface, hooks?: ChatHooks) => {
     place: null,
     conversations: [],
     saveError: null,
+    pending: [],
+    attachNotice: null,
+
+    addAttachments: (list: MessageAttachment[], refused: string[] = []) => {
+      const pending = [...get().pending];
+      const notes = [...refused];
+      for (const attachment of list) {
+        if (pending.some((p) => p.id === attachment.id)) continue;
+        if (pending.length >= MAX_ATTACHMENTS) {
+          notes.push(`A message takes at most ${MAX_ATTACHMENTS} attachments.`);
+          break;
+        }
+        pending.push(attachment);
+      }
+      set({ pending, attachNotice: notes.length > 0 ? notes.join("\n") : null });
+    },
+
+    removeAttachment: (id: string) => {
+      set({ pending: get().pending.filter((a) => a.id !== id), attachNotice: null });
+    },
+
+    // Rust opens the dialog and reads the files; the UI never sees a path.
+    pickAttachments: async () => {
+      const res = await commands.pickAttachments();
+      if (res.status === "ok") {
+        get().addAttachments(res.data.added, res.data.refused);
+      } else {
+        set({ attachNotice: "Couldn't open those files." });
+      }
+    },
+
+    pasteFiles: async (files: File[]) => {
+      const added: MessageAttachment[] = [];
+      const refused: string[] = [];
+      for (const file of files) {
+        const name = file.name || "pasted-image.png";
+        const res = await commands.attachBytes(name, await toBase64(file));
+        if (res.status === "ok") {
+          added.push(res.data);
+        } else {
+          refused.push(
+            res.error.kind === "invalidInput"
+              ? res.error.message
+              : `${name} couldn't be attached.`,
+          );
+        }
+      }
+      get().addAttachments(added, refused);
+    },
 
     openPlace: async (place: string | null) => {
       set({ place, opened: true });
@@ -189,7 +271,21 @@ export const createChatStore = (surface: ChatSurface, hooks?: ChatHooks) => {
       extra?: SendExtra,
     ) => {
       const trimmed = text.trim();
-      if (!trimmed || get().streaming) {
+      const pending = get().pending;
+      if ((!trimmed && pending.length === 0) || get().streaming) {
+        return;
+      }
+
+      const knownModel = useModelsStore
+        .getState()
+        .chatModels.find(
+          (m) =>
+            m.connectionId === model.connectionId &&
+            m.modelId === model.modelId,
+        );
+      // Rust refuses this too; stopping here keeps the message and its files.
+      if (knownModel?.supportsVision === false && pending.some((a) => a.kind === "image")) {
+        set({ attachNotice: NO_VISION });
         return;
       }
 
@@ -197,7 +293,10 @@ export const createChatStore = (surface: ChatSurface, hooks?: ChatHooks) => {
 
       let activeConvId = get().conversationId;
       if (activeConvId === null) {
-        const createRes = await commands.createConversation(trimmed, get().place);
+        const createRes = await commands.createConversation(
+          trimmed || pending[0].name,
+          get().place,
+        );
         if (createRes.status === "ok") {
           activeConvId = createRes.data.id;
           set((state) => ({
@@ -210,13 +309,6 @@ export const createChatStore = (surface: ChatSurface, hooks?: ChatHooks) => {
       }
 
       const modelRef = `${model.connectionId}:${model.modelId}`;
-      const knownModel = useModelsStore
-        .getState()
-        .chatModels.find(
-          (m) =>
-            m.connectionId === model.connectionId &&
-            m.modelId === model.modelId,
-        );
       const modelName =
         knownModel?.displayName || knownModel?.modelId || model.modelId;
 
@@ -226,6 +318,7 @@ export const createChatStore = (surface: ChatSurface, hooks?: ChatHooks) => {
         text: trimmed,
         content: extra?.content,
         chips: extra?.chips,
+        attachments: pending.length > 0 ? pending : undefined,
         status: "complete",
       };
 
@@ -264,14 +357,19 @@ export const createChatStore = (surface: ChatSurface, hooks?: ChatHooks) => {
       for (const m of get().messages) {
         if (
           (m.status === "complete" || m.status === "stopped") &&
-          m.text.trim() !== ""
+          (m.text.trim() !== "" || (m.attachments?.length ?? 0) > 0)
         ) {
-          history.push({ role: m.role, content: m.content ?? m.text });
+          history.push({
+            role: m.role,
+            content: m.content ?? m.text,
+            ...attachmentRefs(m.attachments),
+          });
         }
       }
       history.push({
         role: "user",
         content: extra?.content ?? trimmed,
+        ...attachmentRefs(pending),
       });
 
       inFlightReplies.set(assistantId, {
@@ -285,6 +383,8 @@ export const createChatStore = (surface: ChatSurface, hooks?: ChatHooks) => {
         ),
         messages: [...state.messages, userMessage, assistantPlaceholder],
         streaming: true,
+        pending: [],
+        attachNotice: null,
       }));
 
       const channel = new Channel<ChatEvent_Deserialize>();
