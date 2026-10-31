@@ -64,7 +64,9 @@ Pushed `691cfb2` on 2026-10-31; CI run 41217002508 green on three OSes (233 Vite
 The human checked pin, archive, the chat list (hide, resize) and code colouring in the installed rc.2 on 2026-10-31: "All work".
 RAM of the installed rc.2 (2026-10-31, `docs/dev/measure-ram.md`): idle 128–129 MB; workspace 151–169 MB; terminal open 246 MB (shell 26); after a `qwen2.5-coder:1.5b` reply (1,444 tokens, 6,911 characters) with the terminal open: 557 MB peak while streaming (page 292, GPU process 197), 273 MB for about 2 minutes, then 183 MB (160 without the shell) from 5 minutes after the reply. At rest within the 200 MB budget even with the terminal; the peak while streaming is not. Peak not yet explained (likely: the reply being written is parsed and highlighted again on every token).
 The human accepted the streaming peak for 0.1.0 on 2026-10-31 ("Accept for 0.1.0"); RAM box ticked. After 0.1.0: confirm the cause in the browser with a fake 1,400-token stream, then likely render the reply being written at most ~10 times a second and skip highlighting finished code blocks again.
-Next step: the Linux and 8 GB check in an Ubuntu VM with a real project open (the human's VM).
+The human deferred the Linux/8 GB check and the macOS check on 2026-10-31 ("Let's skip this check for now. The other OSs we will check later") and asked to refine what is built first: attach images and files in Chat, and polish the UI with themes.
+The human chose (2026-11-01): attachments of images, text files and PDFs; all five theme directions (refined flat, Glass, Soft, plus Cyber/digital and Elegant); ship them as `0.1.0-rc.3`, then 0.1.0. Plans written by Claude Code (Opus 5.5): `docs/superpowers/plans/2026-11-01-m6-attachments.md` (A1–A8, three tasks) and `docs/superpowers/plans/2026-11-01-m6-themes.md` (T1–T7, three tasks), defaults not yet approved.
+Next step: the human approves the defaults (or changes them); then attachments Task 1, then themes.
 
 ## Next 3 tasks
 
