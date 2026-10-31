@@ -62,6 +62,7 @@ The database file contains **no secret keys**. Even if the database file is extr
 
 - **HTTPS required for cloud endpoints:** All cloud providers must use `https://`.
 - **Local HTTP exception:** Plain `http://` is allowed only for `localhost`, loopback addresses (`127.0.0.1`, `::1`), and private LAN IP ranges (e.g., `192.168.x.x`, `10.x.x.x`, `172.16-31.x.x`) to support local inference engines like Ollama or LM Studio. Any public unencrypted URL is rejected upfront with `AppError::InsecureUrl` before any network request is initiated.
+- **Update check:** the only call that isn't to a provider or Ollama goes to `github.com` over HTTPS, for the release's `latest.json` and, after you click Install, the installer (see section 11).
 
 ---
 
@@ -151,6 +152,16 @@ Milestone 5 introduces local model support via Ollama and persistent chat histor
 ### Chat History Storage
 - **Unencrypted SQLite database:** Conversations and messages are stored in `aidp.db` inside the user's OS application data directory (`%APPDATA%\com.aidp.desktop\aidp.db` on Windows).
 - **Sensitive data awareness:** Chat history stores user questions, attached files, and assistant replies unencrypted. While secret files are blocked from automated attachments, any file content or code explicitly sent by the user is persisted locally in `aidp.db`.
+
+---
+
+## 11. Updates
+
+- **Signed:** every installer and update is signed in CI with a private key only the maintainer holds (GitHub secrets `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`, plus the maintainer's own backup; never in the repo, chat, logs or memory files). The app checks each download against the public key in `tauri.conf.json` before installing it, and refuses one that doesn't match. Signing can't be turned off.
+- **What the check sends:** a plain HTTPS request for `https://github.com/Arachno-Sapien/A.I.D.P/releases/latest/download/latest.json`. GitHub sees the request (your IP address); nothing else is sent. The check runs once, 10 seconds after start, unless **Check for updates at start** is off in Settings, and whenever you click **Check for updates**.
+- **Nothing installs on its own:** an update downloads and installs only after you click **Install and restart**, and never while a file has unsaved changes. A streaming reply or a running command is stopped, the same as quitting.
+- **No window access:** the updater plugin is driven only from Rust (`commands/updates.rs`). No updater permission is granted in the capability file, so the window can't call the plugin's own commands.
+- **Transport:** the plugin uses native-tls like the rest of the app (decision 0006), with its rustls feature off.
 
 
 **What this protects against:**

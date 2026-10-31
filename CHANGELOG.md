@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Signed updates: the app checks GitHub Releases 10 seconds after start (can be turned off in Settings) or on **Check for updates**, shows a bar when a new version exists, and installs it only on **Install and restart**, never with unsaved files. Settings shows the app version.
 - Workspace layout: the file tree and the AI panel can be shown or hidden (**Files** and **AI** buttons, `Ctrl+B` and `Ctrl+Alt+B`) and resized by dragging the line beside them. The AI panel reopens when a command waits for approval.
 - The window opens at 1024×640 (minimum 720×480), and the workspace panels shrink to fit a smaller window instead of overflowing.
 - Local model runtime powered by Ollama: status detection, in-app start, model pull with live progress and cancel, deletion with confirmation, and memory unloading ("Free memory").

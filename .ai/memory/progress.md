@@ -44,10 +44,12 @@ M6 Task 3 done 2026-10-31 by Claude Code (Opus 5.5): job object for Stop on Wind
 M6 Task 4 done 2026-10-31 by Antigravity (Gemini 2.5 Pro): Agent label `shrink-0 whitespace-nowrap` in `AiPanel.tsx`, model select `min-w-0 truncate` with `title` in `ModelPicker.tsx`; `inFlightReplies` in `createChatStore` retains originating `conversationId` and streamed text so partial replies on folder switch are saved to the correct conversation. 189 Vitest tests and 217 Rust tests passing.
 Tasks 1 to 4 reviewed by Claude Code (Opus 5.5) on 2026-10-31: gate green (217 Rust, 189 Vitest), no blocking findings.
 M6 Task 4b done 2026-10-31 by Claude Code (Opus 5.5): window 1024×640 (min 720×480, centred); file tree and AI panel toggle (Files / AI, Ctrl+B / Ctrl+Alt+B) and resize (`Splitter.tsx`), shrink before overflowing; AI panel reopens on a pending approval; shortcuts only on the Workspace screen. 196 Vitest, 217 Rust. The human checked it in the dev app on 2026-10-31: "Looks right".
-Next step: M6 Task 5 (signed updates) waits for the public update key (D4).
+The human created the update key on 2026-10-31: both GitHub secrets set; public key in `%USERPROFILE%\.tauri\aidp.key.pub` (key ID EE9A69E11D7D346C).
+M6 Task 5 done 2026-10-31 by Claude Code (Opus 5.5): `tauri-plugin-updater` 2.14 (native-tls, no rustls), `plugins.updater` with the public key and the GitHub `latest.json` endpoint, `updates.rs`, `commands/updates.rs` (`app_version`, `check_update`, `install_update`), setting `check_updates_at_start`, `UpdateBar`, Settings → Updates, quiet check 10 s after start. 220 Rust, 204 Vitest. Install is untested until a release exists (Task 8).
+Next step: M6 Task 6, the Release workflow (`.github/workflows/release.yml`, `src-tauri/tauri.updater.conf.json`, bundle settings, version `0.1.0-rc.1`, `docs/dev/release.md`).
 
 ## Next 3 tasks
 
-1. The human creates the update signing key (D4) and hands over the public key.
-2. M6 Task 5: signed updates (check, install, setting).
-3. M6 Tasks 6 to 8: the Release workflow, docs, release candidates and v0.1.0.
+1. M6 Task 6: the Release workflow and bundle settings (0.1.0-rc.1).
+2. M6 Task 7: docs (decision 0017, install guide per OS, release how-to).
+3. M6 Task 8: release candidates, RAM, the 8 GB and Linux checks, update test, v0.1.0.

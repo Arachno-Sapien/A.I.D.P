@@ -25,8 +25,10 @@ vi.mock("./lib/bindings", () => ({
     }),
     getSettings: vi.fn().mockResolvedValue({
       status: "ok",
-      data: { theme: "dark", keepAlive: "ollamaDefault" },
+      data: { theme: "dark", keepAlive: "ollamaDefault", checkUpdatesAtStart: false },
     }),
+    appVersion: vi.fn().mockResolvedValue("0.1.0"),
+    checkUpdate: vi.fn().mockResolvedValue({ status: "ok", data: null }),
   },
 }));
 
@@ -222,5 +224,30 @@ describe("App", () => {
     fireEvent.click(settingsNav);
 
     expect(screen.getByRole("heading", { name: "Settings" })).toBeDefined();
+  });
+
+  it.each([
+    [true, 1],
+    [false, 0],
+  ])("checks for updates 10 s after start when the setting is %s", async (on, calls) => {
+    vi.useFakeTimers();
+    try {
+      vi.mocked(commands.getSettings).mockResolvedValueOnce({
+        status: "ok",
+        data: { theme: "dark", keepAlive: "ollamaDefault", checkUpdatesAtStart: on },
+      });
+      vi.mocked(commands.checkUpdate).mockResolvedValue({ status: "ok", data: null });
+      render(<App />);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(9_000);
+      });
+      expect(commands.checkUpdate).not.toHaveBeenCalled();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1_000);
+      });
+      expect(commands.checkUpdate).toHaveBeenCalledTimes(calls);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

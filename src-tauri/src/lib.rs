@@ -8,6 +8,7 @@ pub mod login_path;
 pub mod ollama;
 pub mod secrets;
 pub mod tools;
+pub mod updates;
 pub mod workspace;
 
 use std::sync::Arc;
@@ -77,6 +78,10 @@ fn specta_builder() -> Builder<tauri::Wry> {
         commands::settings::get_settings,
         commands::settings::set_theme,
         commands::settings::set_keep_alive,
+        commands::settings::set_check_updates,
+        commands::updates::app_version,
+        commands::updates::check_update,
+        commands::updates::install_update,
         close_guard::set_unsaved,
         close_guard::watch_close,
         close_guard::quit_app,
@@ -87,6 +92,9 @@ pub fn run() -> tauri::Result<()> {
     let builder = specta_builder();
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        // Driven only from Rust (commands/updates.rs); no updater permission is
+        // granted, so the window cannot call the plugin's own commands.
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(
             tauri::plugin::Builder::<tauri::Wry>::new("nav-guard")
                 .on_navigation(|_window, url| is_app_url(url))
@@ -113,6 +121,7 @@ pub fn run() -> tauri::Result<()> {
         .manage(tools::pty::TerminalState::default())
         .manage(commands::ollama::OllamaState::default())
         .manage(close_guard::CloseGuard::default())
+        .manage(updates::UpdateState::default())
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 let guard = window.state::<close_guard::CloseGuard>();

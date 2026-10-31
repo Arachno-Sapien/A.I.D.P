@@ -45,6 +45,14 @@ export const commands = {
 	getSettings: () => typedError<AppSettings, AppError_Serialize>(__TAURI_INVOKE("get_settings")),
 	setTheme: (theme: Theme) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("set_theme", { theme })),
 	setKeepAlive: (keepAlive: KeepAlive) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("set_keep_alive", { keepAlive })),
+	setCheckUpdates: (enabled: boolean) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("set_check_updates", { enabled })),
+	appVersion: () => __TAURI_INVOKE<string>("app_version"),
+	checkUpdate: () => typedError<UpdateInfo_Serialize | null, AppError_Serialize>(__TAURI_INVOKE("check_update")),
+	/**
+	 *  Downloads, verifies against the public key, installs and restarts. On
+	 *  Windows the installer closes the app itself.
+	 */
+	installUpdate: (out: Channel<UpdateEvent>) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("install_update", { out })),
 	setUnsaved: (unsaved: boolean) => __TAURI_INVOKE<void>("set_unsaved", { unsaved }),
 	watchClose: (onClose: Channel<boolean>) => __TAURI_INVOKE<void>("watch_close", { onClose }),
 	quitApp: () => __TAURI_INVOKE<void>("quit_app"),
@@ -65,13 +73,14 @@ export type AddedConnection_Serialize = {
 
 export type AppError = AppError_Serialize | AppError_Deserialize;
 
-export type AppError_Deserialize = { kind: "provider"; error: ProviderError_Deserialize } | { kind: "notFound" } | { kind: "keyMissing" } | { kind: "invalidInput"; message: string } | { kind: "insecureUrl"; url: string } | { kind: "keychain"; message: string } | { kind: "storage"; message: string } | { kind: "ollama"; message: string };
+export type AppError_Deserialize = { kind: "provider"; error: ProviderError_Deserialize } | { kind: "notFound" } | { kind: "keyMissing" } | { kind: "invalidInput"; message: string } | { kind: "insecureUrl"; url: string } | { kind: "keychain"; message: string } | { kind: "storage"; message: string } | { kind: "ollama"; message: string } | { kind: "update"; message: string };
 
-export type AppError_Serialize = { kind: "provider"; error: ProviderError_Serialize } | { kind: "notFound" } | { kind: "keyMissing" } | { kind: "invalidInput"; message: string } | { kind: "insecureUrl"; url: string } | { kind: "keychain"; message: string } | { kind: "storage"; message: string } | { kind: "ollama"; message: string };
+export type AppError_Serialize = { kind: "provider"; error: ProviderError_Serialize } | { kind: "notFound" } | { kind: "keyMissing" } | { kind: "invalidInput"; message: string } | { kind: "insecureUrl"; url: string } | { kind: "keychain"; message: string } | { kind: "storage"; message: string } | { kind: "ollama"; message: string } | { kind: "update"; message: string };
 
 export type AppSettings = {
 	theme: Theme,
 	keepAlive: KeepAlive,
+	checkUpdatesAtStart: boolean,
 };
 
 export type ChatEvent = ChatEvent_Serialize | ChatEvent_Deserialize;
@@ -317,6 +326,27 @@ export type ToolOutcome = ToolOutcome_Serialize | ToolOutcome_Deserialize;
 export type ToolOutcome_Deserialize = { status: "ok"; summary: string } | { status: "command"; exitCode?: number | null; output: string; timedOut: boolean } | { status: "declined" } | { status: "error"; message: string } | { status: "stopped" };
 
 export type ToolOutcome_Serialize = { status: "ok"; summary: string } | { status: "command"; exitCode: number | null; output: string; timedOut: boolean } | { status: "declined" } | { status: "error"; message: string } | { status: "stopped" };
+
+export type UpdateEvent = 
+/**  Kilobytes so far and in all (0 when the server does not say). */
+{ event: "progress"; data: {
+	downloadedKb: number,
+	totalKb: number,
+} } | 
+/**  The download is done and verified; the installer runs next. */
+{ event: "installing" };
+
+export type UpdateInfo = UpdateInfo_Serialize | UpdateInfo_Deserialize;
+
+export type UpdateInfo_Deserialize = {
+	version: string,
+	notes?: string | null,
+};
+
+export type UpdateInfo_Serialize = {
+	version: string,
+	notes: string | null,
+};
 
 export type Usage = Usage_Serialize | Usage_Deserialize;
 

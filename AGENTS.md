@@ -80,6 +80,7 @@ Chosen for low memory use and tools agents know well. **No new dependency withou
 | Terminal (M4) | `@xterm/xterm` 6 + `@xterm/addon-fit` with `portable-pty` |
 | Tests | `cargo test` + wiremock (fake provider servers), Vitest |
 | Builds | GitHub Actions + tauri-action |
+| Updates (M6) | tauri-plugin-updater (native-tls), called from Rust only; signed with a key only the human holds |
 
 Package manager: **npm**.
 
@@ -168,6 +169,8 @@ src-tauri/
     workspace/             open folder, path checks, file read/write, secret filter (M3)
     tools/                 tool definitions, tool-call loop, approvals, commands, PTY (M4)
     connections.rs         connection and model orchestration service
+    updates.rs             update state and checks; the plugin is driven from commands/updates.rs
+    login_path.rs          PATH from the login shell on macOS and Linux (called first in main.rs)
     secrets.rs             keychain wrapper, the ONLY file that touches keys
     db/
       mod.rs               schema, numbered migrations, SQLite connection

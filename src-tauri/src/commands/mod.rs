@@ -5,4 +5,5 @@ pub mod ollama;
 pub mod settings;
 pub mod terminal;
 pub mod tools;
+pub mod updates;
 pub mod workspace;

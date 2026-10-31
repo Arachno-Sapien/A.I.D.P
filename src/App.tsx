@@ -6,6 +6,8 @@ import { ModelsScreen } from "./features/models/ModelsScreen";
 import { useModelsStore } from "./features/models/store";
 import { SettingsScreen } from "./features/settings/SettingsScreen";
 import { useSettingsStore } from "./features/settings/store";
+import { UpdateBar } from "./features/settings/UpdateBar";
+import { START_CHECK_DELAY_MS, useUpdatesStore } from "./features/settings/updates";
 import { WorkspaceScreen } from "./features/workspace/WorkspaceScreen";
 import { useWorkspaceStore } from "./features/workspace/store";
 import "./App.css";
@@ -23,7 +25,19 @@ function App() {
 
   useEffect(() => {
     void useModelsStore.getState().refreshOllama();
-    void useSettingsStore.getState().load();
+    // One quiet update check, a little after start, when the setting allows it.
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    void useSettingsStore
+      .getState()
+      .load()
+      .then(() => {
+        if (stopped || !useSettingsStore.getState().checkUpdatesAtStart) return;
+        timer = setTimeout(
+          () => void useUpdatesStore.getState().check(true),
+          START_CHECK_DELAY_MS,
+        );
+      });
     const channel = new Channel<boolean>();
     channel.onmessage = (closeRequested) => {
       if (closeRequested) {
@@ -31,6 +45,10 @@ function App() {
       }
     };
     void commands.watchClose(channel);
+    return () => {
+      stopped = true;
+      clearTimeout(timer);
+    };
   }, []);
 
   const handleSelectScreen = (
@@ -99,6 +117,7 @@ function App() {
           </button>
         </nav>
       </header>
+      <UpdateBar />
 
       <main className="flex-1 overflow-hidden relative flex flex-col">
         {screen === "chat" && (

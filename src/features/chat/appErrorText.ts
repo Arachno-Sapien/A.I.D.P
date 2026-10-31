@@ -19,5 +19,7 @@ export function appErrorText(e: AppError): string {
       return `Couldn't read or write the local database: ${e.message}`;
     case "ollama":
       return e.message;
+    case "update":
+      return e.message;
   }
 }

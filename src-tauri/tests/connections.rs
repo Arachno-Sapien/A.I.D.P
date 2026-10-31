@@ -1097,15 +1097,18 @@ async fn settings_round_trip() {
     let initial = services.get_settings().expect("read default settings");
     assert_eq!(initial.theme, Theme::Dark);
     assert_eq!(initial.keep_alive, KeepAlive::OllamaDefault);
+    assert!(initial.check_updates_at_start);
 
     services.set_theme(Theme::Light).expect("set theme");
     services
         .set_keep_alive(KeepAlive::OneHour)
         .expect("set keep alive");
+    services.set_check_updates(false).expect("set check updates");
 
     let updated = services.get_settings().expect("read updated settings");
     assert_eq!(updated.theme, Theme::Light);
     assert_eq!(updated.keep_alive, KeepAlive::OneHour);
+    assert!(!updated.check_updates_at_start);
 
     let ollama_id = services
         .ensure_ollama_connection()

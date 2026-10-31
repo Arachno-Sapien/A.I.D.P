@@ -7,12 +7,14 @@ export interface SettingsStore {
   theme: Theme;
   resolved: "dark" | "light";
   keepAlive: KeepAlive;
+  checkUpdatesAtStart: boolean;
   loaded: boolean;
   loadError: string | null;
 
   load(): Promise<void>;
   setTheme(theme: Theme): Promise<void>;
   setKeepAlive(keepAlive: KeepAlive): Promise<void>;
+  setCheckUpdates(enabled: boolean): Promise<void>;
 }
 
 export const useSettingsStore = create<SettingsStore>((set) => {
@@ -24,6 +26,7 @@ export const useSettingsStore = create<SettingsStore>((set) => {
     theme: "dark",
     resolved: "dark",
     keepAlive: "ollamaDefault",
+    checkUpdatesAtStart: true,
     loaded: false,
     loadError: null,
 
@@ -35,6 +38,7 @@ export const useSettingsStore = create<SettingsStore>((set) => {
           theme: res.data.theme,
           resolved,
           keepAlive: res.data.keepAlive,
+          checkUpdatesAtStart: res.data.checkUpdatesAtStart,
           loaded: true,
           loadError: null,
         });
@@ -57,6 +61,11 @@ export const useSettingsStore = create<SettingsStore>((set) => {
     setKeepAlive: async (keepAlive: KeepAlive) => {
       set({ keepAlive });
       await commands.setKeepAlive(keepAlive);
+    },
+
+    setCheckUpdates: async (enabled: boolean) => {
+      set({ checkUpdatesAtStart: enabled });
+      await commands.setCheckUpdates(enabled);
     },
   };
 });

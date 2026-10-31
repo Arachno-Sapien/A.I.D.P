@@ -22,3 +22,9 @@ pub fn set_keep_alive(
     services.set_keep_alive(keep_alive)
 }
 
+#[tauri::command]
+#[specta::specta]
+pub fn set_check_updates(services: State<'_, Services>, enabled: bool) -> Result<(), AppError> {
+    services.set_check_updates(enabled)
+}
+

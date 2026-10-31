@@ -35,5 +35,16 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEVFOUE2OUUxMUQ3RDM0NkMKUldSc05IMGQ0V21hN3BOZ1BndFN0YWZnc3gxZHl0NnJLWVorcmV6VWZmR3NQYnJpOUFNRzNaYzkK",
+      "endpoints": [
+        "https://github.com/Arachno-Sapien/A.I.D.P/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }

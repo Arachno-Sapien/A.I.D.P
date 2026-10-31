@@ -47,6 +47,7 @@ Tauri 2 with a React frontend and a Rust core. Every choice below favours low me
 | Terminal (M4) | xterm.js + `portable-pty` | xterm.js draws the terminal; portable-pty runs the shell through Windows ConPTY (Unix PTYs later) |
 | Tests | cargo test + wiremock, Vitest | Fake provider servers for adapter tests |
 | Builds | GitHub Actions + tauri-action | Windows, macOS, Linux installers from one push |
+| Updates (M6) | tauri-plugin-updater (native-tls), driven from Rust | Signed updates from GitHub Releases; no plugin permission reaches the window |
 
 ## Architecture
 
@@ -226,7 +227,7 @@ Four screens: Chat, Workspace, Models, and Settings. A first-time user lands on 
 - Connections list: provider, label, masked key, last test result, Test and Delete buttons.
 - Local panel: Ollama status, downloaded models with size, which ones are loaded in memory, Download / Delete / Free memory.
 
-**Settings:** theme, default model, keep\_alive, chat history location, export all chats.
+**Settings:** theme, default model, keep\_alive, chat history location, export all chats. Updates (M6): the version, **Check for updates at start**, and **Check for updates**; a found update shows a bar under the header with **Install and restart** and **Later**.
 
 **Flow: add a cloud model**
 

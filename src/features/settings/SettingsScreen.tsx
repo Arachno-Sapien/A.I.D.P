@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { parseModelKey, useModelsStore } from "../models/store";
 import { useSettingsStore } from "./store";
+import { useUpdatesStore } from "./updates";
 import { commands, type KeepAlive, type Theme } from "../../lib/bindings";
 
 const THEME_OPTIONS: { id: Theme; label: string }[] = [
@@ -19,15 +20,39 @@ const KEEP_ALIVE_OPTIONS: { id: KeepAlive; label: string }[] = [
 ];
 
 export function SettingsScreen() {
-  const { theme, keepAlive, loaded, loadError, load, setTheme, setKeepAlive } =
-    useSettingsStore();
+  const {
+    theme,
+    keepAlive,
+    checkUpdatesAtStart,
+    loaded,
+    loadError,
+    load,
+    setTheme,
+    setKeepAlive,
+    setCheckUpdates,
+  } = useSettingsStore();
   const { chatModels, selected, refresh } = useModelsStore();
+  const {
+    version,
+    found,
+    checking,
+    upToDate,
+    error: updateError,
+    loadVersion,
+    check,
+  } = useUpdatesStore();
 
   useEffect(() => {
     if (!loaded) {
       void load();
     }
   }, [loaded, load]);
+
+  useEffect(() => {
+    if (version === null) {
+      void loadVersion();
+    }
+  }, [version, loadVersion]);
 
   const selectedValue = selected
     ? `${selected.connectionId}:${selected.modelId}`
@@ -184,6 +209,51 @@ export function SettingsScreen() {
                 </button>
               );
             })}
+          </div>
+        </div>
+
+        {/* Section 4: Updates */}
+        <div className="p-5 rounded-xl bg-neutral-900 border border-neutral-800 space-y-3">
+          <div>
+            <h2 className="text-sm font-semibold text-white">Updates</h2>
+            <p className="text-xs text-neutral-400 mt-0.5">
+              Updates come from GitHub Releases and are checked against the
+              app's signing key before they install. Nothing installs until you
+              click Install.
+            </p>
+          </div>
+
+          <p className="text-xs text-neutral-300">
+            <span>Version {version ?? "…"}</span>
+          </p>
+
+          <label className="flex items-center gap-2 text-xs text-neutral-300 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={checkUpdatesAtStart}
+              onChange={(e) => void setCheckUpdates(e.target.checked)}
+              className="rounded bg-neutral-800 border-neutral-700 cursor-pointer"
+            />
+            Check for updates at start
+          </label>
+
+          <div className="flex items-center gap-3 text-xs">
+            <button
+              type="button"
+              disabled={checking}
+              onClick={() => void check(false)}
+              className="px-3 py-1.5 rounded-lg border border-neutral-800 bg-neutral-950 text-neutral-200 hover:border-neutral-700 hover:text-white transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-default"
+            >
+              {checking ? "Checking…" : "Check for updates"}
+            </button>
+            {upToDate && <span className="text-neutral-400">You're up to date.</span>}
+            {found && (
+              <span className="text-neutral-300">
+                Version {found.version} is available; install it from the bar at
+                the top.
+              </span>
+            )}
+            {updateError && <span className="text-red-400">{updateError}</span>}
           </div>
         </div>
       </div>

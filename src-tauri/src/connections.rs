@@ -163,6 +163,7 @@ impl KeepAlive {
 pub struct AppSettings {
     pub theme: Theme,
     pub keep_alive: KeepAlive,
+    pub check_updates_at_start: bool,
 }
 
 #[derive(Serialize, Deserialize, Type, Clone, Debug, PartialEq)]
@@ -176,6 +177,7 @@ pub enum AppError {
     Keychain { message: String },
     Storage { message: String },
     Ollama { message: String },
+    Update { message: String },
 }
 
 impl From<rusqlite::Error> for AppError {
@@ -523,7 +525,13 @@ impl Services {
         Ok(AppSettings {
             theme: Theme::from_str_opt(theme_str.as_deref()),
             keep_alive: KeepAlive::from_str_opt(keep_alive_str.as_deref()),
+            check_updates_at_start: self.setting("check_updates_at_start")?.as_deref()
+                != Some("false"),
         })
+    }
+
+    pub fn set_check_updates(&self, enabled: bool) -> Result<(), AppError> {
+        self.set_setting("check_updates_at_start", if enabled { "true" } else { "false" })
     }
 
     pub fn set_theme(&self, theme: Theme) -> Result<(), AppError> {

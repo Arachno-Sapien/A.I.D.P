@@ -13,6 +13,10 @@ impl CloseGuard {
         self.unsaved.store(unsaved, Ordering::SeqCst);
     }
 
+    pub fn has_unsaved(&self) -> bool {
+        self.unsaved.load(Ordering::SeqCst)
+    }
+
     pub fn watch(&self, channel: Channel<bool>) {
         let mut guard = self.channel.lock().unwrap_or_else(|e| e.into_inner());
         *guard = Some(channel);
