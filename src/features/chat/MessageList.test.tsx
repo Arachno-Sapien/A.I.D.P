@@ -40,4 +40,47 @@ describe("MessageList", () => {
     expect(Markdown).toHaveBeenCalledTimes(1);
     expect(vi.mocked(Markdown).mock.calls[0][0].text).toBe("second");
   });
+
+  const many = (count: number): UiMessage[] =>
+    Array.from({ length: count }, (_, i) => ({
+      id: `m${i}`,
+      role: i % 2 === 0 ? "user" : "assistant",
+      text: `message ${i}`,
+      status: "complete",
+    }));
+
+  it("keeps only the messages near the view on the page", () => {
+    // Every rendered reply stays in memory, so a long chat must not render all of them.
+    const { container } = render(<MessageList messages={many(200)} />);
+    const rows = container.querySelectorAll("[data-index]").length;
+    expect(rows).toBeGreaterThan(0);
+    expect(rows).toBeLessThan(40);
+  });
+
+  it("follows the end of the conversation", async () => {
+    // jsdom has no layout: give the scroll box a size, or every scroll
+    // target is clamped to 0.
+    const scrollTo = vi.fn();
+    const original = HTMLElement.prototype.scrollTo;
+    HTMLElement.prototype.scrollTo = scrollTo;
+    const sizes = { scrollHeight: 100_000, clientHeight: 800 };
+    for (const [key, value] of Object.entries(sizes)) {
+      Object.defineProperty(HTMLElement.prototype, key, { configurable: true, get: () => value });
+    }
+    try {
+      const { rerender } = render(<MessageList messages={many(50)} />);
+      scrollTo.mockClear();
+      rerender(<MessageList messages={many(51)} />);
+      await vi.waitFor(() => expect(scrollTo).toHaveBeenCalled());
+      const calls = scrollTo.mock.calls;
+      const top = calls[calls.length - 1]?.[0]?.top as number;
+      // 51 rows at the estimated height reach far past the first screen.
+      expect(top).toBeGreaterThan(1000);
+    } finally {
+      HTMLElement.prototype.scrollTo = original;
+      for (const key of Object.keys(sizes)) {
+        delete (HTMLElement.prototype as unknown as Record<string, unknown>)[key];
+      }
+    }
+  });
 });

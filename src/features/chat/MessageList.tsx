@@ -1,4 +1,6 @@
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { memo, useEffect, useRef, type ReactNode } from "react";
+import { observeRectOrInitial } from "../../lib/virtual";
 import { appErrorText } from "./appErrorText";
 import { errorText } from "./errorText";
 import { Markdown } from "./Markdown";
@@ -15,11 +17,31 @@ export function MessageList({
   onApply,
   renderStep,
 }: MessageListProps) {
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  // Only the messages near the view are on the page: a rendered reply
+  // (Markdown, highlighted code) holds its memory for as long as it is there.
+  const virtualizer = useVirtualizer({
+    count: messages.length,
+    getScrollElement: () => scrollRef.current,
+    getItemKey: (index) => messages[index]?.id ?? index,
+    estimateSize: () => ESTIMATED_HEIGHT,
+    // Rows are measured once rendered; jsdom reports 0, which would put
+    // every row on screen.
+    measureElement: (el) => el.getBoundingClientRect().height || ESTIMATED_HEIGHT,
+    overscan: 4,
+    gap: 16,
+    paddingStart: 24,
+    paddingEnd: 24,
+    initialRect: { width: 600, height: 800 },
+    observeElementRect: observeRectOrInitial,
+  });
 
+  // Follow the end of the conversation as messages arrive and replies grow.
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView?.({ behavior: "smooth" });
-  }, [messages]);
+    if (messages.length > 0) {
+      virtualizer.scrollToIndex(messages.length - 1, { align: "end" });
+    }
+  }, [messages, virtualizer]);
 
   if (messages.length === 0) {
     return (
@@ -30,19 +52,33 @@ export function MessageList({
   }
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 space-y-4">
-      {messages.map((msg) => (
-        <MessageItem
-          key={msg.id}
-          msg={msg}
-          onApply={onApply}
-          renderStep={renderStep}
-        />
-      ))}
-      <div ref={messagesEndRef} />
+    <div ref={scrollRef} className="flex-1 overflow-y-auto">
+      <div
+        className="relative w-full"
+        style={{ height: `${virtualizer.getTotalSize()}px` }}
+      >
+        {virtualizer.getVirtualItems().map((item) => (
+          <div
+            key={item.key}
+            data-index={item.index}
+            ref={virtualizer.measureElement}
+            className="absolute left-0 top-0 w-full px-6"
+            style={{ transform: `translateY(${item.start}px)` }}
+          >
+            <MessageItem
+              msg={messages[item.index]}
+              onApply={onApply}
+              renderStep={renderStep}
+            />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
+
+/** A first guess at a message's height; each row is measured once it renders. */
+const ESTIMATED_HEIGHT = 120;
 
 interface MessageItemProps {
   msg: UiMessage;

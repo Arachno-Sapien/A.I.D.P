@@ -39,6 +39,6 @@ $perf = Get-CimInstance Win32_PerfFormattedData_PerfProc_Process | Where-Object 
 | 2026-10-30 (M3) | release, Windows 11 | 127 MB | 155 MB (this repo, 510 files) | 200 MB |
 | 2026-10-31 (M6) | installed 0.1.0-rc.1, Windows 11 | 127 MB (126–143 over 96 s) | 189 MB (a 126-file project); 192 MB with the terminal open, its PowerShell (25 MB) included; 223–225 MB after a local-model reply with the terminal open, 197–199 MB without the shell | 200 MB |
 
-The 223–225 MB reading came from streaming: every chunk rendered every earlier message again, so the page's memory jumped during a long reply. Fixed after rc.1 (memoized message rows); measure again on the next release candidate.
+The 223–225 MB reading came from streaming: every chunk rendered every earlier message again, so the page's memory jumped during a long reply, and every reply stayed on the page. Fixed after rc.1 (memoized message rows, then a virtualized message list); measure again on the next release candidate.
 
 With a local model loaded (2026-10-31): Ollama's server 89 MB and its model runner 3,177 MB for `llama3.1-tuned` (5.6 GB in all, 3.1 GB of it on the GPU, context 8,192). These are Ollama's, listed apart, never the app's.

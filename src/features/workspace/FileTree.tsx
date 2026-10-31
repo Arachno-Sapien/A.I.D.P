@@ -1,6 +1,7 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useRef } from "react";
 import type { DirEntry } from "../../lib/bindings";
+import { observeRectOrInitial } from "../../lib/virtual";
 import { flattenTree } from "./tree";
 
 export interface FileTreeProps {
@@ -25,25 +26,7 @@ export function FileTree({
     estimateSize: () => 24,
     overscan: 10,
     initialRect: { width: 280, height: 600 },
-    observeElementRect: (instance, cb) => {
-      const el = instance.scrollElement;
-      if (!el) return;
-      const width =
-        el.clientWidth || instance.options.initialRect?.width || 280;
-      const height =
-        el.clientHeight || instance.options.initialRect?.height || 600;
-      cb({ width: Math.round(width), height: Math.round(height) });
-      if (!instance.targetWindow?.ResizeObserver) return () => {};
-      const ro = new instance.targetWindow.ResizeObserver(() => {
-        const w =
-          el.clientWidth || instance.options.initialRect?.width || 280;
-        const h =
-          el.clientHeight || instance.options.initialRect?.height || 600;
-        cb({ width: Math.round(w), height: Math.round(h) });
-      });
-      ro.observe(el);
-      return () => ro.disconnect();
-    },
+    observeElementRect: observeRectOrInitial,
   });
 
   return (
