@@ -243,7 +243,7 @@ Prerequisites (Windows): Node ≥ 22, Rust stable with the **MSVC** toolchain (`
 | Rust tests | `cargo test --manifest-path src-tauri/Cargo.toml` |
 | TS typecheck | `npm run typecheck` (script: `tsc --noEmit`) |
 | Frontend tests | `npx vitest run` |
-| Release build | `npm run tauri build` |
+| Release build | `npm run tauri build -- --no-bundle` (the app only; installers come from the Release workflow, `docs/dev/release.md`) |
 
 **The gate:** clippy, cargo test, typecheck, and vitest must all pass before every commit. CI runs the same four on every push.
 

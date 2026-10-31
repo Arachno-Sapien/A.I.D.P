@@ -1,0 +1,82 @@
+name: Release
+
+# Started by hand (Actions > Release > Run workflow, on main). Builds every
+# installer, signs the update files, and leaves a draft release v<version>
+# for the human to check and publish. See docs/dev/release.md.
+on: workflow_dispatch
+
+permissions:
+  contents: write
+
+jobs:
+  # One draft for all three builds. GitHub's lookup by tag skips drafts, so
+  # each build job gets the draft's id instead of making a draft of its own.
+  draft:
+    runs-on: ubuntu-22.04
+    outputs:
+      release_id: ${{ steps.draft.outputs.release_id }}
+    steps:
+      - uses: actions/checkout@v5
+      - id: draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(node -p "require('./package.json').version")
+          tag="v$version"
+          existing=$(gh api "repos/$GITHUB_REPOSITORY/releases" -q ".[] | select(.tag_name == \"$tag\") | .id")
+          if [ -n "$existing" ]; then
+            echo "A release for $tag already exists. Bump the version first (docs/dev/release.md)." >&2
+            exit 1
+          fi
+          id=$(gh api "repos/$GITHUB_REPOSITORY/releases" \
+            -f tag_name="$tag" \
+            -f target_commitish="$GITHUB_SHA" \
+            -f name="A.I.D.P $tag" \
+            -f body="See CHANGELOG.md and the user guide for install steps." \
+            -F draft=true \
+            -F prerelease=false \
+            -q .id)
+          echo "release_id=$id" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: draft
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            args: --bundles nsis
+          - os: macos-latest
+            targets: aarch64-apple-darwin,x86_64-apple-darwin
+            args: --target universal-apple-darwin --bundles app,dmg
+          # The older glibc of 22.04 lets the AppImage run on more systems.
+          - os: ubuntu-22.04
+            args: --bundles appimage,deb
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Linux build packages
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.targets }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: npm ci
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          releaseId: ${{ needs.draft.outputs.release_id }}
+          includeUpdaterJson: true
+          args: ${{ matrix.args }} --config src-tauri/tauri.updater.conf.json

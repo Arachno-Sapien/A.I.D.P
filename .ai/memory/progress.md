@@ -46,7 +46,8 @@ Tasks 1 to 4 reviewed by Claude Code (Opus 5.5) on 2026-10-31: gate green (217 R
 M6 Task 4b done 2026-10-31 by Claude Code (Opus 5.5): window 1024×640 (min 720×480, centred); file tree and AI panel toggle (Files / AI, Ctrl+B / Ctrl+Alt+B) and resize (`Splitter.tsx`), shrink before overflowing; AI panel reopens on a pending approval; shortcuts only on the Workspace screen. 196 Vitest, 217 Rust. The human checked it in the dev app on 2026-10-31: "Looks right".
 The human created the update key on 2026-10-31: both GitHub secrets set; public key in `%USERPROFILE%\.tauri\aidp.key.pub` (key ID EE9A69E11D7D346C).
 M6 Task 5 done 2026-10-31 by Claude Code (Opus 5.5): `tauri-plugin-updater` 2.14 (native-tls, no rustls), `plugins.updater` with the public key and the GitHub `latest.json` endpoint, `updates.rs`, `commands/updates.rs` (`app_version`, `check_update`, `install_update`), setting `check_updates_at_start`, `UpdateBar`, Settings → Updates, quiet check 10 s after start. 220 Rust, 204 Vitest. Install is untested until a release exists (Task 8).
-Next step: M6 Task 6, the Release workflow (`.github/workflows/release.yml`, `src-tauri/tauri.updater.conf.json`, bundle settings, version `0.1.0-rc.1`, `docs/dev/release.md`).
+M6 Task 6 written 2026-10-31 by Claude Code (Opus 5.5): `.github/workflows/release.yml` (one draft job, then a build matrix passing `releaseId`), `src-tauri/tauri.updater.conf.json`, bundle metadata and macOS ad-hoc signing, version `0.1.0-rc.1` in all three files, `docs/dev/release.md`. Not run yet.
+Next step: the human pushes and runs Actions → Release on `main`; then check the draft's files and `latest.json` keys (plan, Task 6 Step 2) and record the real file names in `docs/dev/release.md`.
 
 ## Next 3 tasks
 

@@ -1,6 +1,6 @@
 [package]
 name = "aidp"
-version = "0.1.0"
+version = "0.1.0-rc.1"
 description = "Desktop app for chatting with cloud and local AI models"
 license = "MIT OR Apache-2.0"
 edition = "2024"
