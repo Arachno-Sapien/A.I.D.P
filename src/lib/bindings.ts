@@ -13,7 +13,7 @@ export const commands = {
 	setModels: (connectionId: number, models: ModelInfo_Deserialize[]) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("set_models", { connectionId, models })),
 	chatModels: () => typedError<ChatModel_Serialize[], AppError_Serialize>(__TAURI_INVOKE("chat_models")),
 	setDefaultModel: (connectionId: number, modelId: string) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("set_default_model", { connectionId, modelId })),
-	sendMessage: (surface: ChatSurface, connectionId: number, modelId: string, messages: ChatMessage[], onEvent: Channel<ChatEvent_Deserialize>) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("send_message", { surface, connectionId, modelId, messages, onEvent })),
+	sendMessage: (surface: ChatSurface, connectionId: number, modelId: string, messages: ChatInput_Deserialize[], onEvent: Channel<ChatEvent_Deserialize>) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("send_message", { surface, connectionId, modelId, messages, onEvent })),
 	stopReply: (surface: ChatSurface) => __TAURI_INVOKE<void>("stop_reply", { surface }),
 	openFolder: () => typedError<WorkspaceInfo | null, WorkspaceError>(__TAURI_INVOKE("open_folder")),
 	recentFolders: () => typedError<string[], WorkspaceError>(__TAURI_INVOKE("recent_folders")),
@@ -22,7 +22,7 @@ export const commands = {
 	listDir: (path: string) => typedError<DirEntry[], WorkspaceError>(__TAURI_INVOKE("list_dir", { path })),
 	readFile: (path: string) => typedError<FileContent, WorkspaceError>(__TAURI_INVOKE("read_file", { path })),
 	writeFile: (req: WriteFile_Deserialize) => typedError<string, WorkspaceError>(__TAURI_INVOKE("write_file", { req })),
-	runAgent: (connectionId: number, modelId: string, messages: ChatMessage[], onEvent: Channel<ChatEvent_Deserialize>) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("run_agent", { connectionId, modelId, messages, onEvent })),
+	runAgent: (connectionId: number, modelId: string, messages: ChatInput_Deserialize[], onEvent: Channel<ChatEvent_Deserialize>) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("run_agent", { connectionId, modelId, messages, onEvent })),
 	answerTool: (id: number, approve: boolean) => __TAURI_INVOKE<boolean>("answer_tool", { id, approve }),
 	terminalOpen: (cols: number, rows: number, onEvent: Channel<TerminalEvent>) => typedError<null, WorkspaceError>(__TAURI_INVOKE("terminal_open", { cols, rows, onEvent })),
 	terminalWrite: (data: string) => typedError<null, WorkspaceError>(__TAURI_INVOKE("terminal_write", { data })),
@@ -96,6 +96,12 @@ export type Attachment = Attachment_Serialize | Attachment_Deserialize;
 
 export type AttachmentKind = "image" | "text" | "pdf";
 
+/**  An attachment as a message carries it: its ID and the name the model sees. */
+export type AttachmentRef = {
+	id: string,
+	name: string,
+};
+
 export type Attachment_Deserialize = {
 	id: string,
 	name: string,
@@ -149,9 +155,21 @@ export type ChatEvent_Serialize = { event: "delta"; data: string } | { event: "d
 	outcome: ToolOutcome_Serialize,
 } };
 
-export type ChatMessage = {
+/**  A message as the UI sends it: its text and its attachments. */
+export type ChatInput = ChatInput_Serialize | ChatInput_Deserialize;
+
+/**  A message as the UI sends it: its text and its attachments. */
+export type ChatInput_Deserialize = {
 	role: Role,
 	content: string,
+	attachments?: AttachmentRef[],
+};
+
+/**  A message as the UI sends it: its text and its attachments. */
+export type ChatInput_Serialize = {
+	role: Role,
+	content: string,
+	attachments: AttachmentRef[],
 };
 
 export type ChatModel = ChatModel_Serialize | ChatModel_Deserialize;
@@ -163,6 +181,8 @@ export type ChatModel_Deserialize = {
 	displayName: string,
 	isDefault: boolean,
 	supportsTools?: boolean | null,
+	/**  Known only for local models (Ollama's capabilities); absent means unknown. */
+	supportsVision?: boolean | null,
 	isLocal: boolean,
 	contextTokens?: number | null,
 };
@@ -174,6 +194,8 @@ export type ChatModel_Serialize = {
 	displayName: string,
 	isDefault: boolean,
 	supportsTools: boolean | null,
+	/**  Known only for local models (Ollama's capabilities); absent means unknown. */
+	supportsVision?: boolean,
 	isLocal: boolean,
 	contextTokens: number | null,
 };

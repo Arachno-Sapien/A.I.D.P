@@ -60,6 +60,9 @@ ALTER TABLE models ADD COLUMN num_ctx INTEGER;
 ALTER TABLE conversations ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE conversations ADD COLUMN archived INTEGER NOT NULL DEFAULT 0;
 "#,
+    r#"
+ALTER TABLE models ADD COLUMN supports_vision INTEGER;
+"#,
 ];
 
 pub fn open(path: &Path) -> rusqlite::Result<Connection> {
@@ -102,13 +105,13 @@ mod tests {
         let version: i32 = conn
             .query_row("PRAGMA user_version;", [], |row| row.get(0))
             .unwrap();
-        assert_eq!(version, 5);
+        assert_eq!(version, 6);
 
         migrate(&mut conn).unwrap();
         let version_after: i32 = conn
             .query_row("PRAGMA user_version;", [], |row| row.get(0))
             .unwrap();
-        assert_eq!(version_after, 5);
+        assert_eq!(version_after, 6);
     }
 
     #[test]

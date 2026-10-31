@@ -81,6 +81,7 @@ pub struct LocalModel {
 #[serde(rename_all = "camelCase")]
 pub struct ModelDetails {
     pub supports_tools: bool,
+    pub supports_vision: bool,
     pub context_length: Option<u32>,
 }
 
@@ -227,11 +228,13 @@ impl Ollama {
             message: e.to_string(),
         })?;
 
-        let supports_tools = val
-            .get("capabilities")
-            .and_then(|c| c.as_array())
-            .map(|arr| arr.iter().any(|v| v.as_str() == Some("tools")))
-            .unwrap_or(false);
+        let has = |capability: &str| {
+            val.get("capabilities")
+                .and_then(|c| c.as_array())
+                .is_some_and(|arr| arr.iter().any(|v| v.as_str() == Some(capability)))
+        };
+        let supports_tools = has("tools");
+        let supports_vision = has("vision");
 
         let context_length = val
             .get("model_info")
@@ -245,6 +248,7 @@ impl Ollama {
 
         Ok(ModelDetails {
             supports_tools,
+            supports_vision,
             context_length,
         })
     }

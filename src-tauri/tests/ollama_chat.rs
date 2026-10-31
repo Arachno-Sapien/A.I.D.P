@@ -4,8 +4,8 @@ mod common;
 
 use aidp_lib::gateway::ollama_chat::OllamaChat;
 use aidp_lib::gateway::{
-    ChatMessage, ChatRequest, LocalOptions, ModelProvider, ProviderError, Role, ToolCall,
-    ToolOutput, ToolRound, ToolSpec, TOOLS_UNSUPPORTED,
+    ChatMessage, ChatRequest, ImageInput, LocalOptions, ModelProvider, ProviderError, Role,
+    ToolCall, ToolOutput, ToolRound, ToolSpec, TOOLS_UNSUPPORTED,
 };
 use common::{capture, deltas};
 use serde_json::json;
@@ -26,8 +26,40 @@ fn base_req() -> ChatRequest {
         }],
         tools: vec![],
         rounds: vec![],
+        images: vec![],
         local: Default::default(),
     }
+}
+
+#[tokio::test]
+async fn sends_images_on_the_message() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/api/chat"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(ndjson(&[
+            r#"{"message":{"role":"assistant","content":"ok"},"done":false}"#,
+            r#"{"done":true}"#,
+        ])))
+        .mount(&server)
+        .await;
+    let adapter = OllamaChat::new(reqwest::Client::new(), server.uri());
+    let mut request = base_req();
+    request.images = vec![vec![ImageInput {
+        mime: "image/png".to_string(),
+        data_base64: "iVBORw0KGgo=".to_string(),
+    }]];
+    let (channel, _) = capture();
+    adapter
+        .stream_chat(request, channel, CancellationToken::new())
+        .await
+        .unwrap();
+
+    let requests = server.received_requests().await.unwrap();
+    let body: serde_json::Value = serde_json::from_slice(&requests[0].body).unwrap();
+    assert_eq!(
+        body["messages"][0],
+        json!({"role": "user", "content": "hello", "images": ["iVBORw0KGgo="]})
+    );
 }
 
 #[tokio::test]

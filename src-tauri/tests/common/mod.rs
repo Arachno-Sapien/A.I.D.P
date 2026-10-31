@@ -69,6 +69,7 @@ pub fn req() -> ChatRequest {
         }],
         tools: vec![],
         rounds: vec![],
+        images: vec![],
         local: Default::default(),
     }
 }

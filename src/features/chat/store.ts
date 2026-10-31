@@ -5,7 +5,7 @@ import {
   type AppError,
   type ChatEvent,
   type ChatEvent_Deserialize,
-  type ChatMessage,
+  type ChatInput_Deserialize,
   type ChatSurface,
   type Conversation,
   type ProviderError,
@@ -257,7 +257,7 @@ export const createChatStore = (surface: ChatSurface, hooks?: ChatHooks) => {
         modelName,
       };
 
-      const history: ChatMessage[] = [];
+      const history: ChatInput_Deserialize[] = [];
       if (extra?.system && !isAgent) {
         history.push({ role: "system", content: extra.system });
       }

@@ -5,7 +5,10 @@
 pub mod pdf;
 
 use crate::connections::{AppError, Services};
+use crate::gateway::{ChatMessage, ImageInput, Role};
 use crate::workspace::secret_files;
+use base64::engine::general_purpose::STANDARD as BASE64;
+use base64::Engine as _;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use specta::Type;
@@ -345,6 +348,128 @@ pub fn remove_unused(services: &Services, store: &AttachmentStore) -> Result<u32
     store.remove_unreferenced(&used, UNUSED_GRACE)
 }
 
+pub const NO_VISION: &str = "This model can't read images";
+
+/// An attachment as a message carries it: its ID and the name the model sees.
+#[derive(Deserialize, Type, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct AttachmentRef {
+    pub id: String,
+    pub name: String,
+}
+
+/// A message as the UI sends it: its text and its attachments.
+#[derive(Deserialize, Type, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatInput {
+    pub role: Role,
+    pub content: String,
+    #[serde(default)]
+    pub attachments: Vec<AttachmentRef>,
+}
+
+/// A fenced block for one file, the fence longer than any run of backticks inside.
+fn fenced(name: &str, text: &str, cut: bool) -> String {
+    let mut longest = 0;
+    let mut run = 0;
+    for c in text.chars() {
+        run = if c == '`' { run + 1 } else { 0 };
+        longest = longest.max(run);
+    }
+    let fence = "`".repeat(longest.max(2) + 1);
+    let text = text.strip_suffix('\n').unwrap_or(text);
+    let note = if cut {
+        "\n[cut: the rest didn't fit the model's context]"
+    } else {
+        ""
+    };
+    format!("File: {name}\n{fence}\n{text}\n{fence}{note}")
+}
+
+/// `text` cut to at most `limit` bytes on a character boundary, and whether it was cut.
+fn cut_to(text: &str, limit: usize) -> (&str, bool) {
+    if text.len() <= limit {
+        return (text, false);
+    }
+    let mut end = limit;
+    while !text.is_char_boundary(end) {
+        end -= 1;
+    }
+    (&text[..end], true)
+}
+
+/// Turns the UI's messages into what a provider gets. A text file's or a PDF's text
+/// joins its message's text as a fenced block, at most `text_limit` characters per
+/// message; each image becomes an `ImageInput` of that message. `vision` is what the
+/// model is known to support: `Some(false)` refuses any image before a request is made.
+pub fn resolve(
+    store: &AttachmentStore,
+    inputs: Vec<ChatInput>,
+    text_limit: usize,
+    vision: Option<bool>,
+) -> Result<(Vec<ChatMessage>, Vec<Vec<ImageInput>>), AppError> {
+    let mut messages = Vec::with_capacity(inputs.len());
+    let mut images = Vec::with_capacity(inputs.len());
+    for input in inputs {
+        let mut blocks = Vec::new();
+        let mut own_images = Vec::new();
+        let mut budget = text_limit;
+        for att in &input.attachments {
+            let bytes = match store.read(&att.id) {
+                Ok(bytes) => bytes,
+                Err(AppError::NotFound | AppError::InvalidInput { .. }) => {
+                    blocks.push(format!("[{} is no longer stored]", att.name));
+                    continue;
+                }
+                Err(e) => return Err(e),
+            };
+            let text = match detect(&bytes) {
+                Some((AttachmentKind::Image, mime)) => {
+                    if vision == Some(false) {
+                        return Err(refused(NO_VISION.to_string()));
+                    }
+                    own_images.push(ImageInput {
+                        mime: mime.to_string(),
+                        data_base64: BASE64.encode(&bytes),
+                    });
+                    continue;
+                }
+                Some((AttachmentKind::Text, _)) => String::from_utf8_lossy(&bytes).into_owned(),
+                Some((AttachmentKind::Pdf, _)) => store.text(&att.id)?.unwrap_or_default(),
+                None => continue,
+            };
+            let (text, cut) = cut_to(&text, budget);
+            budget = budget.saturating_sub(text.len());
+            blocks.push(fenced(&att.name, text, cut));
+        }
+        let content = std::iter::once(input.content)
+            .filter(|c| !c.is_empty())
+            .chain(blocks)
+            .collect::<Vec<_>>()
+            .join("\n\n");
+        messages.push(ChatMessage {
+            role: input.role,
+            content,
+        });
+        images.push(own_images);
+    }
+    Ok((messages, images))
+}
+
+/// The messages and images for one request to a model: its context window sets the
+/// text budget, and its known image support is checked.
+pub fn prepare(
+    services: &Services,
+    store: &AttachmentStore,
+    connection_id: u32,
+    model_id: &str,
+    inputs: Vec<ChatInput>,
+) -> Result<(Vec<ChatMessage>, Vec<Vec<ImageInput>>), AppError> {
+    let limit = crate::tools::text_budget(services.context_tokens(connection_id, model_id));
+    let vision = services.supports_vision(connection_id, model_id);
+    resolve(store, inputs, limit, vision)
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
@@ -517,6 +642,102 @@ mod tests {
         .unwrap_err();
         assert!(message(err).contains("bad.pdf"));
         assert!(store.ids().unwrap().is_empty());
+    }
+
+    fn input(content: &str, attachments: Vec<AttachmentRef>) -> ChatInput {
+        ChatInput {
+            role: Role::User,
+            content: content.to_string(),
+            attachments,
+        }
+    }
+
+    fn reference(a: &Attachment) -> AttachmentRef {
+        AttachmentRef {
+            id: a.id.clone(),
+            name: a.name.clone(),
+        }
+    }
+
+    #[test]
+    fn text_files_join_their_message_and_images_go_with_it() {
+        let store = temp_store();
+        let notes = store.store("notes.md", b"# Notes\nline").unwrap();
+        let png = store.store("p.png", PNG).unwrap();
+        let (messages, images) = resolve(
+            &store,
+            vec![
+                input("first", vec![]),
+                input("look", vec![reference(&notes), reference(&png)]),
+            ],
+            10_000,
+            None,
+        )
+        .unwrap();
+        assert_eq!(messages[0].content, "first");
+        assert_eq!(
+            messages[1].content,
+            "look\n\nFile: notes.md\n```\n# Notes\nline\n```"
+        );
+        assert!(images[0].is_empty());
+        assert_eq!(
+            images[1],
+            vec![ImageInput {
+                mime: "image/png".to_string(),
+                data_base64: BASE64.encode(PNG),
+            }]
+        );
+    }
+
+    #[test]
+    fn a_fence_is_longer_than_any_backticks_inside() {
+        let store = temp_store();
+        let md = store.store("x.md", b"```rust\nfn a() {}\n```").unwrap();
+        let (messages, _) =
+            resolve(&store, vec![input("", vec![reference(&md)])], 10_000, None).unwrap();
+        assert_eq!(
+            messages[0].content,
+            "File: x.md\n````\n```rust\nfn a() {}\n```\n````"
+        );
+    }
+
+    #[test]
+    fn attached_text_is_cut_to_the_budget() {
+        let store = temp_store();
+        let long = store.store("long.txt", "a".repeat(5000).as_bytes()).unwrap();
+        let (messages, _) =
+            resolve(&store, vec![input("q", vec![reference(&long)])], 1000, None).unwrap();
+        assert!(messages[0].content.len() < 1200, "{}", messages[0].content.len());
+        assert!(messages[0].content.contains("[cut:"));
+    }
+
+    #[test]
+    fn an_image_for_a_model_that_cannot_see_is_refused() {
+        let store = temp_store();
+        let png = store.store("p.png", PNG).unwrap();
+        let err = resolve(
+            &store,
+            vec![input("look", vec![reference(&png)])],
+            10_000,
+            Some(false),
+        )
+        .unwrap_err();
+        assert_eq!(message(err), "This model can't read images");
+        // Unknown means the provider decides.
+        assert!(resolve(&store, vec![input("look", vec![reference(&png)])], 10_000, None).is_ok());
+    }
+
+    #[test]
+    fn a_missing_attachment_is_noted_not_fatal() {
+        let store = temp_store();
+        let gone = AttachmentRef {
+            id: "c".repeat(64),
+            name: "old.txt".to_string(),
+        };
+        let (messages, images) =
+            resolve(&store, vec![input("q", vec![gone])], 10_000, None).unwrap();
+        assert!(messages[0].content.contains("old.txt is no longer stored"));
+        assert!(images[0].is_empty());
     }
 
     #[tokio::test]

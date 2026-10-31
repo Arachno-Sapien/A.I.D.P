@@ -152,10 +152,19 @@ pub struct LocalOptions {
     pub keep_alive: Option<i32>,
 }
 
+/// An image attached to one message, as base64 (decision 0019).
+#[derive(Clone, Debug, PartialEq)]
+pub struct ImageInput {
+    pub mime: String,
+    pub data_base64: String,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct ChatRequest {
     pub model: String,
     pub messages: Vec<ChatMessage>,
+    /// The images of `messages[i]` are `images[i]`; shorter, or empty, where there are none.
+    pub images: Vec<Vec<ImageInput>>,
     pub tools: Vec<ToolSpec>,
     pub rounds: Vec<ToolRound>,
     pub local: LocalOptions,

@@ -198,13 +198,38 @@ impl ModelProvider for Anthropic {
         let mut system_parts = Vec::new();
         let mut anthropic_messages = Vec::new();
 
-        for msg in &req.messages {
+        for (i, msg) in req.messages.iter().enumerate() {
             match msg.role {
                 Role::System => system_parts.push(msg.content.as_str()),
-                Role::User => anthropic_messages.push(json!({
-                    "role": "user",
-                    "content": &msg.content,
-                })),
+                Role::User => match req.images.get(i).filter(|list| !list.is_empty()) {
+                    None => anthropic_messages.push(json!({
+                        "role": "user",
+                        "content": &msg.content,
+                    })),
+                    // Images go first, as Anthropic suggests; an empty text block is refused.
+                    Some(list) => {
+                        let mut blocks: Vec<serde_json::Value> = list
+                            .iter()
+                            .map(|img| {
+                                json!({
+                                    "type": "image",
+                                    "source": {
+                                        "type": "base64",
+                                        "media_type": img.mime,
+                                        "data": img.data_base64,
+                                    },
+                                })
+                            })
+                            .collect();
+                        if !msg.content.is_empty() {
+                            blocks.push(json!({ "type": "text", "text": &msg.content }));
+                        }
+                        anthropic_messages.push(json!({
+                            "role": "user",
+                            "content": blocks,
+                        }));
+                    }
+                },
                 Role::Assistant => anthropic_messages.push(json!({
                     "role": "assistant",
                     "content": &msg.content,

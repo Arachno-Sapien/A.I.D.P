@@ -1,5 +1,6 @@
+use crate::attachments::{self, AttachmentStore, ChatInput};
 use crate::connections::{AppError, Services};
-use crate::gateway::{ChatEvent, ChatMessage};
+use crate::gateway::ChatEvent;
 use crate::tools::approvals::Approvals;
 use crate::workspace::WorkspaceState;
 use serde::{Deserialize, Serialize};
@@ -44,18 +45,22 @@ impl ChatState {
 
 #[tauri::command]
 #[specta::specta]
+#[allow(clippy::too_many_arguments)]
 pub async fn send_message(
     chat: State<'_, ChatState>,
     services: State<'_, Services>,
+    store: State<'_, AttachmentStore>,
     surface: ChatSurface,
     connection_id: u32,
     model_id: String,
-    messages: Vec<ChatMessage>,
+    messages: Vec<ChatInput>,
     on_event: Channel<ChatEvent>,
 ) -> Result<(), AppError> {
+    let (messages, images) =
+        attachments::prepare(&services, &store, connection_id, &model_id, messages)?;
     let cancel = chat.begin(surface);
     let result = services
-        .stream(connection_id, model_id, messages, on_event.clone(), cancel)
+        .stream(connection_id, model_id, messages, images, on_event.clone(), cancel)
         .await;
 
     match result {
@@ -85,9 +90,10 @@ pub async fn run_agent(
     services: State<'_, Services>,
     workspace: State<'_, WorkspaceState>,
     approvals: State<'_, Approvals>,
+    store: State<'_, AttachmentStore>,
     connection_id: u32,
     model_id: String,
-    messages: Vec<ChatMessage>,
+    messages: Vec<ChatInput>,
     on_event: Channel<ChatEvent>,
 ) -> Result<(), AppError> {
     let root = match workspace.root() {
@@ -99,13 +105,15 @@ pub async fn run_agent(
         }
     };
 
+    let (messages, images) =
+        attachments::prepare(&services, &store, connection_id, &model_id, messages)?;
     let provider = services.provider_for(connection_id)?;
     let local = services.model_options(connection_id, &model_id);
     let context = services.context_tokens(connection_id, &model_id);
     let text_limit = crate::tools::text_budget(context);
     let cancel = chat.begin(ChatSurface::Workspace);
 
-    let result = crate::tools::agent::run(crate::tools::agent::AgentRun {
+    let result = crate::tools::agent::run_with_images(crate::tools::agent::AgentRun {
         provider: provider.as_ref(),
         model: model_id,
         messages,
@@ -116,7 +124,7 @@ pub async fn run_agent(
         command_timeout: crate::tools::COMMAND_TIMEOUT,
         local,
         text_limit,
-    })
+    }, images)
     .await;
 
     match result {

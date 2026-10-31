@@ -4,8 +4,8 @@ use crate::db::connections::{
 };
 use crate::gateway::url::check_base_url;
 use crate::gateway::{
-    provider, ChatEvent, ChatMessage, ChatRequest, ConnectionKind, LocalOptions, ModelInfo,
-    ModelProvider, ProviderError, Usage,
+    provider, ChatEvent, ChatMessage, ChatRequest, ConnectionKind, ImageInput, LocalOptions,
+    ModelInfo, ModelProvider, ProviderError, Usage,
 };
 use crate::ollama::{local_num_ctx, valid_model_name, LocalModelView, Ollama};
 use crate::secrets::{key_hint, SecretError, SecretStore};
@@ -80,6 +80,9 @@ pub struct ChatModel {
     pub display_name: String,
     pub is_default: bool,
     pub supports_tools: Option<bool>,
+    /// Known only for local models (Ollama's capabilities); absent means unknown.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub supports_vision: Option<bool>,
     pub is_local: bool,
     pub context_tokens: Option<u32>,
 }
@@ -487,6 +490,7 @@ impl Services {
                     display_name: r.display_name,
                     is_default: r.is_default,
                     supports_tools: r.supports_tools,
+                    supports_vision: r.supports_vision,
                     is_local,
                     context_tokens,
                 }
@@ -567,12 +571,14 @@ impl Services {
         let ollama = self.ollama();
         let tags = ollama.tags().await?;
         let mut models = Vec::with_capacity(tags.len());
+        let mut vision = Vec::with_capacity(tags.len());
         for tag in tags {
             let details = ollama.show(&tag.name).await.ok();
-            let (supports_tools, context_window) = match details {
+            let (supports_tools, context_window) = match &details {
                 Some(d) => (Some(d.supports_tools), d.context_length),
                 None => (None, None),
             };
+            vision.push((tag.name.clone(), details.map(|d| d.supports_vision)));
             models.push(ModelInfo {
                 id: tag.name.clone(),
                 display_name: tag.name,
@@ -581,6 +587,12 @@ impl Services {
             });
         }
         self.set_models(ollama_id, models)?;
+        let db = self.db.lock().map_err(|e| AppError::Storage {
+            message: e.to_string(),
+        })?;
+        for (model_id, supports) in vision {
+            crate::db::connections::set_supports_vision(&db, ollama_id, &model_id, supports)?;
+        }
         Ok(())
     }
 
@@ -611,6 +623,19 @@ impl Services {
             num_ctx: Some(local_num_ctx(num_ctx_val, context_window_val)),
             keep_alive,
         }
+    }
+
+    /// Whether the model is known to read images; None when nobody has said (cloud models).
+    pub fn supports_vision(&self, connection_id: u32, model_id: &str) -> Option<bool> {
+        let db = self.db.lock().ok()?;
+        db.query_row(
+            "SELECT supports_vision FROM models WHERE connection_id = ?1 AND model_id = ?2",
+            rusqlite::params![connection_id, model_id],
+            |r| r.get::<_, Option<i64>>(0),
+        )
+        .ok()
+        .flatten()
+        .map(|v| v != 0)
     }
 
     pub fn context_tokens(&self, connection_id: u32, model_id: &str) -> Option<u32> {
@@ -794,6 +819,7 @@ impl Services {
         connection_id: u32,
         model_id: String,
         messages: Vec<ChatMessage>,
+        images: Vec<Vec<ImageInput>>,
         out: Channel<ChatEvent>,
         cancel: CancellationToken,
     ) -> Result<Usage, AppError> {
@@ -804,6 +830,7 @@ impl Services {
                 ChatRequest {
                     model: model_id,
                     messages,
+                    images,
                     tools: vec![],
                     rounds: vec![],
                     local,

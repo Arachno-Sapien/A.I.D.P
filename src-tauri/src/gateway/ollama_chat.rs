@@ -55,11 +55,16 @@ impl ModelProvider for OllamaChat {
         let url = format!("{}/api/chat", self.base_url);
 
         let mut messages = Vec::new();
-        for m in &req.messages {
-            messages.push(json!({
+        for (i, m) in req.messages.iter().enumerate() {
+            let mut message = json!({
                 "role": m.role.as_str(),
                 "content": m.content,
-            }));
+            });
+            if let Some(list) = req.images.get(i).filter(|list| !list.is_empty()) {
+                let images: Vec<&str> = list.iter().map(|img| img.data_base64.as_str()).collect();
+                message["images"] = json!(images);
+            }
+            messages.push(message);
         }
 
         for round in &req.rounds {

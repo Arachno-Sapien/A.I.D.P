@@ -4,8 +4,8 @@ mod common;
 
 use aidp_lib::gateway::{
     anthropic::Anthropic, provider, ChatEvent, ChatMessage, ChatRequest, ConnectionKind,
-    ModelInfo, ModelProvider, ProviderError, Role, ToolCall, ToolOutput, ToolRound, ToolSpec,
-    Usage,
+    ImageInput, ModelInfo, ModelProvider, ProviderError, Role, ToolCall, ToolOutput, ToolRound,
+    ToolSpec, Usage,
 };
 use common::{capture, deltas, events, req};
 use secrecy::SecretString;
@@ -34,6 +34,34 @@ impl Match for SystemKeyOmittedMatcher {
             false
         }
     }
+}
+
+#[tokio::test]
+async fn sends_an_image_block_before_the_text() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/v1/messages"))
+        .respond_with(ResponseTemplate::new(500))
+        .mount(&server)
+        .await;
+    let p = test_provider(&server);
+    let mut request = req();
+    request.images = vec![vec![ImageInput {
+        mime: "image/jpeg".to_string(),
+        data_base64: "/9j/4AAQ".to_string(),
+    }]];
+    let (channel, _) = capture();
+    let _ = p.stream_chat(request, channel, CancellationToken::new()).await;
+
+    let requests = server.received_requests().await.unwrap();
+    let body: serde_json::Value = serde_json::from_slice(&requests[0].body).unwrap();
+    assert_eq!(
+        body["messages"][0]["content"],
+        json!([
+            {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": "/9j/4AAQ"}},
+            {"type": "text", "text": "hi"}
+        ])
+    );
 }
 
 #[tokio::test]
@@ -102,6 +130,7 @@ async fn streams_text_deltas_and_usage() {
         ],
         tools: vec![],
         rounds: vec![],
+        images: vec![],
         local: Default::default(),
     };
 

@@ -582,6 +582,7 @@ async fn stream_uses_the_stored_key() {
                 role: Role::User,
                 content: "Hello".to_string(),
             }],
+            vec![],
             channel,
             cancel,
         )
@@ -618,7 +619,7 @@ async fn missing_key_is_reported() {
     let (channel, _) = capture();
     let cancel = CancellationToken::new();
     let err = services
-        .stream(id, "model".to_string(), vec![], channel, cancel)
+        .stream(id, "model".to_string(), vec![], vec![], channel, cancel)
         .await
         .unwrap_err();
 
@@ -683,6 +684,7 @@ async fn anthropic_connections_use_the_anthropic_adapter() {
                 role: Role::User,
                 content: "Hi".to_string(),
             }],
+            vec![],
             channel,
             cancel,
         )
@@ -727,7 +729,7 @@ async fn sync_reads_tools_and_context() {
         .and(path("/api/show"))
         .and(wiremock::matchers::body_json(json!({"model": "a:1b"})))
         .respond_with(ResponseTemplate::new(200).set_body_json(json!({
-            "capabilities": ["tools"],
+            "capabilities": ["tools", "vision"],
             "model_info": {"qwen2.context_length": 32768}
         })))
         .mount(&server)
@@ -752,11 +754,17 @@ async fn sync_reads_tools_and_context() {
 
     let model_a = models.iter().find(|m| m.model_id == "a:1b").unwrap();
     assert_eq!(model_a.supports_tools, Some(true));
+    assert_eq!(model_a.supports_vision, Some(true));
+    // The send path reads it from the database before any request.
+    assert_eq!(services.supports_vision(model_a.connection_id, "a:1b"), Some(true));
+    assert_eq!(services.supports_vision(model_a.connection_id, "b:2b"), Some(false));
+    assert_eq!(services.supports_vision(model_a.connection_id, "missing"), None);
     assert!(model_a.is_local);
     assert_eq!(model_a.context_tokens, Some(8192));
 
     let model_b = models.iter().find(|m| m.model_id == "b:2b").unwrap();
     assert_eq!(model_b.supports_tools, Some(false));
+    assert_eq!(model_b.supports_vision, Some(false));
     assert!(model_b.is_local);
     assert_eq!(model_b.context_tokens, Some(8192));
 }
@@ -852,6 +860,7 @@ async fn provider_for_ollama_needs_no_key() {
                 role: Role::User,
                 content: "Hi".to_string(),
             }],
+            vec![],
             channel,
             cancel,
         )

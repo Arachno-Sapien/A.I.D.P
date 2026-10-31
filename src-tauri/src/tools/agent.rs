@@ -3,8 +3,8 @@ use super::command;
 use super::run;
 use super::{agent_system, specs, ToolAction, ToolOutcome, MAX_STEPS};
 use crate::gateway::{
-    ChatEvent, ChatMessage, ChatRequest, ModelProvider, ProviderError, Role, ToolOutput, ToolRound,
-    Usage,
+    ChatEvent, ChatMessage, ChatRequest, ImageInput, ModelProvider, ProviderError, Role,
+    ToolOutput, ToolRound, Usage,
 };
 use crate::workspace::display_path;
 use std::path::PathBuf;
@@ -26,11 +26,22 @@ pub struct AgentRun<'a> {
 }
 
 pub async fn run(args: AgentRun<'_>) -> Result<Usage, ProviderError> {
+    run_with_images(args, Vec::new()).await
+}
+
+/// `run`, with `images[i]` attached to `args.messages[i]` (decision 0019).
+pub async fn run_with_images(
+    args: AgentRun<'_>,
+    images: Vec<Vec<ImageInput>>,
+) -> Result<Usage, ProviderError> {
     let mut full_messages = vec![ChatMessage {
         role: Role::System,
         content: agent_system(),
     }];
     full_messages.extend(args.messages);
+    // The system message has no images, so the rest move down one.
+    let mut full_images = vec![Vec::new()];
+    full_images.extend(images);
 
     let mut total_usage = Usage::default();
     let mut rounds: Vec<ToolRound> = Vec::new();
@@ -40,6 +51,7 @@ pub async fn run(args: AgentRun<'_>) -> Result<Usage, ProviderError> {
         let req = ChatRequest {
             model: args.model.clone(),
             messages: full_messages.clone(),
+            images: full_images.clone(),
             tools: specs_list.clone(),
             rounds: rounds.clone(),
             local: args.local.clone(),

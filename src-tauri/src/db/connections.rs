@@ -20,6 +20,7 @@ pub struct ChatModelRow {
     pub display_name: String,
     pub is_default: bool,
     pub supports_tools: Option<bool>,
+    pub supports_vision: Option<bool>,
     pub connection_kind: ConnectionKind,
     pub context_window: Option<u32>,
     pub num_ctx: Option<u32>,
@@ -200,9 +201,23 @@ pub fn set_models(
     Ok(())
 }
 
+/// Records whether a model reads images; None when its details could not be read.
+pub fn set_supports_vision(
+    conn: &Connection,
+    connection_id: u32,
+    model_id: &str,
+    supports: Option<bool>,
+) -> rusqlite::Result<()> {
+    conn.execute(
+        "UPDATE models SET supports_vision = ?1 WHERE connection_id = ?2 AND model_id = ?3",
+        params![supports.map(i64::from), connection_id, model_id],
+    )?;
+    Ok(())
+}
+
 pub fn list_chat_models(conn: &Connection) -> rusqlite::Result<Vec<ChatModelRow>> {
     let mut stmt = conn.prepare(
-        "SELECT m.connection_id, c.label, m.model_id, m.display_name, m.is_default, m.supports_tools, c.kind, m.context_window, m.num_ctx
+        "SELECT m.connection_id, c.label, m.model_id, m.display_name, m.is_default, m.supports_tools, c.kind, m.context_window, m.num_ctx, m.supports_vision
          FROM models m
          JOIN connections c ON m.connection_id = c.id
          ORDER BY m.is_default DESC, m.connection_id ASC, m.display_name ASC",
@@ -226,6 +241,8 @@ pub fn list_chat_models(conn: &Connection) -> rusqlite::Result<Vec<ChatModelRow>
         let context_window = context_window_i64.map(|v| v as u32);
         let num_ctx_i64: Option<i64> = row.get(8)?;
         let num_ctx = num_ctx_i64.map(|v| v as u32);
+        let supports_vision_int: Option<i64> = row.get(9)?;
+        let supports_vision = supports_vision_int.map(|v| v != 0);
 
         Ok(ChatModelRow {
             connection_id,
@@ -234,6 +251,7 @@ pub fn list_chat_models(conn: &Connection) -> rusqlite::Result<Vec<ChatModelRow>
             display_name,
             is_default,
             supports_tools,
+            supports_vision,
             connection_kind,
             context_window,
             num_ctx,

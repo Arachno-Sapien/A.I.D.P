@@ -32,6 +32,15 @@ Where to run the parser:
   - pasted data, which the UI sends as base64 bytes, never as a path.
 - Bytes cross IPC as base64 strings, because Tauri would send a `Vec<u8>` as a JSON array of numbers.
 - A file whose name or contents look secret (AGENTS.md rule 6) is allowed, since the user added it by hand, but it carries the warning "Looks like a secret file".
+- Sending: the UI sends each message's text with its attachments' IDs and names (`ChatInput`). Rust (`attachments::resolve`) handles them:
+  - A text file's or a PDF's text joins the message as a fenced block headed `File: <name>`. The fence is longer than any run of backticks inside, and the attached text is capped per message by the model's text budget (`tools::text_budget`).
+  - Images go in each provider's own shape:
+    - OpenAI-compatible: `image_url` parts with a data URL.
+    - Anthropic: `image` blocks before the text.
+    - Ollama: the message's `images`.
+  - A message without images is sent exactly as before.
+  - An attachment no longer stored is named in the text, not sent.
+- Vision: migration 6 adds `models.supports_vision`, filled from Ollama's `/api/show` capabilities ("vision"). A model known not to see refuses an image with "This model can't read images" before any request; for an unknown model (every cloud model) the provider decides.
 - Deleting a chat removes stored files that no message mentions any more and that are more than an hour old. A file picked but not yet sent stays.
 - New crates:
   - `pdf-extract` 0.12 (MIT). It brings `lopdf` 0.42, also used as a dev-dependency to build test PDFs.

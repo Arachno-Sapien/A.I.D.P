@@ -93,7 +93,7 @@ async fn show_reads_tools_and_context() {
         .and(path("/api/show"))
         .and(body_json(json!({ "model": "qwen2.5-coder:1.5b" })))
         .respond_with(ResponseTemplate::new(200).set_body_json(json!({
-            "capabilities": ["completion", "tools"],
+            "capabilities": ["completion", "tools", "vision"],
             "model_info": {
                 "qwen2.context_length": 32768
             }
@@ -114,10 +114,12 @@ async fn show_reads_tools_and_context() {
     let ollama = Ollama::new(reqwest::Client::new(), server.uri());
     let d1 = ollama.show("qwen2.5-coder:1.5b").await.expect("show qwen");
     assert!(d1.supports_tools);
+    assert!(d1.supports_vision);
     assert_eq!(d1.context_length, Some(32768));
 
     let d2 = ollama.show("basic").await.expect("show basic");
     assert!(!d2.supports_tools);
+    assert!(!d2.supports_vision);
     assert_eq!(d2.context_length, None);
 }
 

@@ -68,8 +68,9 @@ The human deferred the Linux/8 GB check and the macOS check on 2026-10-31 ("Let'
 The human chose (2026-11-01): attachments of images, text files and PDFs; all five theme directions (refined flat, Glass, Soft, plus Cyber/digital and Elegant); ship them as `0.1.0-rc.3`, then 0.1.0. Plans written by Claude Code (Opus 5.5): `docs/superpowers/plans/2026-11-01-m6-attachments.md` (A1–A8, three tasks) and `docs/superpowers/plans/2026-11-01-m6-themes.md` (T1–T7, three tasks), defaults not yet approved.
 The human approved both plans' defaults on 2026-11-01 ("Approve, start here").
 Attachments Task 1 done 2026-11-01 by Claude Code (Opus 5.5): `src-tauri/src/attachments/` (checks by first bytes, store by SHA-256, clean-up after a chat is deleted), PDF text in a child process (`aidp --pdf-text`, killed after 20 s; checked with the built exe on a real and a broken PDF), commands `pick_attachments`, `attach_bytes` (base64), `read_attachment` (base64), `watch_drops`; drops read in Rust's window event. Decision 0019. 238 Rust, 233 Vitest. Changes from the plan: `pick_attachments` returns `{ added, refused }`; IDs name files with no extension; bytes over IPC as base64; no page cap (20 s limit and 2 MB of text instead).
-In progress: attachments Task 2 (attachments reach the models), Claude Code (Opus 5.5).
-Next step: `gateway/mod.rs` `ChatMessage.attachments` and `ImageInput`, with failing wiremock tests for the image shape in each adapter.
+Attachments Task 2 done 2026-11-01 by Claude Code (Opus 5.5): the UI sends `ChatInput { role, content, attachments: [{ id, name }] }`; `attachments::prepare`/`resolve` turn text and PDF text into fenced blocks within the model's text budget and images into `ChatRequest.images` (OpenAI-compatible `image_url` data URL, Anthropic `image` blocks first, Ollama `images`); migration 6 `models.supports_vision` from Ollama's capabilities; "This model can't read images" before any request. Changes from the plan: `ChatMessage` unchanged (images ride on `ChatRequest.images`, `agent::run_with_images`), `ChatModel.supportsVision` optional in TS. 246 Rust, 233 Vitest.
+In progress: attachments Task 3 (attaching in the UI), Claude Code (Opus 5.5).
+Next step: `src/features/chat/Composer.tsx` paperclip, chips and paste, with failing tests first; then the CSP `img-src 'self' data:` for thumbnails.
 
 ## Next 3 tasks
 

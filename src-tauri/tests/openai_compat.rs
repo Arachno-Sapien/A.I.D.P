@@ -3,8 +3,8 @@
 mod common;
 
 use aidp_lib::gateway::{
-    openai_compat::OpenAiCompat, ModelProvider, ProviderError, ToolCall, ToolOutput, ToolRound,
-    ToolSpec, Usage,
+    openai_compat::OpenAiCompat, ImageInput, ModelProvider, ProviderError, ToolCall, ToolOutput,
+    ToolRound, ToolSpec, Usage,
 };
 use common::{capture, deltas, req, sse};
 use secrecy::SecretString;
@@ -401,6 +401,47 @@ async fn test_connection_follows_list_models() {
         p.test_connection().await.unwrap_err(),
         ProviderError::InvalidKey
     );
+}
+
+#[tokio::test]
+async fn sends_an_image_url_part_with_an_image() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(sse(&[
+            r#"{"choices":[{"delta":{"content":"ok"}}]}"#,
+            "[DONE]",
+        ])))
+        .mount(&server)
+        .await;
+    let p = provider(&server);
+
+    let mut with_image = req();
+    with_image.images = vec![vec![ImageInput {
+        mime: "image/png".to_string(),
+        data_base64: "iVBORw0KGgo=".to_string(),
+    }]];
+    let (channel, _) = capture();
+    p.stream_chat(with_image, channel, CancellationToken::new())
+        .await
+        .unwrap();
+    let (channel, _) = capture();
+    p.stream_chat(req(), channel, CancellationToken::new())
+        .await
+        .unwrap();
+
+    let requests = server.received_requests().await.unwrap();
+    let body: serde_json::Value = serde_json::from_slice(&requests[0].body).unwrap();
+    assert_eq!(
+        body["messages"][0]["content"],
+        json!([
+            {"type": "text", "text": "hi"},
+            {"type": "image_url", "image_url": {"url": "data:image/png;base64,iVBORw0KGgo="}}
+        ])
+    );
+    // Without images the content stays a plain string, as before.
+    let plain: serde_json::Value = serde_json::from_slice(&requests[1].body).unwrap();
+    assert_eq!(plain["messages"][0]["content"], "hi");
 }
 
 #[tokio::test]

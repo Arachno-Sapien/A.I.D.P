@@ -183,14 +183,33 @@ impl ModelProvider for OpenAiCompat {
         body_map.insert("model".to_string(), json!(req.model));
         body_map.insert("stream".to_string(), json!(true));
 
+        let images = req.images;
         let mut messages_val: Vec<serde_json::Value> = req
             .messages
             .into_iter()
-            .map(|m| {
-                json!({
+            .enumerate()
+            .map(|(i, m)| match images.get(i).filter(|list| !list.is_empty()) {
+                None => json!({
                     "role": m.role,
                     "content": m.content,
-                })
+                }),
+                // With images the content becomes a list of parts: the text, then each image.
+                Some(list) => {
+                    let mut parts = Vec::with_capacity(list.len() + 1);
+                    if !m.content.is_empty() {
+                        parts.push(json!({ "type": "text", "text": m.content }));
+                    }
+                    parts.extend(list.iter().map(|img| {
+                        json!({
+                            "type": "image_url",
+                            "image_url": { "url": format!("data:{};base64,{}", img.mime, img.data_base64) },
+                        })
+                    }));
+                    json!({
+                        "role": m.role,
+                        "content": parts,
+                    })
+                }
             })
             .collect();
 
