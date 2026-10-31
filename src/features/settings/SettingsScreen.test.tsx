@@ -90,6 +90,19 @@ describe("SettingsScreen", () => {
     );
   });
 
+  it("offers every theme and marks the chosen one", () => {
+    render(<SettingsScreen />);
+    for (const name of ["System", "Dark", "Light", "Glass", "Soft", "Cyber", "Elegant"]) {
+      expect(screen.getByRole("button", { name })).toBeDefined();
+    }
+    expect(screen.getByRole("button", { name: "Dark" }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByRole("button", { name: "Cyber" }).getAttribute("aria-pressed")).toBe("false");
+
+    fireEvent.click(screen.getByRole("button", { name: "Cyber" }));
+    expect(commands.setTheme).toHaveBeenCalledWith("cyber");
+    expect(screen.getByRole("button", { name: "Cyber" }).getAttribute("aria-pressed")).toBe("true");
+  });
+
   it("saves theme and keep alive", async () => {
     render(<SettingsScreen />);
 

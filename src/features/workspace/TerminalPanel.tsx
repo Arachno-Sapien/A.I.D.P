@@ -2,6 +2,7 @@ import { Channel } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { commands, type TerminalEvent } from "../../lib/bindings";
 import { useSettingsStore } from "../settings/store";
+import { THEMES } from "../settings/themes";
 import { mountTerminal, type MountedTerminal } from "./term";
 import { workspaceErrorText } from "./workspaceErrorText";
 
@@ -34,10 +35,13 @@ export function TerminalPanel({
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const resolved = useSettingsStore((s) => s.resolved);
+  const cursor = useSettingsStore((s) =>
+    s.theme === "cyber" ? THEMES.cyber.vars["--color-accent"] : undefined,
+  );
 
   useEffect(() => {
-    termRef.current?.setTheme(resolved);
-  }, [resolved]);
+    termRef.current?.setTheme(resolved, cursor);
+  }, [resolved, cursor]);
 
   const startTerminal = useCallback(async () => {
     if (!termRef.current) return;
@@ -66,6 +70,7 @@ export function TerminalPanel({
 
     const term = mountTerminal(containerRef.current, {
       theme: resolved,
+      cursor,
       onInput: (data) => {
         void commands.terminalWrite(data);
       },

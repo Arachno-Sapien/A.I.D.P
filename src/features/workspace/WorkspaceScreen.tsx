@@ -94,7 +94,7 @@ export function WorkspaceScreen({ active = true }: WorkspaceScreenProps) {
 
   if (!info) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center p-6 bg-neutral-950 text-neutral-100">
+      <div className="app-shell flex-1 flex flex-col items-center justify-center p-6 bg-neutral-950 text-neutral-100">
         <div className="max-w-md w-full bg-neutral-900 border border-neutral-800 rounded-xl p-8 shadow-xl text-center">
           <h2 className="text-base font-semibold text-white mb-2">
             No folder open
@@ -142,9 +142,9 @@ export function WorkspaceScreen({ active = true }: WorkspaceScreenProps) {
   }
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-neutral-950 text-neutral-100 overflow-hidden">
+    <div className="app-shell flex-1 flex flex-col h-full bg-neutral-950 text-neutral-100 overflow-hidden">
       {/* Top Workspace Bar */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-neutral-800 bg-neutral-900/50 backdrop-blur select-none">
+      <div className="app-surface flex items-center justify-between px-4 py-2 border-b border-neutral-800 bg-neutral-900/50 backdrop-blur select-none">
         <div className="flex items-center gap-2 truncate">
           <span className="font-semibold text-xs text-neutral-200 truncate">
             {info.name}
@@ -233,7 +233,7 @@ export function WorkspaceScreen({ active = true }: WorkspaceScreenProps) {
         <div
           data-testid="files-panel"
           hidden={!filesOpen}
-          className="bg-neutral-900/30 overflow-hidden flex flex-col"
+          className="app-surface bg-neutral-900/30 overflow-hidden flex flex-col"
           style={{ flex: `0 1 ${filesWidth}px`, minWidth: FILES_MIN }}
         >
           <FileTree

@@ -64,8 +64,9 @@ export const THEMES: Record<ThemeId, ThemeSpec> = {
   glass: {
     label: "Glass",
     base: "dark",
-    swatch: ["#0b0b16", "#4c2a85", "#6d4aff"],
-    backdrop: "#0e5a6e",
+    swatch: ["#0b0b16", "#3a1f6b", "#6d4aff"],
+    // The lightest colour of the backdrop in src/themes.css; text may sit on it directly.
+    backdrop: "#0b4757",
     vars: {
       // The three darkest steps are see-through (78–85%), so the backdrop shows.
       ...ramp([

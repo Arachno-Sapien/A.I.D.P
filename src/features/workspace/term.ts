@@ -6,12 +6,14 @@ export interface TerminalOpts {
   onInput(data: string): void;
   onResize(cols: number, rows: number): void;
   theme?: "dark" | "light";
+  /** A theme's own cursor colour (Cyber's accent). */
+  cursor?: string;
 }
 
 export interface MountedTerminal {
   write(data: string): void;
   fit(): void;
-  setTheme(theme: "dark" | "light"): void;
+  setTheme(theme: "dark" | "light", cursor?: string): void;
   dispose(): void;
   readonly cols: number;
   readonly rows: number;
@@ -31,8 +33,9 @@ export const LIGHT_THEME = {
   selectionBackground: "#d4d4d4",
 };
 
-export function terminalTheme(theme: "dark" | "light") {
-  return theme === "dark" ? DARK_THEME : LIGHT_THEME;
+export function terminalTheme(theme: "dark" | "light", cursor?: string) {
+  const base = theme === "dark" ? DARK_THEME : LIGHT_THEME;
+  return cursor ? { ...base, cursor } : base;
 }
 
 export function mountTerminal(
@@ -50,7 +53,7 @@ export function mountTerminal(
       "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
     fontSize: 12,
     scrollback: 1000,
-    theme: terminalTheme(initialTheme),
+    theme: terminalTheme(initialTheme, opts.cursor),
     windowsPty: isWindows ? { backend: "conpty" } : undefined,
   });
 
@@ -85,8 +88,8 @@ export function mountTerminal(
       term.write(data);
     },
     fit: performFit,
-    setTheme: (theme: "dark" | "light") => {
-      term.options.theme = terminalTheme(theme);
+    setTheme: (theme: "dark" | "light", cursor?: string) => {
+      term.options.theme = terminalTheme(theme, cursor);
     },
     dispose: () => {
       term.dispose();

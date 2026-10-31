@@ -107,8 +107,8 @@ const MessageItem = memo(function MessageItem({
           <div
             className={`max-w-[85%] rounded-xl px-4 py-3 text-sm ${
               msg.role === "user"
-                ? "bg-neutral-800 text-neutral-100 whitespace-pre-wrap"
-                : "bg-neutral-900 border border-neutral-800 text-neutral-100"
+                ? "app-raised bg-accent/15 border border-accent/30 text-neutral-100 whitespace-pre-wrap"
+                : "app-raised bg-neutral-900 border border-neutral-800 text-neutral-100"
             }`}
           >
             {msg.role === "user" ? (

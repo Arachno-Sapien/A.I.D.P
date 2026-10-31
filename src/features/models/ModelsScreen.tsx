@@ -129,7 +129,7 @@ export function ModelsScreen({
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-neutral-950 text-neutral-100 overflow-y-auto p-6 max-w-5xl mx-auto w-full">
+    <div className="app-shell flex-1 flex flex-col h-full bg-neutral-950 text-neutral-100 overflow-y-auto p-6 max-w-5xl mx-auto w-full">
       <div className="flex items-center justify-between pb-6 border-b border-neutral-800 mb-6">
         <div>
           <h1 className="text-xl font-semibold text-white">Models</h1>
@@ -192,7 +192,7 @@ export function ModelsScreen({
             return (
               <div
                 key={c.id}
-                className="bg-neutral-900 border border-neutral-800 rounded-xl p-5 shadow-xs space-y-3"
+                className="app-raised bg-neutral-900 border border-neutral-800 rounded-xl p-5 shadow-xs space-y-3"
               >
                 <div className="flex items-start justify-between">
                   <div>
@@ -356,7 +356,7 @@ export function ModelsScreen({
           aria-label="Choose models"
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
         >
-          <div className="w-full max-w-lg bg-neutral-900 border border-neutral-800 rounded-xl p-6 shadow-2xl text-neutral-100">
+          <div className="app-raised w-full max-w-lg bg-neutral-900 border border-neutral-800 rounded-xl p-6 shadow-2xl text-neutral-100">
             <ChooseModels
               connectionId={chooseModelsTarget.connectionId}
               available={chooseModelsTarget.available}

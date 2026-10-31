@@ -80,8 +80,8 @@ function App() {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-neutral-950 text-neutral-100 font-sans">
-      <header className="flex items-center justify-between px-6 py-2.5 border-b border-neutral-800 bg-neutral-900/50 backdrop-blur select-none">
+    <div className="app-shell flex flex-col h-screen bg-neutral-950 text-neutral-100 font-sans">
+      <header className="app-surface flex items-center justify-between px-6 py-2.5 border-b border-neutral-800 bg-neutral-900/50 backdrop-blur select-none">
         <span className="font-semibold text-sm tracking-wide text-white">
           A.I.D.P
         </span>
@@ -92,7 +92,7 @@ function App() {
             onClick={() => handleSelectScreen("chat")}
             className={`flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer focus-visible:ring-1 focus-visible:ring-neutral-400 focus-visible:outline-none ${
               screen === "chat"
-                ? "bg-neutral-800 text-white"
+                ? "app-accent bg-accent/20 text-neutral-50"
                 : "text-neutral-400 hover:text-neutral-200"
             }`}
           >
@@ -105,7 +105,7 @@ function App() {
             onClick={() => handleSelectScreen("workspace")}
             className={`flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer focus-visible:ring-1 focus-visible:ring-neutral-400 focus-visible:outline-none ${
               screen === "workspace"
-                ? "bg-neutral-800 text-white"
+                ? "app-accent bg-accent/20 text-neutral-50"
                 : "text-neutral-400 hover:text-neutral-200"
             }`}
           >
@@ -118,7 +118,7 @@ function App() {
             onClick={() => handleSelectScreen("models")}
             className={`flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer focus-visible:ring-1 focus-visible:ring-neutral-400 focus-visible:outline-none ${
               screen === "models"
-                ? "bg-neutral-800 text-white"
+                ? "app-accent bg-accent/20 text-neutral-50"
                 : "text-neutral-400 hover:text-neutral-200"
             }`}
           >
@@ -131,7 +131,7 @@ function App() {
             onClick={() => handleSelectScreen("settings")}
             className={`flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer focus-visible:ring-1 focus-visible:ring-neutral-400 focus-visible:outline-none ${
               screen === "settings"
-                ? "bg-neutral-800 text-white"
+                ? "app-accent bg-accent/20 text-neutral-50"
                 : "text-neutral-400 hover:text-neutral-200"
             }`}
           >
@@ -175,7 +175,7 @@ function App() {
       {/* Quit Prompt Modal */}
       {quitPrompt && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-          <div className="bg-neutral-900 border border-neutral-800 rounded-xl max-w-md w-full p-6 shadow-2xl text-neutral-100">
+          <div className="app-raised bg-neutral-900 border border-neutral-800 rounded-xl max-w-md w-full p-6 shadow-2xl text-neutral-100">
             <h3 className="text-base font-semibold mb-2">Unsaved changes</h3>
             <p className="text-sm text-neutral-400 mb-6">
               You have unsaved changes in {tabs.filter((t) => t.dirty).length}{" "}
@@ -218,7 +218,7 @@ function App() {
       {/* Folder Switch / Close Dirty Prompt Modal */}
       {dirtyPrompt && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-          <div className="bg-neutral-900 border border-neutral-800 rounded-xl max-w-md w-full p-6 shadow-2xl text-neutral-100">
+          <div className="app-raised bg-neutral-900 border border-neutral-800 rounded-xl max-w-md w-full p-6 shadow-2xl text-neutral-100">
             <h3 className="text-base font-semibold mb-2">Unsaved changes</h3>
             <p className="text-sm text-neutral-400 mb-6">
               You have unsaved changes in {tabs.filter((t) => t.dirty).length}{" "}

@@ -40,7 +40,7 @@ export function ModelPicker({ children, left }: ModelPickerProps = {}) {
     currentModel?.displayName || currentModel?.modelId || undefined;
 
   return (
-    <div className="flex items-center justify-between gap-3 px-6 py-2 border-b border-neutral-800 bg-neutral-900/50 backdrop-blur select-none">
+    <div className="app-surface flex items-center justify-between gap-3 px-6 py-2 border-b border-neutral-800 bg-neutral-900/50 backdrop-blur select-none">
       <div className="flex items-center gap-2 min-w-0">
         {left}
         {hasModels && (
@@ -56,7 +56,7 @@ export function ModelPicker({ children, left }: ModelPickerProps = {}) {
                   void select(parsed);
                 }
               }}
-              className="bg-neutral-800 border border-neutral-700/80 rounded px-2.5 py-1 text-xs text-neutral-100 focus:outline-none focus:border-neutral-600 cursor-pointer min-w-0 truncate"
+              className="app-inset bg-neutral-800 border border-neutral-700/80 rounded px-2.5 py-1 text-xs text-neutral-100 focus:outline-none focus:border-neutral-600 cursor-pointer min-w-0 truncate"
             >
               {uniqueCloudConnectionIds.map((connId) => {
                 const groupModels = cloudModels.filter(

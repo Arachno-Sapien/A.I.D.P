@@ -42,6 +42,9 @@ describe("themes", () => {
           `${id}: secondary text on ${surface}`,
         ).toBeGreaterThanOrEqual(4.5);
       }
+      if (t.backdrop) {
+        expect(contrast(v(400), t.backdrop), `${id}: secondary text on the backdrop`).toBeGreaterThanOrEqual(4.5);
+      }
       expect(
         contrast(t.vars["--color-accent-fg"], t.vars["--color-accent"]),
         `${id}: text on the accent`,

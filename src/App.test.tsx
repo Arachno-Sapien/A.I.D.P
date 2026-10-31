@@ -238,6 +238,15 @@ describe("App", () => {
     expect(useWorkspaceChatStore.getState().pending).toHaveLength(0);
   });
 
+  it("the main surfaces carry the theme hooks", () => {
+    const { container } = render(<App />);
+    expect(container.firstElementChild?.classList.contains("app-shell")).toBe(true);
+    expect(container.querySelector("header")?.classList.contains("app-surface")).toBe(true);
+    expect(container.querySelector("aside")?.classList.contains("app-surface")).toBe(true);
+    expect(screen.getByPlaceholderText(/type a message/i).closest(".app-inset")).not.toBeNull();
+    expect(screen.getByRole("button", { name: "Send" }).classList.contains("app-accent")).toBe(true);
+  });
+
   it("shows Settings in the nav", () => {
     render(<App />);
 

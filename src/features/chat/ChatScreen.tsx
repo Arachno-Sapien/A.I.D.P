@@ -76,7 +76,7 @@ export function ChatScreen({
   }, [openPlace]);
 
   return (
-    <div className="flex flex-col h-full bg-neutral-950 text-neutral-100 font-sans">
+    <div className="app-shell flex flex-col h-full bg-neutral-950 text-neutral-100 font-sans">
       <ModelPicker
         left={
           <button

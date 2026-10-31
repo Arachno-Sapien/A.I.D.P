@@ -1,13 +1,22 @@
 import { useEffect } from "react";
 import { parseModelKey, useModelsStore } from "../models/store";
 import { useSettingsStore } from "./store";
+import { THEMES } from "./themes";
 import { useUpdatesStore } from "./updates";
 import { commands, type KeepAlive, type Theme } from "../../lib/bindings";
 
-const THEME_OPTIONS: { id: Theme; label: string }[] = [
-  { id: "dark", label: "Dark" },
-  { id: "light", label: "Light" },
-  { id: "system", label: "System" },
+/** System first, then every theme in the table, each with its three colours. */
+const THEME_OPTIONS: { id: Theme; label: string; swatch: string[] }[] = [
+  {
+    id: "system",
+    label: "System",
+    swatch: [THEMES.dark.swatch[0], THEMES.light.swatch[0], THEMES.dark.swatch[2]],
+  },
+  ...Object.entries(THEMES).map(([id, t]) => ({
+    id: id as Theme,
+    label: t.label,
+    swatch: t.swatch,
+  })),
 ];
 
 const KEEP_ALIVE_OPTIONS: { id: KeepAlive; label: string }[] = [
@@ -65,7 +74,7 @@ export function SettingsScreen() {
   );
 
   return (
-    <div className="flex-1 overflow-y-auto bg-neutral-950 text-neutral-100 p-8">
+    <div className="app-shell flex-1 overflow-y-auto bg-neutral-950 text-neutral-100 p-8">
       <div className="max-w-2xl mx-auto space-y-8">
         <div>
           <h1 className="text-xl font-bold text-white tracking-tight">
@@ -83,7 +92,7 @@ export function SettingsScreen() {
         )}
 
         {/* Section 1: Default model */}
-        <div className="p-5 rounded-xl bg-neutral-900 border border-neutral-800 space-y-3">
+        <div className="app-raised p-5 rounded-xl bg-neutral-900 border border-neutral-800 space-y-3">
           <div>
             <h2 className="text-sm font-semibold text-white">Default model</h2>
             <p className="text-xs text-neutral-400 mt-0.5">
@@ -146,7 +155,7 @@ export function SettingsScreen() {
         </div>
 
         {/* Section 2: Theme */}
-        <div className="p-5 rounded-xl bg-neutral-900 border border-neutral-800 space-y-3">
+        <div className="app-raised p-5 rounded-xl bg-neutral-900 border border-neutral-800 space-y-3">
           <div>
             <h2 className="text-sm font-semibold text-white">Theme</h2>
             <p className="text-xs text-neutral-400 mt-0.5">
@@ -154,20 +163,30 @@ export function SettingsScreen() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {THEME_OPTIONS.map((t) => {
               const active = theme === t.id;
               return (
                 <button
                   key={t.id}
                   type="button"
+                  aria-pressed={active}
                   onClick={() => void setTheme(t.id)}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors cursor-pointer ${
+                  className={`app-raised flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors cursor-pointer focus-visible:ring-1 focus-visible:ring-neutral-400 focus-visible:outline-none ${
                     active
-                      ? "bg-neutral-100 text-neutral-900 border-neutral-100 font-semibold"
+                      ? "bg-accent/15 text-neutral-50 border-accent font-semibold"
                       : "bg-neutral-950 text-neutral-300 border-neutral-800 hover:border-neutral-700 hover:text-white"
                   }`}
                 >
+                  <span aria-hidden="true" className="flex">
+                    {t.swatch.map((colour, i) => (
+                      <span
+                        key={i}
+                        className="h-3 w-3 rounded-full border border-neutral-500/40 -ml-1 first:ml-0"
+                        style={{ background: colour }}
+                      />
+                    ))}
+                  </span>
                   {t.label}
                 </button>
               );
@@ -176,7 +195,7 @@ export function SettingsScreen() {
         </div>
 
         {/* Section 3: Keep local models loaded */}
-        <div className="p-5 rounded-xl bg-neutral-900 border border-neutral-800 space-y-3">
+        <div className="app-raised p-5 rounded-xl bg-neutral-900 border border-neutral-800 space-y-3">
           <div>
             <h2 className="text-sm font-semibold text-white">
               Keep local models loaded
@@ -213,7 +232,7 @@ export function SettingsScreen() {
         </div>
 
         {/* Section 4: Updates */}
-        <div className="p-5 rounded-xl bg-neutral-900 border border-neutral-800 space-y-3">
+        <div className="app-raised p-5 rounded-xl bg-neutral-900 border border-neutral-800 space-y-3">
           <div>
             <h2 className="text-sm font-semibold text-white">Updates</h2>
             <p className="text-xs text-neutral-400 mt-0.5">

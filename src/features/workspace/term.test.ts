@@ -47,7 +47,7 @@ vi.mock("@xterm/addon-fit", () => {
 
 vi.mock("@xterm/xterm/css/xterm.css", () => ({}));
 
-import { mountTerminal } from "./term";
+import { DARK_THEME, LIGHT_THEME, mountTerminal, terminalTheme } from "./term";
 
 describe("mountTerminal", () => {
   it("mounts with xterm, dark theme and monospace", () => {
@@ -105,5 +105,13 @@ describe("mountTerminal", () => {
 
     term.setTheme("dark");
     expect(capturedOptions.theme.background).toBe("#0a0a0a");
+  });
+});
+
+describe("terminal colours", () => {
+  it("Cyber's cursor is its accent; other themes keep the base cursor", () => {
+    expect(terminalTheme("dark", "#00e5ff").cursor).toBe("#00e5ff");
+    expect(terminalTheme("dark").cursor).toBe(DARK_THEME.cursor);
+    expect(terminalTheme("light").cursor).toBe(LIGHT_THEME.cursor);
   });
 });

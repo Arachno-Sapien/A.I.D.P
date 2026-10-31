@@ -229,7 +229,7 @@ Four screens: Chat, Workspace, Models, and Settings. A first-time user lands on 
 - Connections list: provider, label, masked key, last test result, Test and Delete buttons.
 - Local panel: Ollama status, downloaded models with size, which ones are loaded in memory, Download / Delete / Free memory.
 
-**Settings:** theme, default model, keep\_alive, chat history location, export all chats. Updates (M6): the version, **Check for updates at start**, and **Check for updates**; a found update shows a bar under the header with **Install and restart** and **Later**.
+**Settings:** theme (M6, decision 0020: System, Dark, Light, Glass, Soft, Cyber, Elegant, each a button with its three colours; the editor, diff, code blocks and terminal follow the theme's dark or light base), default model, keep\_alive, chat history location, export all chats. Updates (M6): the version, **Check for updates at start**, and **Check for updates**; a found update shows a bar under the header with **Install and restart** and **Later**.
 
 **Flow: add a cloud model**
 

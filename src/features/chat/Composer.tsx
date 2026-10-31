@@ -77,7 +77,7 @@ export function Composer({
             {shownNotice}
           </div>
         )}
-        <div className="flex flex-col bg-neutral-900 border border-neutral-800 rounded-xl p-2 focus-within:border-neutral-700 transition-colors">
+        <div className="app-inset flex flex-col bg-neutral-900 border border-neutral-800 rounded-xl p-2 focus-within:border-neutral-700 transition-colors">
           {pending.length > 0 && (
             <div className="flex flex-wrap gap-1.5 px-1 pb-2">
               {pending.map((a) => (
@@ -123,7 +123,7 @@ export function Composer({
                 type="button"
                 onClick={handleSend}
                 disabled={!canSend}
-                className="bg-neutral-100 hover:bg-white disabled:bg-neutral-800 disabled:text-neutral-600 text-neutral-900 text-xs font-semibold px-4 py-2 rounded-lg transition-colors cursor-pointer disabled:cursor-not-allowed"
+                className="app-accent bg-accent text-accent-fg hover:brightness-110 disabled:bg-neutral-800 disabled:text-neutral-600 text-xs font-semibold px-4 py-2 rounded-lg transition-colors cursor-pointer disabled:cursor-not-allowed"
               >
                 Send
               </button>

@@ -128,7 +128,7 @@ With Agent turned on, the model can iteratively explore your project:
 
 Open the **Settings** tab in the top navigation:
 - **Default model:** Select the model that automatically loads when starting new chats or opening workspaces.
-- **Theme:** Switch between **Dark**, **Light**, and **System** (follows your OS light/dark mode preference). The code editor and terminal automatically match the selected theme.
+- **Theme:** Pick **System** (follows your OS light or dark mode), **Dark**, **Light**, **Glass** (frosted panels over a soft colour backdrop), **Soft** (raised and pressed shapes), **Cyber** (dark navy with cyan edges and monospace labels) or **Elegant** (ivory with serif headings). Each button shows the theme's colours. The code editor, code blocks in replies and the terminal match the theme's dark or light base.
 - **Keep local models loaded:** Configure how long Ollama models stay in memory after a reply (Ollama default 5 min, 5 min, 30 min, 1 hour, until Free memory, or unload after each reply).
 - **Updates:** Shows the version you run. The app checks GitHub for a new version once, 10 seconds after it starts; turn **Check for updates at start** off to stop that, and use **Check for updates** to check by hand. A new version shows a bar at the top with **Install and restart** and **Later**. Nothing installs until you click Install, and the app asks you to save your files first. Updates are signed, and the app refuses one whose signature doesn't match.
 

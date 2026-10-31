@@ -2,9 +2,31 @@
 
 import { fireEvent, render } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+// The real highlighter, watched: which colours each code block is given.
+vi.mock("prism-react-renderer", async (importOriginal) => {
+  const real = await importOriginal<typeof import("prism-react-renderer")>();
+  return { ...real, Highlight: vi.fn(real.Highlight) };
+});
+
+import { Highlight, themes } from "prism-react-renderer";
 import { Markdown } from "./Markdown";
+import { useSettingsStore } from "../settings/store";
 
 describe("Markdown", () => {
+  it("code blocks follow the theme's base", () => {
+    // jsdom drops the hsl() colours both code themes use, so check the theme given.
+    const code = "```ts\nconst a = 1;\n```";
+    useSettingsStore.setState({ resolved: "light" });
+    const light = render(<Markdown text={code} />);
+    expect(vi.mocked(Highlight).mock.lastCall?.[0].theme).toBe(themes.oneLight);
+    light.unmount();
+    useSettingsStore.setState({ resolved: "dark" });
+    // No automatic cleanup here (known-issues): unmount, or later tests see two blocks.
+    const dark = render(<Markdown text={code} />);
+    expect(vi.mocked(Highlight).mock.lastCall?.[0].theme).toBe(themes.oneDark);
+    dark.unmount();
+  });
+
   it("a reply's image never gets a data: source", () => {
     // The CSP allows data: images for attachment thumbnails; a model's reply
     // must not use that to show images of its own.

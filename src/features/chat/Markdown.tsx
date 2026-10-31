@@ -2,6 +2,7 @@ import { Highlight, themes } from "prism-react-renderer";
 import { type ComponentPropsWithoutRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { useSettingsStore } from "../settings/store";
 
 function CodeBlock({
   code,
@@ -15,6 +16,9 @@ function CodeBlock({
   applyDisabled?: boolean;
 }) {
   const [copied, setCopied] = useState(false);
+
+  // Code colours follow the theme's base, as the editor's do.
+  const resolved = useSettingsStore((s) => s.resolved);
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(code);
@@ -46,7 +50,11 @@ function CodeBlock({
           </button>
         </div>
       </div>
-      <Highlight theme={themes.oneDark} code={code} language={language}>
+      <Highlight
+        theme={resolved === "light" ? themes.oneLight : themes.oneDark}
+        code={code}
+        language={language}
+      >
         {({ className, style, tokens, getLineProps, getTokenProps }) => (
           <pre className={`${className} overflow-x-auto p-3`} style={style}>
             {tokens.map((line, i) => (

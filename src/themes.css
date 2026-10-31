@@ -1,0 +1,79 @@
+/*
+ * Theme effects colour alone can't give (decision 0020). Colours come from
+ * src/features/settings/themes.ts. The hook classes do nothing in Dark and Light:
+ *   app-shell    a screen's background
+ *   app-surface  the header, bars and side panels
+ *   app-raised   message bubbles, cards and dialogs
+ *   app-inset    the composer and inputs
+ *   app-accent   Send and the screen shown in the nav
+ * Nothing here animates.
+ */
+
+/* Glass: frosted panels over a still backdrop. Screens let the backdrop through;
+   panels stay at least 78% opaque, so text reads where blur is slow or missing. */
+:root[data-theme="glass"] body {
+  background:
+    radial-gradient(circle at 15% 15%, #3a1f6b 0, transparent 45%),
+    radial-gradient(circle at 85% 85%, #0b4757 0, transparent 50%),
+    #0b0b16;
+}
+:root[data-theme="glass"] .app-shell {
+  background-color: transparent;
+}
+:root[data-theme="glass"] .app-surface {
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border-color: rgb(255 255 255 / 0.1);
+}
+:root[data-theme="glass"] .app-raised {
+  border-color: rgb(255 255 255 / 0.14);
+}
+:root[data-theme="glass"] .app-inset {
+  border-color: rgb(255 255 255 / 0.16);
+}
+
+/* Soft: raised and pressed shapes from paired shadows, no borders. */
+:root[data-theme="soft"] :is(.app-surface, .app-raised, .app-inset) {
+  border-color: transparent;
+}
+:root[data-theme="soft"] .app-raised {
+  box-shadow: 4px 4px 10px #191a1e, -4px -4px 10px #2f3238;
+}
+:root[data-theme="soft"] .app-inset {
+  box-shadow: inset 3px 3px 7px #191a1e, inset -3px -3px 7px #2f3238;
+}
+:root[data-theme="soft"] .app-accent:not(:disabled) {
+  box-shadow: 3px 3px 8px #191a1e, -3px -3px 8px #2f3238;
+}
+
+/* Cyber: thin glowing edges in cyan, magenta selection, monospace labels. */
+:root[data-theme="cyber"] .app-surface {
+  border-color: rgb(0 229 255 / 0.22);
+}
+:root[data-theme="cyber"] .app-raised {
+  border-color: rgb(0 229 255 / 0.28);
+  box-shadow: 0 0 14px rgb(0 229 255 / 0.07);
+}
+:root[data-theme="cyber"] .app-inset:focus-within {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 10px rgb(0 229 255 / 0.25);
+}
+:root[data-theme="cyber"] .app-accent:not(:disabled) {
+  box-shadow: 0 0 12px rgb(0 229 255 / 0.45);
+}
+:root[data-theme="cyber"] :is(nav, h1, h2, h3) {
+  font-family: var(--font-label);
+  letter-spacing: 0.03em;
+}
+:root[data-theme="cyber"] ::selection {
+  background: rgb(255 43 214 / 0.35);
+}
+
+/* Elegant: serif headings, soft lift on cards. */
+:root[data-theme="elegant"] :is(nav, h1, h2, h3, h4) {
+  font-family: var(--font-heading);
+  letter-spacing: 0.01em;
+}
+:root[data-theme="elegant"] .app-raised {
+  box-shadow: 0 1px 3px rgb(35 31 25 / 0.08);
+}

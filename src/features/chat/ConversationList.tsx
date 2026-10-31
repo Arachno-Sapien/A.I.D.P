@@ -181,7 +181,7 @@ export function ConversationList({ width = LIST_WIDTH }: { width?: number } = {}
   return (
     // Like the workspace panels, the list gives way before the chat in a narrow window.
     <aside
-      className="border-r border-neutral-800 bg-neutral-950 flex flex-col h-full select-none text-xs"
+      className="app-surface border-r border-neutral-800 bg-neutral-950 flex flex-col h-full select-none text-xs"
       style={{ flex: `0 1 ${width}px`, minWidth: LIST_MIN }}
     >
       <div className="p-3 border-b border-neutral-800 space-y-2">
@@ -205,7 +205,7 @@ export function ConversationList({ width = LIST_WIDTH }: { width?: number } = {}
           placeholder="Filter chats…"
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          className="w-full px-2.5 py-1 bg-neutral-900 border border-neutral-800 rounded-md text-neutral-100 placeholder-neutral-500 text-xs focus:outline-none focus:border-neutral-700 focus-visible:ring-1 focus-visible:ring-neutral-400"
+          className="app-inset w-full px-2.5 py-1 bg-neutral-900 border border-neutral-800 rounded-md text-neutral-100 placeholder-neutral-500 text-xs focus:outline-none focus:border-neutral-700 focus-visible:ring-1 focus-visible:ring-neutral-400"
         />
       </div>
 
