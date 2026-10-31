@@ -26,11 +26,16 @@ function stepLabel(action: ToolAction): string {
   }
 }
 
+/** Whether the step waits for the user to approve or decline it. */
+export function awaitsAnswer(step: ToolStep): boolean {
+  return step.needsAnswer && !step.answered && !step.outcome;
+}
+
 export function ToolStepView({ step, onAnswer }: ToolStepViewProps) {
   const { acceptProposal, rejectProposal } = useWorkspaceStore();
   const label = stepLabel(step.action);
   const isPending = !step.outcome;
-  const showApproval = step.needsAnswer && !step.answered && !step.outcome;
+  const showApproval = awaitsAnswer(step);
 
   return (
     <div className="my-2 p-2.5 rounded-lg border border-neutral-800 bg-neutral-900/80 text-xs text-neutral-200">

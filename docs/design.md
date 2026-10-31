@@ -210,6 +210,7 @@ Four screens: Chat, Workspace, Models, and Settings. A first-time user lands on 
 - Centre: editor tabs.
 - Right: AI panel with the model picker, context chips (open file, selection), and the same message list and composer as Chat.
 - Bottom (M4): terminal panel.
+- The file tree and the AI panel can be hidden (Files and AI buttons, `Ctrl+B` and `Ctrl+Alt+B`) and resized by dragging the line beside them; they shrink before the editor does, and the AI panel reopens when a command waits for approval (M6).
 - Every AI edit opens a diff over the editor with Accept and Reject.
 - Every command the model wants to run opens an approval prompt showing the command and folder, with Run and Deny.
 

@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Workspace layout: the file tree and the AI panel can be shown or hidden (**Files** and **AI** buttons, `Ctrl+B` and `Ctrl+Alt+B`) and resized by dragging the line beside them. The AI panel reopens when a command waits for approval.
+- The window opens at 1024×640 (minimum 720×480), and the workspace panels shrink to fit a smaller window instead of overflowing.
 - Local model runtime powered by Ollama: status detection, in-app start, model pull with live progress and cancel, deletion with confirmation, and memory unloading ("Free memory").
 - `ollama_chat` provider adapter supporting streaming replies, tool calling, per-model `num_ctx`, and `keep_alive` options.
 - Model picker grouping: cloud models grouped by provider and local models grouped under `Local · Ollama`, with disabled state and clear status when Ollama is stopped.

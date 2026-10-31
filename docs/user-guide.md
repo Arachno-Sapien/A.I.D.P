@@ -64,6 +64,7 @@ Open any folder on your computer to edit files alongside an AI assistant that ca
 - **Editor tabs (Centre):** CodeMirror 6 editor with syntax highlighting, dirty tab indicators, conflict detection for files modified on disk, and preservation of line endings (LF/CRLF) and UTF-8 BOM.
 - **AI Panel (Right):** Context-aware conversation with access to open file tabs and active selections.
 - **Terminal (Bottom):** Built-in native terminal (`powershell.exe` on Windows, `$SHELL` on Unix). Toggle open/closed using the terminal icon or `Ctrl+\`.
+- **Layout:** Show or hide the file tree with **Files** or `Ctrl+B`, and the AI panel with **AI** or `Ctrl+Alt+B`. Drag the thin line beside either panel to resize it (or focus the line with Tab and use the arrow keys); double-click the line to reset its width. When the window gets narrow, the panels shrink before the editor does. The AI panel opens by itself when a command waits for your approval. Panel sizes go back to their defaults when the app restarts.
 
 ### Context Chips & Token Budgeting
 - When a file or selection is active, context chips appear above the composer.

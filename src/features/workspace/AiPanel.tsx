@@ -188,7 +188,7 @@ export function AiPanel({ onApply }: AiPanelProps) {
   };
 
   return (
-    <div className="flex flex-col h-full bg-neutral-900/30 border-l border-neutral-800 text-neutral-100">
+    <div className="flex flex-col h-full bg-neutral-900/30 text-neutral-100">
       <ModelPicker>
         <div className="flex items-center gap-3">
           <label

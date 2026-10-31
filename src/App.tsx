@@ -117,7 +117,7 @@ function App() {
               screen === "workspace" ? "" : "hidden"
             }`}
           >
-            <WorkspaceScreen />
+            <WorkspaceScreen active={screen === "workspace"} />
           </div>
         )}
         {screen === "models" && (
