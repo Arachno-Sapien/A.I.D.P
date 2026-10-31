@@ -14,13 +14,13 @@ A local model runs in Ollama's processes, not ours, so these numbers never inclu
 
 ## 2. Script
 
-Run it in PowerShell while the app is open. It measures the **release** build (`src-tauri\target\release\aidp.exe`), so a dev build that is still running cannot be picked up by mistake.
+Run it in PowerShell while the app is open. It measures a **release** build, either `src-tauri\target\release\aidp.exe` or the installed app (`%LOCALAPPDATA%\A.I.D.P\aidp.exe`), so a dev build that is still running cannot be picked up by mistake. It skips `ollama.exe` and everything under it: when the app starts Ollama, Ollama becomes its child process, but its memory is not the app's.
 
 ```powershell
-$app = Get-Process aidp -ErrorAction Stop | Where-Object Path -like '*\target\release\aidp.exe' | Select-Object -First 1
+$app = Get-Process aidp -ErrorAction Stop | Where-Object { $_.Path -like '*\target\release\aidp.exe' -or $_.Path -like '*\AppData\Local\A.I.D.P\aidp.exe' } | Select-Object -First 1
 $all = Get-CimInstance Win32_Process
 $ids = @($app.Id); $i = 0
-while ($i -lt $ids.Count) { $ids += @($all | Where-Object ParentProcessId -eq $ids[$i] | ForEach-Object ProcessId); $i++ }
+while ($i -lt $ids.Count) { $ids += @($all | Where-Object { $_.ParentProcessId -eq $ids[$i] -and $_.Name -ne 'ollama.exe' } | ForEach-Object ProcessId); $i++ }
 $p = Get-Process -Id $ids -ErrorAction SilentlyContinue
 $perf = Get-CimInstance Win32_PerfFormattedData_PerfProc_Process | Where-Object { $ids -contains [int]$_.IDProcess }
 "{0:N0} MB Task Manager memory, {1:N0} MB private, {2:N0} MB working set, {3} processes" -f (($perf | Measure-Object WorkingSetPrivate -Sum).Sum / 1MB), (($p | Measure-Object PrivateMemorySize64 -Sum).Sum / 1MB), (($p | Measure-Object WorkingSet64 -Sum).Sum / 1MB), $p.Count
