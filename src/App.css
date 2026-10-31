@@ -12,8 +12,24 @@
 @theme {
   --color-accent: #4f46e5;
   --color-accent-fg: #ffffff;
+  --color-popup: #171717;
   --font-heading: var(--font-sans);
   --font-label: var(--font-sans);
+}
+
+/*
+ * An open dropdown list is drawn over white, so a see-through colour (Glass's
+ * panels) turns grey there. Options get each theme's solid colour instead,
+ * and the chosen one its accent.
+ */
+select option,
+select optgroup {
+  background-color: var(--color-popup);
+  color: var(--color-neutral-100);
+}
+select option:checked {
+  background-color: var(--color-accent);
+  color: var(--color-accent-fg);
 }
 
 /*

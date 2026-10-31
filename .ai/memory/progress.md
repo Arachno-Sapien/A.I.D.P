@@ -74,7 +74,8 @@ The human tried attachments in the dev app on 2026-11-01 (images to cloud and lo
 Themes Task 1 done 2026-11-01 by Claude Code (Opus 5.5): `src/features/settings/themes.ts` (`THEMES` for Dark, Light, Glass, Soft, Cyber, Elegant; `contrast`), `theme.ts` (`themeId`, `paint`: variables on `:root`, `data-theme` = name, `data-base` = base), `App.css` (Light block moved into the table; `@theme` accent and font defaults), Rust `Theme` gains Glass, Soft, Cyber, Elegant (unknown is Dark). Decision 0020. 259 Vitest, 247 Rust. Not yet visible: Settings still offers Dark, Light, System until Task 2's picker.
 Themes Task 2 done 2026-11-01 by Claude Code (Opus 5.5): Settings picker (System plus the six themes, three-colour swatches, `aria-pressed`); `src/themes.css` (Glass backdrop, see-through shell and blurred surfaces; Soft shadows; Cyber glow, magenta selection, mono nav and headings; Elegant serif headings) on five hook classes (`app-shell` added to the plan's four); accent (`bg-accent`) on Send, the active nav item and user bubbles in every theme; code blocks `oneLight` on a light base; Cyber's terminal cursor is its accent. Glass backdrop darkened to #3a1f6b/#0b4757 so secondary text reads straight on it (tested). 263 Vitest, 247 Rust. Not yet seen in the app.
 In progress: themes Task 3 (review, RAM with Glass, the human's check), Claude Code (Opus 5.5).
-Next step: the human checks each theme in the dev app (Chat, Workspace with editor, terminal and diff, Models, Settings); then the `web-design-guidelines` review and RAM of a release build with Dark and Glass; then version `0.1.0-rc.3`.
+The human checked every theme in the dev app on 2026-11-01: "Checked, all good".
+Next step: the `web-design-guidelines` review of the new UI, then version `0.1.0-rc.3`; RAM with Glass measured on the installed rc.3, as for rc.2.
 
 ## Next 3 tasks
 

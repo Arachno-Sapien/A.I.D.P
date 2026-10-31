@@ -26,6 +26,8 @@ describe("themes", () => {
       expect(t.vars["--color-accent-fg"], id).toMatch(/^#[0-9a-f]{6}$/);
       expect(["dark", "light"]).toContain(t.base);
       expect(t.swatch).toHaveLength(3);
+      // An open dropdown list is drawn over white: its colour must be solid.
+      expect(t.vars["--color-popup"], `${id} popup`).toMatch(/^#[0-9a-f]{6}$/);
     }
   });
 
@@ -42,6 +44,10 @@ describe("themes", () => {
           `${id}: secondary text on ${surface}`,
         ).toBeGreaterThanOrEqual(4.5);
       }
+      expect(
+        contrast(v(100), t.vars["--color-popup"]),
+        `${id}: text in an open dropdown`,
+      ).toBeGreaterThanOrEqual(4.5);
       if (t.backdrop) {
         expect(contrast(v(400), t.backdrop), `${id}: secondary text on the backdrop`).toBeGreaterThanOrEqual(4.5);
       }
