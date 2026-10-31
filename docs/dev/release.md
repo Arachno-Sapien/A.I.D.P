@@ -25,7 +25,18 @@ Releases are built by CI (`.github/workflows/release.yml`), never by hand. The u
    - `latest.json`, which the app's updater reads.
 
    It stops at once if a release for that version already exists.
-5. **Check the draft** on the Releases page: every file above is there, and `latest.json` lists `windows-x86_64`, `darwin-aarch64`, `darwin-x86_64` and `linux-x86_64`.
+5. **Check the draft** on the Releases page: every file above is there, and `latest.json` lists `windows-x86_64`, `darwin-aarch64`, `darwin-x86_64` and `linux-x86_64`. The first run (`v0.1.0-rc.1`, 2026-10-31, about 20 minutes) produced:
+
+   | File | Size |
+   | --- | --- |
+   | `A.I.D.P_0.1.0-rc.1_x64-setup.exe` + `.sig` | 4.4 MB |
+   | `A.I.D.P_0.1.0-rc.1_universal.dmg` | 10.9 MB |
+   | `A.I.D.P_universal.app.tar.gz` + `.sig` (macOS updates) | 11.0 MB |
+   | `A.I.D.P_0.1.0-rc.1_amd64.AppImage` + `.sig` | 86.6 MB (bundles WebKitGTK) |
+   | `A.I.D.P_0.1.0-rc.1_amd64.deb` + `.sig` | 6.5 MB |
+   | `latest.json` | also has per-format keys such as `linux-x86_64-deb` and `windows-x86_64-nsis` |
+
+   Each `.sig` should name key `EE9A69E11D7D346C`: decode the file from base64, take the second line, decode it, and read bytes 2 to 9 reversed. A different key means the secret holds the wrong private key, and installed apps would refuse the update.
 6. **Publish** the draft as a normal release, not a pre-release: the updater reads `releases/latest`, which skips pre-releases.
 
 ## Notes
