@@ -6,7 +6,7 @@ Updated: 2026-10-31 by Claude Code (Opus 5.5)
 
 Plan approved by the human on 2026-10-31 with the defaults for D1 to D6: phase doc `docs/phases/M6.md`, plan `docs/superpowers/plans/2026-10-30-m6-release.md`. Stop for review after Task 4. Before Task 5 the human creates the update signing key and hands over only the public key (D4).
 
-- [ ] Idle RAM (no folder open) under 150 MB; workspace RAM within the budget set in M3 and M4
+- [x] Idle RAM (no folder open) under 150 MB; workspace RAM within the budget set in M3 and M4 (installed rc.2, 2026-10-31: idle 128–129 MB; workspace 151–169 MB, 183 MB at rest with the terminal after a local reply; the 557 MB peak while streaming accepted for 0.1.0 by the human)
 - [ ] Installers for Windows, macOS and Linux built by CI and published as a GitHub release
 - [x] Auto-update tested from one version to the next (rc.1 → rc.2 on Windows, 2026-10-31: the human's report plus the installed version)
 - [ ] Tested on an 8 GB RAM machine with a real project open
@@ -63,10 +63,11 @@ Reviewed by Claude Code (Opus 5.5) on 2026-10-31; four bugs fixed test-first: pi
 Pushed `691cfb2` on 2026-10-31; CI run 41217002508 green on three OSes (233 Vitest each; 223 Rust on Windows and macOS, 222 on Linux). Release run 41219130980 (started by the human) passed: draft `v0.1.0-rc.2` held the NSIS exe, universal dmg and app.tar.gz, AppImage and deb; `latest.json` 0.1.0-rc.2 for all platforms, every update file signed by key EE9A69E11D7D346C. The human published it at 16:33 UTC (normal release, now `releases/latest`) and reported the installed rc.1 updated itself. Checked: `%LOCALAPPDATA%\A.I.D.P\aidp.exe` product version 0.1.0-rc.2; its installer ran at 16:34 UTC (`uninstall.exe` time). Auto-update box ticked.
 The human checked pin, archive, the chat list (hide, resize) and code colouring in the installed rc.2 on 2026-10-31: "All work".
 RAM of the installed rc.2 (2026-10-31, `docs/dev/measure-ram.md`): idle 128–129 MB; workspace 151–169 MB; terminal open 246 MB (shell 26); after a `qwen2.5-coder:1.5b` reply (1,444 tokens, 6,911 characters) with the terminal open: 557 MB peak while streaming (page 292, GPU process 197), 273 MB for about 2 minutes, then 183 MB (160 without the shell) from 5 minutes after the reply. At rest within the 200 MB budget even with the terminal; the peak while streaming is not. Peak not yet explained (likely: the reply being written is parsed and highlighted again on every token).
-Next step: the human decides whether to look into the streaming peak before 0.1.0.
+The human accepted the streaming peak for 0.1.0 on 2026-10-31 ("Accept for 0.1.0"); RAM box ticked. After 0.1.0: confirm the cause in the browser with a fake 1,400-token stream, then likely render the reply being written at most ~10 times a second and skip highlighting finished code blocks again.
+Next step: the Linux and 8 GB check in an Ubuntu VM with a real project open (the human's VM).
 
 ## Next 3 tasks
 
-1. The streaming peak, if the human chooses (Task 8).
-2. The Linux and 8 GB check in an Ubuntu VM with a real project open (Task 8).
-3. Review the whole M6 diff, then `0.1.0` and close M6 with the human (Task 8).
+1. The Linux and 8 GB check in an Ubuntu VM with a real project open (Task 8).
+2. Review the whole M6 diff (Task 8).
+3. Version `0.1.0`, the release, and closing M6 with the human (Task 8).

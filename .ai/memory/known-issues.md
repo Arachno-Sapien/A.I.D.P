@@ -4,6 +4,7 @@ Bugs, gotchas, and approaches that failed. Newest first. If you hit one of the "
 
 ## Seen in this repo
 
+- **2026-10-31 · RAM spikes while a long local reply streams (accepted for 0.1.0).** Installed rc.2, `qwen2.5-coder:1.5b`, 1,444 tokens: 557 MB peak (page 292, GPU process 197), back to 183 MB within 5 minutes. Likely cause, not confirmed: the reply being written is parsed as Markdown and its code highlighted again on every token. Readings taken right after a reply overstate memory at rest; sample for 5 minutes (`docs/dev/measure-ram.md`).
 - **2026-10-31 · NSIS keeps the build time on installed files.** After an update, `%LOCALAPPDATA%\A.I.D.P\aidp.exe` shows the CI build time as both created and modified, not the install time. To see when an install or update ran, look at `uninstall.exe` in the same folder; check the version with `(Get-Item aidp.exe).VersionInfo.ProductVersion`.
 - **2026-10-31 · A clickable row with buttons inside.** Making the row `role="button"` (or a `<button>`) hides the buttons inside it from screen readers, because a button's children are presentational. Make the part that opens the item its own `<button>` beside the action buttons, as in `ConversationList.tsx`. Test: the opening button contains no `button`.
 - **2026-10-31 · The unlazy skill's `GATES.md`.** It is a working file with machine paths and evidence hashes; `.gitignore` keeps it (and `.unlazy/`) out of the repo. Put a task's checks in its plan and log instead.
