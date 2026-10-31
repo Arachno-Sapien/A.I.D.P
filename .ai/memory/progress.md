@@ -59,12 +59,13 @@ M6 chat list, pin/archive, icons, and UI review done 2026-10-31 by Antigravity (
 - Task 2: Chat list toggle via top bar button and `Ctrl+B`, resize with `Splitter` within limits (`7365acf`).
 - Task 3: Pin and archive chats with SQLite migration 5, history commands, store methods, and grouped list (`beaeecd`).
 - Task 4: `web-design-guidelines` skill installed and mirrored; UI review polish applied (focus rings, accessible labels, keyboard handlers); all 6 acceptance gates in `GATES.md` verified and met. 228 Vitest, 220 Rust tests passing.
-Reviewed by Claude Code (Opus 5.5) on 2026-10-31; four bugs fixed test-first: pin/archive changed the list even when the command failed; chat rows were `role="button"` with the Pin/Archive/Delete buttons inside (hidden from screen readers); the chat list didn't shrink in a narrower window; `ModelPicker` showed the AI panel's bar with no models. Also `aria-expanded` on Archived, `GATES.md` untracked and ignored. The human checked the icons: "they look fine". Pin, archive, hide/resize and code colouring not yet seen in the app.
+Reviewed by Claude Code (Opus 5.5) on 2026-10-31; four bugs fixed test-first: pin/archive changed the list even when the command failed; chat rows were `role="button"` with the Pin/Archive/Delete buttons inside (hidden from screen readers); the chat list didn't shrink in a narrower window; `ModelPicker` showed the AI panel's bar with no models. Also `aria-expanded` on Archived, `GATES.md` untracked and ignored. The human checked the icons: "they look fine".
 Pushed `691cfb2` on 2026-10-31; CI run 41217002508 green on three OSes (233 Vitest each; 223 Rust on Windows and macOS, 222 on Linux). Release run 41219130980 (started by the human) passed: draft `v0.1.0-rc.2` held the NSIS exe, universal dmg and app.tar.gz, AppImage and deb; `latest.json` 0.1.0-rc.2 for all platforms, every update file signed by key EE9A69E11D7D346C. The human published it at 16:33 UTC (normal release, now `releases/latest`) and reported the installed rc.1 updated itself. Checked: `%LOCALAPPDATA%\A.I.D.P\aidp.exe` product version 0.1.0-rc.2; its installer ran at 16:34 UTC (`uninstall.exe` time). Auto-update box ticked.
-Next step: the human checks pin, archive, the chat list (hide, resize) and code colouring in the installed rc.2; then RAM again after a local-model reply (`docs/dev/measure-ram.md`).
+The human checked pin, archive, the chat list (hide, resize) and code colouring in the installed rc.2 on 2026-10-31: "All work".
+Next step: RAM of the installed rc.2 (idle, workspace, terminal, after a local-model reply) with the script in `docs/dev/measure-ram.md`, the human setting up each state.
 
 ## Next 3 tasks
 
-1. The human checks rc.2 in the app; RAM of rc.2 after a local-model reply (Task 8).
+1. RAM of rc.2, idle and after a local-model reply (Task 8).
 2. The Linux and 8 GB check in an Ubuntu VM with a real project open (Task 8).
 3. Review the whole M6 diff, then `0.1.0` and close M6 with the human (Task 8).
