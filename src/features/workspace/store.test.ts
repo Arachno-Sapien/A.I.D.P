@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { language } from "@codemirror/language";
 
 vi.mock("../../lib/bindings", () => ({
   commands: {
@@ -207,6 +208,22 @@ describe("useWorkspaceStore", () => {
     expect(commands.readFile).toHaveBeenCalledTimes(1);
     expect(useWorkspaceStore.getState().tabs).toHaveLength(1);
     expect(useWorkspaceStore.getState().active).toBe("a.ts");
+  });
+
+  it("opening a code file loads its language, so it is coloured", async () => {
+    vi.mocked(commands.readFile).mockResolvedValue({
+      status: "ok",
+      data: {
+        path: "lib.py",
+        text: "def f():\n    return 1\n",
+        version: "v1",
+        lineEnding: "lf",
+        hasBom: false,
+        isSecret: false,
+      },
+    });
+    await useWorkspaceStore.getState().openFile("lib.py");
+    expect(buffers.get("lib.py")?.facet(language)?.name).toBe("python");
   });
 
   it("save sends expectedVersion, clears dirty on success", async () => {

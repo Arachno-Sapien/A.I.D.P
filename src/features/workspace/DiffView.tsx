@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { mountDiff } from "./cm";
+import { loadLanguage, mountDiff } from "./cm";
 import { useSettingsStore } from "../settings/store";
 import { useWorkspaceStore } from "./store";
 
@@ -16,14 +16,17 @@ export function DiffView() {
 
   useEffect(() => {
     if (!editorRef.current || !proposal) return;
-    const view = mountDiff(
-      editorRef.current,
-      proposal.original,
-      proposal.proposed,
-      resolved,
-    );
+    const parent = editorRef.current;
+    const { path, original, proposed } = proposal;
+    let cancelled = false;
+    let view: ReturnType<typeof mountDiff> | null = null;
+    // The diff is coloured by the file's language, loaded before mounting.
+    void loadLanguage(path).then(() => {
+      if (!cancelled) view = mountDiff(parent, original, proposed, resolved, path);
+    });
     return () => {
-      view.destroy();
+      cancelled = true;
+      view?.destroy();
     };
   }, [proposal?.path, proposal?.original, proposal?.proposed, resolved]);
 

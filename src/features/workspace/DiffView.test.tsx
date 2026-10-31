@@ -1,11 +1,13 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { loadLanguage, mountDiff } from "./cm";
 import { DiffView } from "./DiffView";
 import { useWorkspaceStore } from "./store";
 
 vi.mock("./cm", () => ({
+  loadLanguage: vi.fn(() => Promise.resolve()),
   mountDiff: vi.fn(() => ({
     dom: document.createElement("div"),
     destroy: vi.fn(),
@@ -45,6 +47,22 @@ describe("DiffView", () => {
     const rejectBtn = screen.getByRole("button", { name: /^reject$/i });
     fireEvent.click(rejectBtn);
     expect(rejectProposal).toHaveBeenCalled();
+  });
+
+  it("mounts the diff with the file's language once it is loaded", async () => {
+    render(<DiffView />);
+
+    await waitFor(() => expect(mountDiff).toHaveBeenCalled());
+    expect(loadLanguage).toHaveBeenCalledWith("src/a.ts");
+    expect(vi.mocked(mountDiff).mock.calls[0][4]).toBe("src/a.ts");
+  });
+
+  it("does not mount a diff that closed while its language loaded", async () => {
+    const { unmount } = render(<DiffView />);
+    unmount();
+    await Promise.resolve();
+
+    expect(mountDiff).not.toHaveBeenCalled();
   });
 
   it("shows git confirmation when needsGitConfirm is true", () => {

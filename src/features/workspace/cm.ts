@@ -27,18 +27,32 @@ export function setEditorTheme(
   });
 }
 
+/**
+ * Loads the grammar for `filename`'s language the first time it is needed.
+ * `language-data` keeps it on the shared description, so `createState` and
+ * `mountDiff` find it ready afterwards. A grammar that fails to load leaves
+ * the file as plain text.
+ */
+export async function loadLanguage(filename: string): Promise<void> {
+  const desc = LanguageDescription.matchFilename(languages, filename);
+  await desc?.load().catch(() => undefined);
+}
+
+/** The file's language if `loadLanguage` has loaded it; plain text otherwise. */
+function languageFor(filename: string): Extension {
+  return LanguageDescription.matchFilename(languages, filename)?.support ?? [];
+}
+
 export function createState(
   doc: string,
   filename: string,
   options: CreateStateOptions = {},
   theme: "dark" | "light" = "dark",
 ): EditorState {
-  const languageCompartment = new Compartment();
-
   const extensions: Extension[] = [
     basicSetup,
     themeCompartment.of(themeExtension(theme)),
-    languageCompartment.of([]),
+    languageFor(filename),
   ];
 
   if (options.onUpdate) {
@@ -65,11 +79,6 @@ export function createState(
     );
   }
 
-  const langDesc = LanguageDescription.matchFilename(languages, filename);
-  if (langDesc?.support) {
-    extensions.push(languageCompartment.of(langDesc.support));
-  }
-
   return EditorState.create({
     doc,
     extensions,
@@ -88,12 +97,14 @@ export function mountDiff(
   original: string,
   proposed: string,
   theme: "dark" | "light" = "dark",
+  filename = "",
 ): EditorView {
   const state = EditorState.create({
     doc: proposed,
     extensions: [
       basicSetup,
       themeCompartment.of(themeExtension(theme)),
+      languageFor(filename),
       EditorState.readOnly.of(true),
       EditorView.editable.of(false),
       unifiedMergeView({ original, mergeControls: false }),

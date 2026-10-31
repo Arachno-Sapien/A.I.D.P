@@ -52,10 +52,11 @@ M6 Task 8 under way (Claude Code, Opus 5.5, with the human). 2026-10-31: the hum
 RAM of the installed rc.1 (2026-10-31, `docs/dev/measure-ram.md`): idle 127 MB; workspace 189 MB; with the terminal 192 MB; after a local-model reply with the terminal open 223–225 MB (197–199 MB without the user's shell). Ollama apart: server 89 MB, runner 3,177 MB. The human chose to look into the growth first. Root cause (Claude Code, 2026-10-31): every streamed chunk rendered every earlier message again (Markdown parse and code highlighting per message per chunk). Fixed by memoizing `MessageItem` in `MessageList.tsx` and `useCallback` in `AiPanel.tsx`: 20 messages went from 234 to 22 ms per chunk and +170 to +37 MB heap (browser, dev build). Not yet: virtualizing the message list (AGENTS.md stack says messages are virtualized; about 254 elements per reply stay on the page).
 The human chose to virtualize first: done 2026-10-31 by Claude Code (Opus 5.5). `MessageList` uses react-virtual with measured rows and follows the end with `scrollToIndex`; `src/lib/virtual.ts` holds the zero-size fallback shared with `FileTree`. Browser measurement (dev build): a 200-message chat 1,571 page elements instead of 50,744; streaming into 100 messages 12 ms per chunk and +16 MB heap. 208 Vitest, 220 Rust.
 The human checked chat scrolling, following the end while streaming, switching chats and Apply in the dev app on 2026-10-31: "All fine". Version set to `0.1.0-rc.2` (three files, CHANGELOG section).
-Next step: push; the human runs the Release workflow and publishes rc.2 (normal release); the installed rc.1 should offer the update (the update test); then RAM again after a local-model reply, and the Linux/8 GB VM.
+The human asked when code files get coloured; it was a bug since M3 (grammars load lazily and the editor was created before they arrived). Fixed for rc.2 on 2026-10-31 by Claude Code (Opus 5.5): `loadLanguage` in `cm.ts`, awaited by the store's `editorState` and by `DiffView` before mounting; `mountDiff` takes the filename. 213 Vitest, 220 Rust. Not yet seen in the app.
+Next step: push; the human runs the Release workflow and publishes rc.2 (normal release); the installed rc.1 should offer the update (the update test), and rc.2 should colour code files; then RAM again after a local-model reply, and the Linux/8 GB VM.
 
 ## Next 3 tasks
 
-1. The human publishes `v0.1.0-rc.1` and installs it on Windows (Task 8).
-2. RAM in the release build; the Linux and 8 GB check in an Ubuntu VM (Task 8).
-3. The update test with `0.1.0-rc.2`, review, then `0.1.0` (Task 8).
+1. Push; the human runs the Release workflow for `0.1.0-rc.2` and publishes it (Task 8).
+2. The update test from the installed rc.1; RAM again after a local-model reply; the Linux and 8 GB check in an Ubuntu VM (Task 8).
+3. Review the whole M6 diff, then `0.1.0` and close M6 with the human (Task 8).

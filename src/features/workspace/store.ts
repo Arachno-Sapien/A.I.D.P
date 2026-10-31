@@ -9,7 +9,7 @@ import {
 import { applyProposal } from "./applyProposal";
 import { buffers, type SelectionInfo } from "./buffers";
 import { useWorkspaceChatStore } from "./chatStore";
-import { createState } from "./cm";
+import { createState, loadLanguage } from "./cm";
 import { workspaceErrorText } from "./workspaceErrorText";
 
 export interface Tab {
@@ -106,8 +106,10 @@ function sameSelection(a: SelectionInfo | null, b: SelectionInfo | null) {
 }
 
 // Every editor state writes itself back into `buffers`, which is what Save,
-// the AI context and tab switching read.
-function editorState(path: string, text: string, filename: string) {
+// the AI context and tab switching read. The file's language is loaded first,
+// or the editor shows it as plain, uncoloured text.
+async function editorState(path: string, text: string, filename: string) {
+  await loadLanguage(filename);
   return createState(text, filename, {
     onUpdate: (state, docChanged) => {
       buffers.set(path, state);
@@ -285,7 +287,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       // The tab and its buffer use the path that was asked for. Rust may answer
       // with the link target's path, and two keys for one tab lose its text.
       const filename = path.split("/").pop() || path;
-      buffers.open(path, editorState(path, file.text, filename));
+      buffers.open(path, await editorState(path, file.text, filename));
 
       const tab: Tab = {
         path,
@@ -382,7 +384,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
     if (res.status === "ok") {
       const file = res.data;
       const filename = tab?.name ?? (path.split("/").pop() || path);
-      buffers.open(path, editorState(path, file.text, filename));
+      buffers.open(path, await editorState(path, file.text, filename));
 
       const nextTabs = get().tabs.map((t) =>
         t.path === path
@@ -531,7 +533,10 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
     }
 
     const newVersion = res.data;
-    buffers.open(tab.path, editorState(tab.path, proposal.proposed, tab.name));
+    buffers.open(
+      tab.path,
+      await editorState(tab.path, proposal.proposed, tab.name),
+    );
 
     const nextTabs = get().tabs.map((t) =>
       t.path === proposal.path
