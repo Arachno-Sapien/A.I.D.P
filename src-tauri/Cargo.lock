@@ -56,7 +56,7 @@ dependencies = [
 
 [[package]]
 name = "aidp"
-version = "0.1.0-rc.2"
+version = "0.1.0-rc.3"
 dependencies = [
  "async-trait",
  "base64 0.22.1",

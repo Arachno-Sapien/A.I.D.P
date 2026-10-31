@@ -78,7 +78,7 @@ describe("ChatScreen", () => {
     ).toBeDefined();
 
     const textarea = screen.getByPlaceholderText(
-      "Type a message... (Shift+Enter for newline)",
+      "Type a message… (Shift+Enter for newline)",
     ) as HTMLTextAreaElement;
     expect(textarea.disabled).toBe(true);
   });

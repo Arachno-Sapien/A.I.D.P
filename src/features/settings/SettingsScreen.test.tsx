@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../lib/bindings", () => ({
@@ -92,8 +92,10 @@ describe("SettingsScreen", () => {
 
   it("offers every theme and marks the chosen one", () => {
     render(<SettingsScreen />);
+    // One named group, so a screen reader says what the seven buttons choose.
+    const group = screen.getByRole("group", { name: "Theme" });
     for (const name of ["System", "Dark", "Light", "Glass", "Soft", "Cyber", "Elegant"]) {
-      expect(screen.getByRole("button", { name })).toBeDefined();
+      expect(within(group).getByRole("button", { name })).toBeDefined();
     }
     expect(screen.getByRole("button", { name: "Dark" }).getAttribute("aria-pressed")).toBe("true");
     expect(screen.getByRole("button", { name: "Cyber" }).getAttribute("aria-pressed")).toBe("false");

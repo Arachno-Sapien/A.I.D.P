@@ -20,7 +20,7 @@ export function Composer({
   onStop,
   streaming,
   disabled,
-  placeholder = "Type a message... (Shift+Enter for newline)",
+  placeholder = "Type a message… (Shift+Enter for newline)",
 }: ComposerProps) {
   const [input, setInput] = useState("");
   const pending = store((s) => s.pending);
@@ -101,6 +101,7 @@ export function Composer({
               <Paperclip size={16} aria-hidden="true" />
             </button>
             <textarea
+              aria-label="Message"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}

@@ -73,12 +73,11 @@ Attachments Task 3 done 2026-11-01 by Claude Code (Opus 5.5): store `pending`, `
 The human tried attachments in the dev app on 2026-11-01 (images to cloud and local models, a code file, PDFs, drop and paste, restart, delete a chat): "All work". The attachments plan is done.
 Themes Task 1 done 2026-11-01 by Claude Code (Opus 5.5): `src/features/settings/themes.ts` (`THEMES` for Dark, Light, Glass, Soft, Cyber, Elegant; `contrast`), `theme.ts` (`themeId`, `paint`: variables on `:root`, `data-theme` = name, `data-base` = base), `App.css` (Light block moved into the table; `@theme` accent and font defaults), Rust `Theme` gains Glass, Soft, Cyber, Elegant (unknown is Dark). Decision 0020. 259 Vitest, 247 Rust. Not yet visible: Settings still offers Dark, Light, System until Task 2's picker.
 Themes Task 2 done 2026-11-01 by Claude Code (Opus 5.5): Settings picker (System plus the six themes, three-colour swatches, `aria-pressed`); `src/themes.css` (Glass backdrop, see-through shell and blurred surfaces; Soft shadows; Cyber glow, magenta selection, mono nav and headings; Elegant serif headings) on five hook classes (`app-shell` added to the plan's four); accent (`bg-accent`) on Send, the active nav item and user bubbles in every theme; code blocks `oneLight` on a light base; Cyber's terminal cursor is its accent. Glass backdrop darkened to #3a1f6b/#0b4757 so secondary text reads straight on it (tested). 263 Vitest, 247 Rust. Not yet seen in the app.
-In progress: themes Task 3 (review, RAM with Glass, the human's check), Claude Code (Opus 5.5).
-The human checked every theme in the dev app on 2026-11-01: "Checked, all good".
-Next step: the `web-design-guidelines` review of the new UI, then version `0.1.0-rc.3`; RAM with Glass measured on the installed rc.3, as for rc.2.
+Themes Task 3 done 2026-11-01 by Claude Code (Opus 5.5): the human checked every theme in the dev app ("Checked, all good"), then found dropdowns grey in Glass (an open list is drawn over white); fixed with a solid `--color-popup` per theme and the accent on the chosen option (`2f5e029`; "Dropdowns look right"). `web-design-guidelines` review: fixed the message box's missing name (`aria-label="Message"`), the theme buttons' group name, and "..." placeholders; listed, not fixed: the two unsaved-changes dialogs in `App.tsx` have no `role="dialog"`, `aria-modal` or focus handling (older code). Version `0.1.0-rc.3` (four files, CHANGELOG). 264 Vitest, 247 Rust. Both rc.3 plans (attachments, themes) are done. RAM with Glass moves to the installed rc.3, as for rc.2.
+Next step: push; the human runs the Release workflow for rc.3 and publishes it; the installed rc.2 should update to rc.3; then RAM of rc.3 with Dark and Glass.
 
 ## Next 3 tasks
 
-1. The Linux and 8 GB check in an Ubuntu VM with a real project open (Task 8).
-2. Review the whole M6 diff (Task 8).
-3. Version `0.1.0`, the release, and closing M6 with the human (Task 8).
+1. Push, release rc.3, update test rc.2 → rc.3, RAM with Dark and Glass (Task 8).
+2. The Linux and 8 GB check, and macOS, when the human is ready (deferred by the human on 2026-10-31).
+3. Review the whole M6 diff, then `0.1.0` and close M6 with the human (Task 8).

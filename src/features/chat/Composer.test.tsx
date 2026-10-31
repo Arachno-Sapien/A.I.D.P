@@ -64,6 +64,11 @@ describe("Composer attachments", () => {
     expect(store.getState().pending.map((a) => a.name)).toEqual([".env"]);
   });
 
+  it("the message box has a name for screen readers", () => {
+    renderComposer();
+    expect(screen.getByRole("textbox", { name: "Message" })).toBeDefined();
+  });
+
   it("Send works with only an attachment", () => {
     store.getState().addAttachments([png]);
     const onSend = vi.fn();

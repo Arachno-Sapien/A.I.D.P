@@ -163,7 +163,7 @@ export function SettingsScreen() {
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div role="group" aria-label="Theme" className="flex flex-wrap items-center gap-2">
             {THEME_OPTIONS.map((t) => {
               const active = theme === t.id;
               return (

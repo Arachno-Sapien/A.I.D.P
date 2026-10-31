@@ -351,7 +351,7 @@ export function AiPanel({ onApply }: AiPanelProps) {
         onStop={stop}
         streaming={streaming}
         disabled={!selected}
-        placeholder="Ask about this code..."
+        placeholder="Ask about this code…"
       />
     </div>
   );
