@@ -43,11 +43,11 @@ M6 Task 2 done 2026-10-31 by Claude Code (Opus 5.5) in `dada40c`: login-shell PA
 M6 Task 3 done 2026-10-31 by Claude Code (Opus 5.5): job object for Stop on Windows (`dc84d24`); model commands refused for full-width characters everywhere and, on Windows, for any character the ANSI code page doesn't hold exactly or that gets an ASCII trail byte (three automated security reviews: `61a9ca4`, `9f2aa6a`, `b9ccfd3`). CI run 41121384526 green (217 Rust tests on Windows and macOS, 216 on Linux).
 M6 Task 4 done 2026-10-31 by Antigravity (Gemini 2.5 Pro): Agent label `shrink-0 whitespace-nowrap` in `AiPanel.tsx`, model select `min-w-0 truncate` with `title` in `ModelPicker.tsx`; `inFlightReplies` in `createChatStore` retains originating `conversationId` and streamed text so partial replies on folder switch are saved to the correct conversation. 189 Vitest tests and 217 Rust tests passing.
 Tasks 1 to 4 reviewed by Claude Code (Opus 5.5) on 2026-10-31: gate green (217 Rust, 189 Vitest), no blocking findings.
-M6 Task 4b done 2026-10-31 by Claude Code (Opus 5.5): window 1024×640 (min 720×480, centred); file tree and AI panel toggle (Files / AI, Ctrl+B / Ctrl+Alt+B) and resize (`Splitter.tsx`), shrink before overflowing; AI panel reopens on a pending approval; shortcuts only on the Workspace screen. 196 Vitest, 217 Rust. Not yet checked in the real app window by the human.
-Next step: the human checks the layout in the dev app; M6 Task 5 waits for the public update key (D4).
+M6 Task 4b done 2026-10-31 by Claude Code (Opus 5.5): window 1024×640 (min 720×480, centred); file tree and AI panel toggle (Files / AI, Ctrl+B / Ctrl+Alt+B) and resize (`Splitter.tsx`), shrink before overflowing; AI panel reopens on a pending approval; shortcuts only on the Workspace screen. 196 Vitest, 217 Rust. The human checked it in the dev app on 2026-10-31: "Looks right".
+Next step: M6 Task 5 (signed updates) waits for the public update key (D4).
 
 ## Next 3 tasks
 
-1. The human checks the workspace layout in the dev app (Task 4b).
-2. The human creates the update signing key (D4) before Task 5.
-3. M6 Tasks 5 to 8: updates, the Release workflow, docs, release candidates and v0.1.0.
+1. The human creates the update signing key (D4) and hands over the public key.
+2. M6 Task 5: signed updates (check, install, setting).
+3. M6 Tasks 6 to 8: the Release workflow, docs, release candidates and v0.1.0.
