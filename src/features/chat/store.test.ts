@@ -591,13 +591,13 @@ describe("useChatStore", () => {
       ],
     });
 
-    await (useChatStore.getState() as any).setArchived?.(2, true);
+    await useChatStore.getState().setArchived(2, true);
 
     expect(commands.setConversationArchived).toHaveBeenCalledWith(2, true);
     expect(useChatStore.getState().conversationId).toBe(1);
 
     // Archiving the last remaining opens startNew
-    await (useChatStore.getState() as any).setArchived?.(1, true);
+    await useChatStore.getState().setArchived(1, true);
     expect(useChatStore.getState().conversationId).toBeNull();
   });
 
@@ -609,11 +609,34 @@ describe("useChatStore", () => {
       ],
     });
 
-    await (useChatStore.getState() as any).setPinned?.(1, true);
+    await useChatStore.getState().setPinned(1, true);
 
     expect(commands.setConversationPinned).toHaveBeenCalledWith(1, true);
     expect(useChatStore.getState().conversationId).toBe(1);
     expect(useChatStore.getState().conversations[0].pinned).toBe(true);
+  });
+
+  it("a failed pin or archive leaves the list and the open chat as they were", async () => {
+    const before = [
+      { id: 1, title: "Chat One", workspacePath: null, updatedAt: 100, pinned: false, archived: false },
+      { id: 2, title: "Chat Two", workspacePath: null, updatedAt: 90, pinned: false, archived: false },
+    ];
+    useChatStore.setState({ conversationId: 1, conversations: before });
+    vi.mocked(commands.setConversationPinned).mockResolvedValueOnce({
+      status: "error",
+      error: { kind: "notFound" },
+    });
+    vi.mocked(commands.setConversationArchived).mockResolvedValueOnce({
+      status: "error",
+      error: { kind: "notFound" },
+    });
+
+    await useChatStore.getState().setPinned(1, true);
+    await useChatStore.getState().setArchived(1, true);
+
+    expect(useChatStore.getState().conversations).toEqual(before);
+    expect(useChatStore.getState().conversationId).toBe(1);
+    expect(commands.loadMessages).not.toHaveBeenCalled();
   });
 
   it("sending in an archived chat un-archives it in the list", async () => {

@@ -33,6 +33,10 @@ secrets.local.json
 .vscode/
 .idea/
 
+# Agent working files (the unlazy skill's gates hold machine paths)
+GATES.md
+.unlazy/
+
 # OS files
 Thumbs.db
 [Dd]esktop.ini

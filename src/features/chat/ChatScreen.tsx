@@ -2,15 +2,13 @@ import { useEffect, useRef } from "react";
 import { create } from "zustand";
 import { PanelLeft } from "lucide-react";
 import { Composer } from "./Composer";
-import { ConversationList } from "./ConversationList";
+import { ConversationList, LIST_MIN, LIST_WIDTH } from "./ConversationList";
 import { MessageList } from "./MessageList";
 import { ModelPicker } from "./ModelPicker";
 import { Splitter } from "../workspace/Splitter";
 import { useChatStore } from "./store";
 import { useModelsStore } from "../models/store";
 
-export const LIST_WIDTH = 240;
-export const LIST_MIN = 180;
 export const CHAT_MIN = 360;
 
 export interface ChatLayoutState {
@@ -110,7 +108,7 @@ export function ChatScreen({
           </>
         )}
 
-        <div className="flex-1 flex flex-col min-w-0">
+        <div className="flex-1 flex flex-col" style={{ minWidth: CHAT_MIN }}>
           {/* Main Content Area */}
           {loaded && loadError ? (
             <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">

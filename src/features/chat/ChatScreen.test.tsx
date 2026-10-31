@@ -27,7 +27,7 @@ import { ChatScreen, useChatLayout } from "./ChatScreen";
 describe("ChatScreen", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useChatLayout?.setState?.({ listOpen: true, listWidth: 240 });
+    useChatLayout.setState({ listOpen: true, listWidth: 240 });
     useChatStore.setState({
       messages: [],
       streaming: false,
@@ -45,6 +45,19 @@ describe("ChatScreen", () => {
 
   afterEach(() => {
     cleanup();
+  });
+
+  it("the chat list shrinks before the chat does", () => {
+    render(<ChatScreen />);
+
+    // Like the workspace panels: in a narrower window the list gives way down
+    // to its minimum, and the chat keeps its own.
+    const list = screen.getByRole("complementary");
+    expect(list.style.flex).toBe("0 1 240px");
+    expect(list.style.minWidth).toBe("180px");
+    const chat = screen.getByRole("separator", { name: "Resize chat list" })
+      .nextElementSibling as HTMLElement;
+    expect(chat.style.minWidth).toBe("360px");
   });
 
   it("offers Add a model on first run", () => {
@@ -170,7 +183,7 @@ describe("ChatScreen", () => {
 describe("ChatScreen history", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useChatLayout?.setState?.({ listOpen: true, listWidth: 240 });
+    useChatLayout.setState({ listOpen: true, listWidth: 240 });
   });
 
   afterEach(() => {

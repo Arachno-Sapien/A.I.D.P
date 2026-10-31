@@ -142,7 +142,9 @@ export const createChatStore = (surface: ChatSurface, hooks?: ChatHooks) => {
     },
 
     setPinned: async (id: number, pinned: boolean) => {
-      await commands.setConversationPinned(id, pinned);
+      // The list changes only once the database has.
+      const res = await commands.setConversationPinned(id, pinned);
+      if (res.status !== "ok") return;
       set((state) => ({
         conversations: state.conversations.map((c) =>
           c.id === id ? { ...c, pinned } : c,
@@ -151,7 +153,8 @@ export const createChatStore = (surface: ChatSurface, hooks?: ChatHooks) => {
     },
 
     setArchived: async (id: number, archived: boolean) => {
-      await commands.setConversationArchived(id, archived);
+      const res = await commands.setConversationArchived(id, archived);
+      if (res.status !== "ok") return;
       const updated = get().conversations.map((c) =>
         c.id === id ? { ...c, archived, pinned: archived ? false : c.pinned } : c,
       );

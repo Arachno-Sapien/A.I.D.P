@@ -28,6 +28,21 @@ describe("ModelPicker", () => {
     cleanup();
   });
 
+  it("with no models, only a bar with a left control shows", () => {
+    // The AI panel passes its Agent switch as children; with no models its bar stays hidden.
+    const { container, unmount } = render(
+      <ModelPicker>
+        <span>Agent</span>
+      </ModelPicker>,
+    );
+    expect(container.firstChild).toBeNull();
+    unmount();
+
+    render(<ModelPicker left={<button type="button">Chat list</button>} />);
+    expect(screen.getByRole("button", { name: "Chat list" })).toBeDefined();
+    expect(screen.queryByRole("combobox", { name: "Model" })).toBeNull();
+  });
+
   it("selects a local model with a colon", async () => {
     const selectSpy = vi.fn();
     useModelsStore.setState({

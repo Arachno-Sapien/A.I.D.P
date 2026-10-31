@@ -58,6 +58,8 @@ M6 chat list, pin/archive, icons, and UI review done 2026-10-31 by Antigravity (
 - Task 1: `lucide-react` icons for nav, workspace toolbar, and conversation list; accessible names retained; bundle size verified (`38a9192`).
 - Task 2: Chat list toggle via top bar button and `Ctrl+B`, resize with `Splitter` within limits (`7365acf`).
 - Task 3: Pin and archive chats with SQLite migration 5, history commands, store methods, and grouped list (`beaeecd`).
+Reviewed by Claude Code (Opus 5.5) on 2026-10-31; four bugs fixed test-first: pin/archive changed the list even when the command failed; chat rows were `role="button"` with the Pin/Archive/Delete buttons inside (hidden from screen readers); the chat list didn't shrink in a narrower window; `ModelPicker` showed the AI panel's bar with no models. Also `aria-expanded` on Archived, `GATES.md` untracked and ignored. The human checked the icons: "they look fine". Pin, archive, hide/resize and code colouring not yet seen in the app.
+Next step: push; CI green on three OSes; the human runs the Release workflow for rc.2 and publishes it, then checks pin, archive, the chat list and code colouring in rc.2.
 - Task 4: `web-design-guidelines` skill installed and mirrored; UI review polish applied (focus rings, accessible labels, keyboard handlers); all 6 acceptance gates in `GATES.md` verified and met. 228 Vitest, 220 Rust tests passing.
 
 ## Next 3 tasks

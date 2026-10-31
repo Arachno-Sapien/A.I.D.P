@@ -34,6 +34,30 @@ describe("ConversationList", () => {
     });
   });
 
+  it("opening a chat is a button of its own, beside its actions", () => {
+    render(<ConversationList />);
+
+    // A button inside a button is hidden from screen readers.
+    const open = screen.getByRole("button", { name: /^Rust questions/ });
+    expect(open.querySelector("button")).toBeNull();
+    expect(open.getAttribute("aria-current")).toBe("true");
+    expect(
+      screen.getByRole("button", { name: /^React notes/ }).getAttribute("aria-current"),
+    ).toBeNull();
+  });
+
+  it("the Archived toggle says whether it is open", () => {
+    useChatStore.setState({
+      conversations: [{ id: 3, title: "Old", updatedAt: 50, pinned: false, archived: true }],
+    });
+    render(<ConversationList />);
+
+    const toggle = screen.getByRole("button", { name: /archived \(1\)/i });
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+  });
+
   it("filters, creates and deletes chats", async () => {
     render(<ConversationList />);
 

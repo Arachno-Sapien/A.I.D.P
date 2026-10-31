@@ -11,7 +11,8 @@ export function ModelPicker({ children, left }: ModelPickerProps = {}) {
 
   const hasModels = loaded && chatModels.length > 0;
 
-  if (!hasModels && !left && !children) {
+  // With no models only a left control (the chat list toggle) keeps the bar.
+  if (!hasModels && !left) {
     return null;
   }
 

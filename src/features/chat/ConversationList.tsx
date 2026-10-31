@@ -11,7 +11,10 @@ import {
 import { useChatStore } from "./store";
 import type { Conversation } from "../../lib/bindings";
 
-export function ConversationList({ width }: { width?: number } = {}) {
+export const LIST_WIDTH = 240;
+export const LIST_MIN = 180;
+
+export function ConversationList({ width = LIST_WIDTH }: { width?: number } = {}) {
   const {
     conversations,
     conversationId,
@@ -82,37 +85,32 @@ export function ConversationList({ width }: { width?: number } = {}) {
       );
     }
 
+    // The row holds two kinds of button side by side: one that opens the chat
+    // and its actions. A button inside a button is hidden from screen readers.
     return (
       <div
         key={c.id}
-        tabIndex={0}
-        role="button"
-        onKeyDown={(e) => {
-          if (e.target !== e.currentTarget) return;
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            if (!streaming && c.id !== conversationId) {
-              void load(c.id);
-            }
-          }
-        }}
-        onClick={() => {
-          if (!streaming && c.id !== conversationId) {
-            void load(c.id);
-          }
-        }}
-        className={`group flex items-center justify-between px-2.5 py-2 rounded-lg cursor-pointer transition-colors focus-visible:ring-1 focus-visible:ring-neutral-400 focus-visible:outline-none ${
+        className={`group flex items-center justify-between pr-2.5 rounded-lg transition-colors ${
           isActive
             ? "bg-neutral-800/90 text-white font-medium"
             : "text-neutral-400 hover:bg-neutral-900/80 hover:text-neutral-200"
         }`}
       >
-        <div className="min-w-0 flex-1 pr-1.5">
-          <div className="truncate text-xs">{c.title}</div>
-          <div className="text-[10px] text-neutral-500 font-mono">
+        <button
+          type="button"
+          aria-current={isActive ? "true" : undefined}
+          onClick={() => {
+            if (!streaming && c.id !== conversationId) {
+              void load(c.id);
+            }
+          }}
+          className="min-w-0 flex-1 pl-2.5 pr-1.5 py-2 text-left rounded-lg cursor-pointer focus-visible:ring-1 focus-visible:ring-neutral-400 focus-visible:outline-none"
+        >
+          <span className="block truncate text-xs">{c.title}</span>
+          <span className="block text-[10px] text-neutral-500 font-mono">
             {formatDate(c.updatedAt)}
-          </div>
-        </div>
+          </span>
+        </button>
 
         <div className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 flex items-center gap-0.5 shrink-0">
           {!c.archived && (
@@ -181,9 +179,10 @@ export function ConversationList({ width }: { width?: number } = {}) {
   };
 
   return (
+    // Like the workspace panels, the list gives way before the chat in a narrow window.
     <aside
-      className="shrink-0 border-r border-neutral-800 bg-neutral-950 flex flex-col h-full select-none text-xs"
-      style={{ width }}
+      className="border-r border-neutral-800 bg-neutral-950 flex flex-col h-full select-none text-xs"
+      style={{ flex: `0 1 ${width}px`, minWidth: LIST_MIN }}
     >
       <div className="p-3 border-b border-neutral-800 space-y-2">
         <button
@@ -241,6 +240,7 @@ export function ConversationList({ width }: { width?: number } = {}) {
               <div className="pt-2 border-t border-neutral-800/80 mt-2">
                 <button
                   type="button"
+                  aria-expanded={archivedOpen}
                   onClick={() => setArchivedOpen(!archivedOpen)}
                   className="w-full flex items-center justify-between px-2.5 py-1 text-[11px] font-semibold text-neutral-400 hover:text-neutral-200 cursor-pointer"
                 >
