@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Streaming a reply no longer renders every earlier message again on each chunk. In a 20-message chat each chunk took about a tenth of the time and made about a fifth of the short-lived memory, which had pushed the app over its 200 MB workspace budget after a long local-model reply.
+
 ## [0.1.0-rc.1] - 2026-10-31
 
 ### Added

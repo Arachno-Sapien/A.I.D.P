@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Composer } from "../chat/Composer";
 import { MessageList } from "../chat/MessageList";
 import { ModelPicker } from "../chat/ModelPicker";
-import type { ApplyTarget, SendExtra, UiMessage } from "../chat/store";
+import type { ApplyTarget, SendExtra, ToolStep, UiMessage } from "../chat/store";
 import { useModelsStore } from "../models/store";
 import { buffers } from "./buffers";
 import { useWorkspaceChatStore } from "./chatStore";
@@ -179,13 +179,24 @@ export function AiPanel({ onApply }: AiPanelProps) {
     await send(question, selected, extra);
   };
 
-  const handleApply = (code: string, language: string, message: UiMessage) => {
-    if (onApply) {
-      onApply(code, language, message);
-    } else if (message.target) {
-      void propose(message.target, code);
-    }
-  };
+  // Stable across renders, so MessageList's memoized rows don't all render
+  // again on every streamed chunk.
+  const handleApply = useCallback(
+    (code: string, language: string, message: UiMessage) => {
+      if (onApply) {
+        onApply(code, language, message);
+      } else if (message.target) {
+        void propose(message.target, code);
+      }
+    },
+    [onApply, propose],
+  );
+  const renderStep = useCallback(
+    (step: ToolStep) => (
+      <ToolStepView step={step} onAnswer={(id, approve) => void answer(id, approve)} />
+    ),
+    [answer],
+  );
 
   return (
     <div className="flex flex-col h-full bg-neutral-900/30 text-neutral-100">
@@ -330,12 +341,7 @@ export function AiPanel({ onApply }: AiPanelProps) {
       <MessageList
         messages={messages}
         onApply={handleApply}
-        renderStep={(step) => (
-          <ToolStepView
-            step={step}
-            onAnswer={(id, approve) => void answer(id, approve)}
-          />
-        )}
+        renderStep={renderStep}
       />
 
       {/* Composer */}

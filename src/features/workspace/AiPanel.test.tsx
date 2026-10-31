@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { Markdown } from "../chat/Markdown";
 import { AiPanel } from "./AiPanel";
 import { commands } from "../../lib/bindings";
 import { useWorkspaceStore } from "./store";
@@ -34,6 +35,12 @@ vi.mock("@tauri-apps/api/core", () => ({
     onmessage = (_: unknown) => {};
   },
 }));
+
+// The real Markdown, counted, to see which messages render again.
+vi.mock("../chat/Markdown", async (importOriginal) => {
+  const real = await importOriginal<typeof import("../chat/Markdown")>();
+  return { Markdown: vi.fn(real.Markdown) };
+});
 
 vi.mock("../models/store", () => {
   const fn = vi.fn();
@@ -419,5 +426,23 @@ describe("AiPanel while a reply streams", () => {
     });
     render(<AiPanel />);
     expect(screen.queryByRole("button", { name: "Clear" })).toBeNull();
+  });
+
+  it("a streamed chunk re-renders only the reply it belongs to", () => {
+    useWorkspaceChatStore.setState({
+      messages: [
+        { id: "a1", role: "assistant", text: "an earlier reply", status: "complete" },
+        { id: "a2", role: "assistant", text: "", status: "streaming" },
+      ],
+      streaming: true,
+    });
+    render(<AiPanel />);
+    vi.mocked(Markdown).mockClear();
+
+    act(() => {
+      useWorkspaceChatStore.getState().applyEvent("a2", { event: "delta", data: "hi" });
+    });
+    expect(Markdown).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(Markdown).mock.calls[0][0].text).toBe("hi");
   });
 });

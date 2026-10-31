@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { memo, useEffect, useRef, type ReactNode } from "react";
 import { appErrorText } from "./appErrorText";
 import { errorText } from "./errorText";
 import { Markdown } from "./Markdown";
@@ -32,8 +32,37 @@ export function MessageList({
   return (
     <div className="flex-1 overflow-y-auto p-6 space-y-4">
       {messages.map((msg) => (
-        <div
+        <MessageItem
           key={msg.id}
+          msg={msg}
+          onApply={onApply}
+          renderStep={renderStep}
+        />
+      ))}
+      <div ref={messagesEndRef} />
+    </div>
+  );
+}
+
+interface MessageItemProps {
+  msg: UiMessage;
+  onApply?: MessageListProps["onApply"];
+  renderStep?: MessageListProps["renderStep"];
+}
+
+/**
+ * One message. Memoized because a streamed chunk replaces only its own
+ * message object: the others then skip parsing Markdown and highlighting
+ * code again on every chunk, which made the page's memory jump during long
+ * replies. Callers must pass stable `onApply` and `renderStep`.
+ */
+const MessageItem = memo(function MessageItem({
+  msg,
+  onApply,
+  renderStep,
+}: MessageItemProps) {
+  return (
+        <div
           className={`flex ${
             msg.role === "user" ? "justify-end" : "justify-start"
           }`}
@@ -118,8 +147,5 @@ export function MessageList({
             )}
           </div>
         </div>
-      ))}
-      <div ref={messagesEndRef} />
-    </div>
   );
-}
+});
