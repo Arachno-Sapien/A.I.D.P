@@ -9,7 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0-rc.1] - 2026-10-31
+
 ### Added
+- Installers for Windows (NSIS `.exe`), macOS (universal `.dmg`) and Linux (`.AppImage`, `.deb`), built by a Release workflow started by hand (decisions 0016 and 0017). They aren't code-signed yet; the user guide shows how to open them.
 - Signed updates: the app checks GitHub Releases 10 seconds after start (can be turned off in Settings) or on **Check for updates**, shows a bar when a new version exists, and installs it only on **Install and restart**, never with unsaved files. Settings shows the app version.
 - Workspace layout: the file tree and the AI panel can be shown or hidden (**Files** and **AI** buttons, `Ctrl+B` and `Ctrl+Alt+B`) and resized by dragging the line beside them. The AI panel reopens when a command waits for approval.
 - The window opens at 1024×640 (minimum 720×480), and the workspace panels shrink to fit a smaller window instead of overflowing.
@@ -50,6 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dual license: MIT OR Apache-2.0 (`LICENSE-MIT`, `LICENSE-APACHE`, decision 0004).
 
 ### Changed
+- On macOS and Linux, an app opened from Finder or a desktop menu takes `PATH` from your login shell, so model commands, the terminal and Ollama find the same programs as your own terminal. The macOS terminal starts a login shell.
 - App display name is now **A.I.D.P** (window title, page title, heading). Internal names stay `aidp`.
 - Replies show headings, lists, quotes and inline code with proper spacing.
 
@@ -57,9 +61,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `config.local.json` key file, loader, and configuration panel (replaced by in-app Models management and OS keychain).
 
 ### Fixed
+- Stop and the command timeout on Windows now also end a process the command started and left running after its shell exited (job object).
+- A reply still streaming when you switch workspace folders is saved, as stopped, to the conversation it started in.
+- The Agent label in the workspace AI panel is no longer cut off by a long model name.
+- Workspace shortcuts work only on the Workspace screen; `Ctrl+\` no longer opens a terminal while another screen is showing.
 - `config.local.json` still loads when an editor saves it with a byte-order mark.
 
 ### Security
+- A model command containing a full-width character (such as `＂`) is refused, and on Windows so is any character the system's ANSI code page doesn't hold exactly, since some programs would receive it as a different ASCII character ("WorstFit").
+- Updates are verified against the app's public key before they install; the release workflow pins every action to a commit hash because it holds the signing key.
 - Agent tools cannot use the `.git` folder, also through links or names Windows trims such as `.git.` (decision 0012).
 - PGP and PuTTY private keys and `*.ppk` files are treated as secret, like PEM keys (decision 0012).
 - A model command containing hidden or control characters is refused before its approval card appears, so the card always shows what runs.

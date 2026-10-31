@@ -47,10 +47,11 @@ M6 Task 4b done 2026-10-31 by Claude Code (Opus 5.5): window 1024×640 (min 720�
 The human created the update key on 2026-10-31: both GitHub secrets set; public key in `%USERPROFILE%\.tauri\aidp.key.pub` (key ID EE9A69E11D7D346C).
 M6 Task 5 done 2026-10-31 by Claude Code (Opus 5.5): `tauri-plugin-updater` 2.14 (native-tls, no rustls), `plugins.updater` with the public key and the GitHub `latest.json` endpoint, `updates.rs`, `commands/updates.rs` (`app_version`, `check_update`, `install_update`), setting `check_updates_at_start`, `UpdateBar`, Settings → Updates, quiet check 10 s after start. 220 Rust, 204 Vitest. Install is untested until a release exists (Task 8).
 M6 Task 6 done 2026-10-31 by Claude Code (Opus 5.5): `.github/workflows/release.yml` (one draft job, then a build matrix passing `releaseId`; actions pinned to commit hashes), `src-tauri/tauri.updater.conf.json`, bundle metadata, macOS ad-hoc signing, version `0.1.0-rc.1`, `docs/dev/release.md`. Release run 41188603905 (started by the human) passed first time: draft `v0.1.0-rc.1` (release id 429837322) holds the NSIS exe, universal dmg and app.tar.gz, AppImage and deb, each update file signed by key EE9A69E11D7D346C; `latest.json` lists all four platforms. The draft is NOT published.
-Next step: M6 Task 7, docs: decision 0017 (D1 to D4), the user guide's install steps per OS (SmartScreen, Gatekeeper Open Anyway, AppImage/libfuse2, Secret Service), README Status and Download, CHANGELOG 0.1.0, setup.md for macOS/Linux; then the human publishes rc.1 (Task 8).
+M6 Task 7 done 2026-10-31 by Claude Code (Opus 5.5): decision 0017 (formats, no paid signing, updates, releasing); user guide Install per OS, Updates, troubleshooting; README Status and Download; CHANGELOG `0.1.0-rc.1`; setup.md "Building on macOS or Linux"; security.md unsigned installers; design risk row; known issues.
+Next step: M6 Task 8. The human publishes the draft `v0.1.0-rc.1` (Releases page, as a normal release, not pre-release), installs it on Windows from the release page, and runs the rc.1 checks, RAM, and the Linux/8 GB VM (plan, Task 8).
 
 ## Next 3 tasks
 
-1. M6 Task 6: the Release workflow and bundle settings (0.1.0-rc.1).
-2. M6 Task 7: docs (decision 0017, install guide per OS, release how-to).
-3. M6 Task 8: release candidates, RAM, the 8 GB and Linux checks, update test, v0.1.0.
+1. The human publishes `v0.1.0-rc.1` and installs it on Windows (Task 8).
+2. RAM in the release build; the Linux and 8 GB check in an Ubuntu VM (Task 8).
+3. The update test with `0.1.0-rc.2`, review, then `0.1.0` (Task 8).

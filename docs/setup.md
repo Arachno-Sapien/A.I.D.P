@@ -23,6 +23,20 @@ Ensure the following tools are installed:
 > git config --global core.longpaths true
 > ```
 
+## Building on macOS or Linux
+
+This guide is written for Windows, but the app builds on macOS and Linux too; CI builds and tests all three.
+
+- **macOS:** Xcode Command Line Tools (`xcode-select --install`), Node.js 22 or newer, and Rust stable (`rustup`).
+- **Ubuntu or Debian:** Node.js 22 or newer, Rust stable, and Tauri's build packages:
+  ```bash
+  sudo apt install libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+  ```
+  Other distributions: see [Tauri's prerequisites](https://v2.tauri.app/start/prerequisites/).
+- To save API keys on Linux, a Secret Service must be running (GNOME Keyring or KWallet).
+
+No signing key is needed to develop or to run `npm run tauri build -- --no-bundle`. Installers with update files are built only by the Release workflow ([docs/dev/release.md](dev/release.md)).
+
 ---
 
 ## 2. Getting Started

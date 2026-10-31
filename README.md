@@ -6,11 +6,21 @@ The name stands for AI Independent Development Platform, at least for now. The m
 
 ## Status
 
-Early. You can chat with one OpenAI-compatible provider (OpenAI, OpenRouter, Groq, DeepSeek or a local server). Replies stream in, Stop works, and code blocks have a Copy button. For now the provider details live in a local config file, which the setup guide describes. Next come the keychain, a screen for adding providers, and Anthropic support, then the coding workspace.
+v0.1 is in release candidates. Everything listed under "What v0.1 does" below is built: cloud models through OpenAI-compatible APIs and Anthropic, local models through Ollama, keys in the system keychain, the coding workspace with AI edits as diffs and agent tools that ask before every command, a terminal, chat history, settings, and signed updates.
 
-v0.1 is planned for Windows, macOS and Linux. Windows is the development machine and is tested first.
+It runs on Windows, macOS and Linux. Windows is the development machine and gets the most testing. CI builds and tests all three; Linux gets a hand check in a VM before 0.1.0, and the macOS build hasn't been tried on a real Mac yet.
 
-## What v0.1 will do
+## Download
+
+Get the installer for your system from the [latest release](https://github.com/Arachno-Sapien/A.I.D.P/releases/latest):
+
+- Windows 10 or 11: `A.I.D.P_<version>_x64-setup.exe`
+- macOS, Apple silicon or Intel: `A.I.D.P_<version>_universal.dmg` (not yet tested on a real Mac)
+- Linux: `A.I.D.P_<version>_amd64.AppImage`, or the `.deb` for Debian and Ubuntu
+
+The installers aren't code-signed yet, so Windows and macOS warn the first time you open the app. The [user guide](docs/user-guide.md#install) shows how to get past that. After that the app updates itself, but only when you click Install.
+
+## What v0.1 does
 
 - A coding workspace. Open a folder, browse it in a file tree, and edit files in tabs. An AI panel beside the editor sees the file you have open and whatever you've selected.
 - AI edits you approve. Suggested changes show up as a diff, and nothing touches the disk until you accept it. Models that support tool calling can also read and search your project and ask to run commands, such as your tests, one approval at a time.
@@ -40,9 +50,9 @@ A.I.D.P is a Tauri 2 app. The frontend is React, TypeScript and Vite, styled wit
 
 The window never touches the network or the disk itself. Every request goes through the Rust core, which holds the keys, calls the providers, manages Ollama, saves chats to a local SQLite file, and does all the reading, writing and running inside your project folder. The editor is CodeMirror 6, picked over Monaco because it's much lighter. The TypeScript functions the UI calls are generated from the Rust code by tauri-specta, and CI fails if the two ever drift apart.
 
-## Getting started
+## Building from source
 
-You'll need these on Windows:
+You'll need these on Windows (on macOS or Linux, see the [setup guide](docs/setup.md#building-on-macos-or-linux)):
 
 - Node.js 22 or newer
 - Rust stable with the MSVC toolchain (`rustup default stable-msvc`)
@@ -59,7 +69,7 @@ npm ci
 npm run tauri dev
 ```
 
-The first run compiles the Rust side and takes a few minutes. After that a window titled A.I.D.P opens and tells you which provider config file to create. The [setup guide](docs/setup.md) has the longer version, including a fix for the "Filename too long" error Git sometimes hits on Windows.
+The first run compiles the Rust side and takes a few minutes. After that a window titled A.I.D.P opens on the Chat screen, with one button: Add a model. The [setup guide](docs/setup.md) has the longer version, including a fix for the "Filename too long" error Git sometimes hits on Windows.
 
 To build the release app without an installer:
 

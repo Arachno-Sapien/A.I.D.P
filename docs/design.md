@@ -468,7 +468,7 @@ The biggest risk is an agent-built Rust core you can't debug; the plan answers i
 | Exams and coursework | Milestones slip | Two buffer weeks; each milestone ends in a working app |
 | Linux keyring missing | Keys can't be saved | Clear error naming GNOME Keyring or KWallet; never a plain-text fallback |
 | WebView differences across OSes | UI looks or behaves differently | Windows first; macOS and Linux tested before v0.1 ships |
-| Unsigned installer | Windows shows an "unknown publisher" warning | Document how to proceed; sign once the app has users |
+| Unsigned installer | Windows shows an "unknown publisher" warning; macOS blocks the first open | Document how to proceed (user guide, decision 0017); sign once the app has users |
 | Provider API changes | An adapter breaks | Fake-server tests catch it; adapters are isolated files |
 | Small local models handle tools poorly | Agent tools don't work with them | Capability flags limit those models to the M3 workspace |
 | An AI edit damages files | User loses work | Every edit is a diff the user accepts; warning in folders without git |

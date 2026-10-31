@@ -162,6 +162,7 @@ Milestone 5 introduces local model support via Ollama and persistent chat histor
 - **Nothing installs on its own:** an update downloads and installs only after you click **Install and restart**, and never while a file has unsaved changes. A streaming reply or a running command is stopped, the same as quitting.
 - **No window access:** the updater plugin is driven only from Rust (`commands/updates.rs`). No updater permission is granted in the capability file, so the window can't call the plugin's own commands.
 - **Transport:** the plugin uses native-tls like the rest of the app (decision 0006), with its rustls feature off.
+- **Unsigned installers (decision 0017):** the Windows installer isn't code-signed and the macOS app is only ad-hoc signed, not notarized, so the operating system can't vouch for who made them and warns on first open. The update signature above is separate: it proves each update came from the same key as the app you installed.
 - **The release workflow** (`.github/workflows/release.yml`) is the only place the private key is used. It runs only when started by hand, gives the key to the build step alone, and pins every action to a full commit hash, so a moved tag in a third-party action can't reach the key.
 
 
