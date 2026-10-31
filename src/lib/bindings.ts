@@ -31,6 +31,13 @@ export const commands = {
 	listConversations: (workspacePath: string | null) => typedError<Conversation_Serialize[], AppError_Serialize>(__TAURI_INVOKE("list_conversations", { workspacePath })),
 	createConversation: (firstText: string, workspacePath: string | null) => typedError<Conversation_Serialize, AppError_Serialize>(__TAURI_INVOKE("create_conversation", { firstText, workspacePath })),
 	deleteConversation: (id: number) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("delete_conversation", { id })),
+	watchDrops: (onDrop: Channel<Attachments_Deserialize>) => __TAURI_INVOKE<void>("watch_drops", { onDrop }),
+	/**  Opens the file dialog in Rust and adds what the user picks. */
+	pickAttachments: () => typedError<Attachments_Serialize, AppError_Serialize>(__TAURI_INVOKE("pick_attachments")),
+	/**  Adds pasted data, sent as base64 so it crosses IPC as one string. */
+	attachBytes: (name: string, dataBase64: string) => typedError<Attachment_Serialize, AppError_Serialize>(__TAURI_INVOKE("attach_bytes", { name, dataBase64 })),
+	/**  An attachment's bytes as base64, for its thumbnail. */
+	readAttachment: (id: string) => typedError<string, AppError_Serialize>(__TAURI_INVOKE("read_attachment", { id })),
 	setConversationPinned: (id: number, pinned: boolean) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("set_conversation_pinned", { id, pinned })),
 	setConversationArchived: (id: number, archived: boolean) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("set_conversation_archived", { id, archived })),
 	loadMessages: (conversationId: number) => typedError<StoredMessage_Serialize[], AppError_Serialize>(__TAURI_INVOKE("load_messages", { conversationId })),
@@ -83,6 +90,43 @@ export type AppSettings = {
 	theme: Theme,
 	keepAlive: KeepAlive,
 	checkUpdatesAtStart: boolean,
+};
+
+export type Attachment = Attachment_Serialize | Attachment_Deserialize;
+
+export type AttachmentKind = "image" | "text" | "pdf";
+
+export type Attachment_Deserialize = {
+	id: string,
+	name: string,
+	mime: string,
+	size: number,
+	kind: AttachmentKind,
+	warning?: string | null,
+};
+
+export type Attachment_Serialize = {
+	id: string,
+	name: string,
+	mime: string,
+	size: number,
+	kind: AttachmentKind,
+	warning: string | null,
+};
+
+/**  What a pick or a drop gave: the files added, and a message for each one refused. */
+export type Attachments = Attachments_Serialize | Attachments_Deserialize;
+
+/**  What a pick or a drop gave: the files added, and a message for each one refused. */
+export type Attachments_Deserialize = {
+	added: Attachment_Deserialize[],
+	refused: string[],
+};
+
+/**  What a pick or a drop gave: the files added, and a message for each one refused. */
+export type Attachments_Serialize = {
+	added: Attachment_Serialize[],
+	refused: string[],
 };
 
 export type ChatEvent = ChatEvent_Serialize | ChatEvent_Deserialize;

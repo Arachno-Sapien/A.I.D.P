@@ -104,6 +104,24 @@ pub fn delete_conversation(conn: &Connection, id: u32) -> rusqlite::Result<bool>
     Ok(affected > 0)
 }
 
+/// The attachment IDs among `ids` that some message's stored parts mention.
+pub fn attachments_in_use(
+    conn: &Connection,
+    ids: &[String],
+) -> rusqlite::Result<std::collections::HashSet<String>> {
+    let mut stmt = conn.prepare(
+        "SELECT EXISTS(SELECT 1 FROM messages WHERE instr(content_parts, ?1) > 0)",
+    )?;
+    let mut used = std::collections::HashSet::new();
+    for id in ids {
+        let found: bool = stmt.query_row(params![id], |row| row.get(0))?;
+        if found {
+            used.insert(id.clone());
+        }
+    }
+    Ok(used)
+}
+
 pub fn set_pinned(conn: &Connection, id: u32, pinned: bool) -> rusqlite::Result<bool> {
     let affected = conn.execute(
         "UPDATE conversations SET pinned = ?1 WHERE id = ?2",

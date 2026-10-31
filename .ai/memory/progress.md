@@ -66,7 +66,10 @@ RAM of the installed rc.2 (2026-10-31, `docs/dev/measure-ram.md`): idle 128–12
 The human accepted the streaming peak for 0.1.0 on 2026-10-31 ("Accept for 0.1.0"); RAM box ticked. After 0.1.0: confirm the cause in the browser with a fake 1,400-token stream, then likely render the reply being written at most ~10 times a second and skip highlighting finished code blocks again.
 The human deferred the Linux/8 GB check and the macOS check on 2026-10-31 ("Let's skip this check for now. The other OSs we will check later") and asked to refine what is built first: attach images and files in Chat, and polish the UI with themes.
 The human chose (2026-11-01): attachments of images, text files and PDFs; all five theme directions (refined flat, Glass, Soft, plus Cyber/digital and Elegant); ship them as `0.1.0-rc.3`, then 0.1.0. Plans written by Claude Code (Opus 5.5): `docs/superpowers/plans/2026-11-01-m6-attachments.md` (A1–A8, three tasks) and `docs/superpowers/plans/2026-11-01-m6-themes.md` (T1–T7, three tasks), defaults not yet approved.
-Next step: the human approves the defaults (or changes them); then attachments Task 1, then themes.
+The human approved both plans' defaults on 2026-11-01 ("Approve, start here").
+Attachments Task 1 done 2026-11-01 by Claude Code (Opus 5.5): `src-tauri/src/attachments/` (checks by first bytes, store by SHA-256, clean-up after a chat is deleted), PDF text in a child process (`aidp --pdf-text`, killed after 20 s; checked with the built exe on a real and a broken PDF), commands `pick_attachments`, `attach_bytes` (base64), `read_attachment` (base64), `watch_drops`; drops read in Rust's window event. Decision 0019. 238 Rust, 233 Vitest. Changes from the plan: `pick_attachments` returns `{ added, refused }`; IDs name files with no extension; bytes over IPC as base64; no page cap (20 s limit and 2 MB of text instead).
+In progress: attachments Task 2 (attachments reach the models), Claude Code (Opus 5.5).
+Next step: `gateway/mod.rs` `ChatMessage.attachments` and `ImageInput`, with failing wiremock tests for the image shape in each adapter.
 
 ## Next 3 tasks
 

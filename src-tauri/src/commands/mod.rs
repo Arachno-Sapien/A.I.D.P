@@ -1,3 +1,4 @@
+pub mod attachments;
 pub mod chat;
 pub mod connections;
 pub mod history;

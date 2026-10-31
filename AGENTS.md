@@ -82,6 +82,7 @@ Chosen for low memory use and tools agents know well. **No new dependency withou
 | Builds | GitHub Actions + tauri-action |
 | Updates (M6) | tauri-plugin-updater (native-tls), called from Rust only; signed with a key only the human holds |
 | Icons | lucide-react (decision 0018) |
+| Attachments (M6) | `pdf-extract` in a child process (`aidp --pdf-text`), `sha2` content IDs, `base64` over IPC (decision 0019) |
 
 Package manager: **npm**.
 
@@ -167,6 +168,7 @@ src-tauri/
       anthropic.rs
       ollama_chat.rs
     ollama/                detect, start, pull, ps, delete, unload
+    attachments/           chat attachments: checks, store by hash, PDF text in a child process (M6)
     workspace/             open folder, path checks, file read/write, secret filter (M3)
     tools/                 tool definitions, tool-call loop, approvals, commands, PTY (M4)
     connections.rs         connection and model orchestration service

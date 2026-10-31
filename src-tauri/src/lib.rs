@@ -1,3 +1,4 @@
+pub mod attachments;
 pub mod close_guard;
 pub mod commands;
 pub mod connections;
@@ -64,6 +65,10 @@ fn specta_builder() -> Builder<tauri::Wry> {
         commands::history::list_conversations,
         commands::history::create_conversation,
         commands::history::delete_conversation,
+        commands::attachments::watch_drops,
+        commands::attachments::pick_attachments,
+        commands::attachments::attach_bytes,
+        commands::attachments::read_attachment,
         commands::history::set_conversation_pinned,
         commands::history::set_conversation_archived,
         commands::history::load_messages,
@@ -115,8 +120,12 @@ pub fn run() -> tauri::Result<()> {
                 Arc::new(secrets::Keychain),
                 http,
             ));
+            app.manage(attachments::AttachmentStore::new(
+                app_data_dir.join("attachments"),
+            ));
             Ok(())
         })
+        .manage(commands::attachments::DropWatch::default())
         .manage(commands::chat::ChatState::default())
         .manage(workspace::WorkspaceState::default())
         .manage(tools::approvals::Approvals::default())
@@ -124,14 +133,25 @@ pub fn run() -> tauri::Result<()> {
         .manage(commands::ollama::OllamaState::default())
         .manage(close_guard::CloseGuard::default())
         .manage(updates::UpdateState::default())
-        .on_window_event(|window, event| {
-            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+        .on_window_event(|window, event| match event {
+            tauri::WindowEvent::CloseRequested { api, .. } => {
                 let guard = window.state::<close_guard::CloseGuard>();
                 if guard.should_block() {
                     api.prevent_close();
                     guard.notify_close_requested();
                 }
             }
+            // Dropped files are read here, so no path ever comes from the UI.
+            tauri::WindowEvent::DragDrop(tauri::DragDropEvent::Drop { paths, .. }) => {
+                let app = window.app_handle().clone();
+                let paths = paths.clone();
+                tauri::async_runtime::spawn(async move {
+                    let store = app.state::<attachments::AttachmentStore>();
+                    let dropped = attachments::add_paths(&store, paths).await;
+                    app.state::<commands::attachments::DropWatch>().send(dropped);
+                });
+            }
+            _ => {}
         })
         .invoke_handler(builder.invoke_handler())
         .run(tauri::generate_context!())

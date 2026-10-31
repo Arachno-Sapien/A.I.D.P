@@ -1,3 +1,4 @@
+use crate::attachments::AttachmentStore;
 use crate::connections::{AppError, Services};
 use crate::history::{Conversation, NewMessage, StoredMessage};
 use tauri::State;
@@ -23,8 +24,15 @@ pub fn create_conversation(
 
 #[tauri::command]
 #[specta::specta]
-pub fn delete_conversation(services: State<'_, Services>, id: u32) -> Result<(), AppError> {
-    services.delete_conversation(id)
+pub fn delete_conversation(
+    services: State<'_, Services>,
+    store: State<'_, AttachmentStore>,
+    id: u32,
+) -> Result<(), AppError> {
+    services.delete_conversation(id)?;
+    // Files no message refers to any more go too; failing that never fails the delete.
+    let _ = crate::attachments::remove_unused(&services, &store);
+    Ok(())
 }
 
 #[tauri::command]

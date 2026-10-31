@@ -122,6 +122,17 @@ impl Services {
         Ok(())
     }
 
+    /// The attachment IDs among `ids` that a stored message still refers to.
+    pub fn attachments_in_use(
+        &self,
+        ids: &[String],
+    ) -> Result<std::collections::HashSet<String>, AppError> {
+        let conn = self.db.lock().map_err(|_| AppError::Storage {
+            message: "database lock poisoned".to_string(),
+        })?;
+        Ok(db::conversations::attachments_in_use(&conn, ids)?)
+    }
+
     pub fn delete_conversation(&self, id: u32) -> Result<(), AppError> {
         let conn = self.db.lock().map_err(|_| AppError::Storage {
             message: "database lock poisoned".to_string(),

@@ -320,6 +320,35 @@ async fn a_new_message_unarchives() {
 }
 
 #[tokio::test]
+async fn attachments_in_use_are_found_in_stored_messages() {
+    let services = create_services(Arc::new(MemoryStore::default()));
+    let used = "a".repeat(64);
+    let unused = "b".repeat(64);
+    let conv = services.create_conversation("With a file", None).unwrap();
+    let msg = NewMessage {
+        role: Role::User,
+        content_parts: format!(
+            r#"{{"v":1,"text":"see file","parts":[{{"kind":"attachment","id":"{used}"}}]}}"#
+        ),
+        model_ref: None,
+        model_name: None,
+        status: "complete".to_string(),
+        error_kind: None,
+        tokens_in: None,
+        tokens_out: None,
+    };
+    services.append_message(conv.id, msg).unwrap();
+
+    let found = services
+        .attachments_in_use(&[used.clone(), unused])
+        .unwrap();
+    assert_eq!(found, std::collections::HashSet::from([used.clone()]));
+
+    services.delete_conversation(conv.id).unwrap();
+    assert!(services.attachments_in_use(&[used]).unwrap().is_empty());
+}
+
+#[tokio::test]
 async fn pin_or_archive_a_missing_chat() {
     let store = Arc::new(MemoryStore::default());
     let services = create_services(store);

@@ -36,12 +36,20 @@ tauri-plugin-dialog = "2"
 tokio = { version = "1", features = ["process", "time", "sync", "io-util", "macros", "rt"] }
 portable-pty = "0.9"
 tauri-plugin-updater = { version = "2", default-features = false, features = ["native-tls", "system-proxy", "zip"] }
+# Attachments (decision 0019): a PDF's text, read only in a child process;
+# content IDs for stored files (sha2 is already in the tree).
+pdf-extract = "0.12"
+sha2 = "0.10"
+# Attachment bytes cross IPC as one base64 string, not a JSON array of numbers.
+base64 = "0.22"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Globalization", "Win32_Security", "Win32_System_JobObjects", "Win32_System_Threading"] }
 
 [dev-dependencies]
 wiremock = "0.6"
+# Builds small PDFs for the attachment tests; the version pdf-extract uses.
+lopdf = { version = "0.42", default-features = false }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 
 [lints.clippy]
