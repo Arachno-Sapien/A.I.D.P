@@ -218,7 +218,7 @@ Four screens: Chat, Workspace, Models, and Settings. A first-time user lands on 
 
 **Chat**
 
-- Left sidebar: conversation list with search and new chat.
+- Left sidebar: conversation list with search and new chat. Can be hidden (`PanelLeft` button in the model row, `Ctrl+B`) and resized by dragging the splitter between the list and the chat column.
 - Top: model picker, grouped into Cloud and Local, with a status dot per model. Unavailable models stay visible but greyed out, with the reason (key invalid, Ollama stopped, model not downloaded).
 - Messages with Markdown and code blocks (copy button on each). Long chats render only what is on screen.
 - Composer with Send and Stop. A stopped or failed reply stays in the chat with its status.

@@ -9,10 +9,10 @@ Scope: Add lucide-react icons to top nav, workspace bar, and chat list; make cha
   EXPECT: 2 passed
   EVIDENCE: automatic-evidence=v1; definition-sha256=5038bb58bdce0071dcdee2f70315950d8f35c1c9d1480c54ef0990980e985ad1; exit=0; EXPECT=matched; output-sha256=ff371b977f785d07d989fb9a05ebd8fcaf9a96b21a405b6d05a184ef4236970b; output-bytes=835; shell=C:\WINDOWS\system32\cmd.exe; cwd=C:\Users\SYED\Documents\Junaid\A.I.D.P; path=116b443f33f6/54 entries
 
-- [ ] G2: chat list hides with button and Ctrl+B and resizes within width limits
+- [x] G2: chat list hides with button and Ctrl+B and resizes within width limits
   CHECK: npx vitest run -t "chat list hides and shows from its button|Ctrl\+B toggles the chat list" src/features/chat/ChatScreen.test.tsx
   EXPECT: 2 passed
-  EVIDENCE: pending
+  EVIDENCE: automatic-evidence=v1; definition-sha256=d84b6dbaaa657fd722845a62bbc69fc83645cc7edc7d56b791422945c97d6534; exit=0; EXPECT=matched; output-sha256=ee766580e30a90443c2ffb51864c8489fb228eb0a3b917ed14518ce4d71b230d; output-bytes=707; shell=C:\WINDOWS\system32\cmd.exe; cwd=C:\Users\SYED\Documents\Junaid\A.I.D.P; path=116b443f33f6/54 entries
 
 - [ ] G3: migration 5 applies and Rust db/history pin and archive operations pass
   CHECK: cargo test --manifest-path src-tauri/Cargo.toml pin_and_archive_round_trip

@@ -127,6 +127,7 @@ function App() {
       <main className="flex-1 overflow-hidden relative flex flex-col">
         {screen === "chat" && (
           <ChatScreen
+            active={screen === "chat"}
             onStartAdding={() => {
               handleSelectScreen("models");
               setStartAdding(true);

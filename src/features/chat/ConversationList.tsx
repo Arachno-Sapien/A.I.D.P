@@ -2,7 +2,7 @@ import { useState } from "react";
 import { SquarePen, Trash2 } from "lucide-react";
 import { useChatStore } from "./store";
 
-export function ConversationList() {
+export function ConversationList({ width }: { width?: number } = {}) {
   const { conversations, conversationId, streaming, load, startNew, remove } =
     useChatStore();
   // Switching mid-reply would leave the reply unsaved, so the list waits for it.
@@ -24,7 +24,10 @@ export function ConversationList() {
   };
 
   return (
-    <aside className="w-60 shrink-0 border-r border-neutral-800 bg-neutral-950 flex flex-col h-full select-none text-xs">
+    <aside
+      className="shrink-0 border-r border-neutral-800 bg-neutral-950 flex flex-col h-full select-none text-xs"
+      style={{ width }}
+    >
       <div className="p-3 border-b border-neutral-800 space-y-2">
         <button
           type="button"

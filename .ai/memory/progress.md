@@ -56,7 +56,7 @@ The human asked when code files get coloured; it was a bug since M3 (grammars lo
 
 Claimed by Antigravity (Gemini 2.5 Pro), 2026-10-31:
 Task: Chat list (hide/resize), pin and archive (migration 5), icons (lucide-react), and web-design-guidelines UI review (docs/superpowers/plans/2026-10-31-m6-chat-list-and-icons.md).
-Next step: Author GATES.md with unlazy, lint with gate-lint.mjs, execute Task 1 (Icons).
+Next step: Task 3 (Pin and archive: migration 5, history commands, conversation store and list).
 
 ## Next 3 tasks
 

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../lib/bindings", () => ({
@@ -22,11 +22,12 @@ vi.mock("../../lib/bindings", () => ({
 
 import { useModelsStore } from "../models/store";
 import { useChatStore } from "./store";
-import { ChatScreen } from "./ChatScreen";
+import { ChatScreen, useChatLayout } from "./ChatScreen";
 
 describe("ChatScreen", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    useChatLayout?.setState?.({ listOpen: true, listWidth: 240 });
     useChatStore.setState({
       messages: [],
       streaming: false,
@@ -167,6 +168,15 @@ describe("ChatScreen", () => {
 });
 
 describe("ChatScreen history", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useChatLayout?.setState?.({ listOpen: true, listWidth: 240 });
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
   it("opens the newest chat only on the first visit", () => {
     // Coming back to Chat reloaded the newest chat, dropping a reply still streaming.
     const openPlace = vi.fn(async () => {
@@ -179,5 +189,62 @@ describe("ChatScreen history", () => {
     render(<ChatScreen />);
 
     expect(openPlace).toHaveBeenCalledTimes(1);
+  });
+
+  it("the chat list hides and shows from its button", () => {
+    render(<ChatScreen />);
+    const toggleBtn = screen.getByRole("button", { name: "Chat list" });
+    expect(toggleBtn.getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByRole("button", { name: "New chat" })).toBeDefined();
+
+    fireEvent.click(toggleBtn);
+    expect(toggleBtn.getAttribute("aria-pressed")).toBe("false");
+    expect(screen.queryByRole("button", { name: "New chat" })).toBeNull();
+
+    fireEvent.click(toggleBtn);
+    expect(toggleBtn.getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByRole("button", { name: "New chat" })).toBeDefined();
+  });
+
+  it("Ctrl+B toggles the chat list", () => {
+    render(<ChatScreen />);
+    expect(screen.getByRole("button", { name: "New chat" })).toBeDefined();
+
+    fireEvent.keyDown(window, { key: "b", ctrlKey: true });
+    expect(screen.queryByRole("button", { name: "New chat" })).toBeNull();
+
+    fireEvent.keyDown(window, { key: "b", ctrlKey: true });
+    expect(screen.getByRole("button", { name: "New chat" })).toBeDefined();
+  });
+
+  it("the chat list keeps its state when Chat is shown again", () => {
+    const { unmount } = render(<ChatScreen />);
+    const toggleBtn = screen.getByRole("button", { name: "Chat list" });
+    fireEvent.click(toggleBtn);
+    expect(screen.queryByRole("button", { name: "New chat" })).toBeNull();
+
+    unmount();
+
+    render(<ChatScreen />);
+    expect(screen.queryByRole("button", { name: "New chat" })).toBeNull();
+  });
+
+  it("the chat list resizes by keyboard and stays within its limits", () => {
+    const { container } = render(<ChatScreen />);
+    const row = container.querySelector(".flex-1.flex.flex-row") as HTMLElement | null;
+    if (row) {
+      Object.defineProperty(row, "clientWidth", { value: 1000, configurable: true });
+    }
+    const splitter = screen.getByRole("separator", { name: "Resize chat list" });
+    splitter.focus();
+
+    fireEvent.keyDown(splitter, { key: "ArrowRight" });
+    expect(splitter.getAttribute("aria-valuenow")).toBe("256");
+
+    fireEvent.keyDown(splitter, { key: "End" });
+    expect(splitter.getAttribute("aria-valuenow")).toBe("640");
+
+    fireEvent.keyDown(splitter, { key: "Home" });
+    expect(splitter.getAttribute("aria-valuenow")).toBe("180");
   });
 });
