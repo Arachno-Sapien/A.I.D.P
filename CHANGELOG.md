@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- On Windows, installing or updating now tells Explorer to refresh its icons, so the taskbar shows the app's own icon instead of the Tauri icon it cached from an earlier version.
+
 ## [0.1.0-rc.4] - 2026-11-01
 
 ### Added
