@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- A.I.D.P has its own icon (a star in a purple-to-gold hexagon), in place of Tauri's default: on the window, the taskbar or dock, and the Windows, macOS and Linux installers.
+
 ## [0.1.0-rc.3] - 2026-11-01
 
 ### Added

@@ -41,6 +41,8 @@ Releases are built by CI (`.github/workflows/release.yml`), never by hand. The u
 
 ## Notes
 
+- **App icon.** The source is `app-icon.png` at the repo root: 1024 px, round, with transparent corners. After changing it, run `npm run tauri icon app-icon.png`, then delete what it also makes for mobile (`src-tauri/icons/android/`, `src-tauri/icons/ios/`, `src-tauri/icons/64x64.png`; mobile isn't in v1). A local build keeps the old icon until its build script runs again: touch `src-tauri/build.rs`. CI release builds start clean.
+
 - **Not code-signed** (M6 plan, D2): Windows SmartScreen and macOS Gatekeeper warn on first run; the user guide shows the steps. macOS builds are ad-hoc signed (`signingIdentity: "-"`), which Apple silicon needs to open them at all.
 - **No MSI:** WiX rejects versions like `0.1.0-rc.1`. For a local installer use `npm run tauri build -- --bundles nsis`. Without `TAURI_SIGNING_PRIVATE_KEY` set, `createUpdaterArtifacts` stays off locally (it lives in `src-tauri/tauri.updater.conf.json`, which only the workflow passes), so local builds need no key.
 - **Pinned actions:** every action in `release.yml` is pinned to a full commit hash, because the job holds the signing key. To update one, find the new tag's commit (`gh api repos/<owner>/<action>/commits/<tag> -q .sha`), read what changed, and replace both the hash and the tag in its comment. `dtolnay/rust-toolchain` then needs `toolchain: stable` as an input.

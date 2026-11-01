@@ -146,6 +146,7 @@ CLAUDE.md                  one line: @AGENTS.md
 GEMINI.md                  pointer to this file (Gemini CLI / Antigravity)
 CHANGELOG.md
 skills-lock.json           sources + hashes of installed agent skills (section 12)
+app-icon.png               source of the app icon; src-tauri/icons/ is generated from it
 .agents/skills/            agent skills for Codex, Antigravity, Gemini CLI, Cursor, Copilot
 .claude/skills/            identical copy for Claude Code
 .ai/memory/                progress, known issues, session logs (section 11)
