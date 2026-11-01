@@ -9,8 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0-rc.4] - 2026-11-01
+
 ### Added
-- A.I.D.P has its own icon (a star in a purple-to-gold hexagon), in place of Tauri's default: on the window, the taskbar or dock, and the Windows, macOS and Linux installers.
+- A.I.D.P has its own icon (a star in a purple-to-gold hexagon), in place of Tauri's default: on the window, the taskbar or dock, and the Windows, macOS and Linux installers. The icon also replaces the "A.I.D.P" text at the left of the top bar.
+
+### Fixed
+- The "Unsaved changes" question before quitting or leaving a folder is now a real dialog: screen readers announce it with its message, focus starts on Cancel, Tab stays inside it, Escape cancels, and focus returns where it was afterwards.
 
 ## [0.1.0-rc.3] - 2026-11-01
 

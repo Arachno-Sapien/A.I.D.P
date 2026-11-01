@@ -11,8 +11,10 @@ import { SettingsScreen } from "./features/settings/SettingsScreen";
 import { useSettingsStore } from "./features/settings/store";
 import { UpdateBar } from "./features/settings/UpdateBar";
 import { START_CHECK_DELAY_MS, useUpdatesStore } from "./features/settings/updates";
+import { UnsavedChangesDialog } from "./features/workspace/UnsavedChangesDialog";
 import { WorkspaceScreen } from "./features/workspace/WorkspaceScreen";
 import { useWorkspaceStore } from "./features/workspace/store";
+import appIcon from "../src-tauri/icons/128x128.png";
 import "./App.css";
 
 function App() {
@@ -82,9 +84,14 @@ function App() {
   return (
     <div className="app-shell flex flex-col h-screen bg-neutral-950 text-neutral-100 font-sans">
       <header className="app-surface flex items-center justify-between px-6 py-2.5 border-b border-neutral-800 bg-neutral-900/50 backdrop-blur select-none">
-        <span className="font-semibold text-sm tracking-wide text-white">
-          A.I.D.P
-        </span>
+        <img
+          src={appIcon}
+          alt="A.I.D.P"
+          width={28}
+          height={28}
+          className="h-7 w-7"
+          draggable={false}
+        />
         <nav className="flex items-center gap-1 bg-neutral-950 p-1 border border-neutral-800 rounded-lg">
           <button
             type="button"
@@ -172,89 +179,38 @@ function App() {
         {screen === "settings" && <SettingsScreen />}
       </main>
 
-      {/* Quit Prompt Modal */}
       {quitPrompt && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-          <div className="app-raised bg-neutral-900 border border-neutral-800 rounded-xl max-w-md w-full p-6 shadow-2xl text-neutral-100">
-            <h3 className="text-base font-semibold mb-2">Unsaved changes</h3>
-            <p className="text-sm text-neutral-400 mb-6">
-              You have unsaved changes in {tabs.filter((t) => t.dirty).length}{" "}
-              {tabs.filter((t) => t.dirty).length === 1 ? "file" : "files"}.
-            </p>
-            <div className="flex items-center justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setQuitPrompt(false)}
-                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-300 transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => void commands.quitApp()}
-                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-red-950/80 hover:bg-red-900 text-red-200 border border-red-800/80 transition-colors cursor-pointer"
-              >
-                Discard and quit
-              </button>
-              <button
-                type="button"
-                onClick={async () => {
-                  // Quit only if every file was written; otherwise the conflict stays on screen.
-                  if (await saveAll()) {
-                    await commands.quitApp();
-                  } else {
-                    setQuitPrompt(false);
-                  }
-                }}
-                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-neutral-100 hover:bg-white text-neutral-900 transition-colors cursor-pointer"
-              >
-                Save all
-              </button>
-            </div>
-          </div>
-        </div>
+        <UnsavedChangesDialog
+          count={tabs.filter((t) => t.dirty).length}
+          discardLabel="Discard and quit"
+          onCancel={() => setQuitPrompt(false)}
+          onDiscard={() => void commands.quitApp()}
+          onSaveAll={async () => {
+            // Quit only if every file was written; otherwise the conflict stays on screen.
+            if (await saveAll()) {
+              await commands.quitApp();
+            } else {
+              setQuitPrompt(false);
+            }
+          }}
+        />
       )}
 
-      {/* Folder Switch / Close Dirty Prompt Modal */}
+      {/* Leaving or switching the folder */}
       {dirtyPrompt && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-          <div className="app-raised bg-neutral-900 border border-neutral-800 rounded-xl max-w-md w-full p-6 shadow-2xl text-neutral-100">
-            <h3 className="text-base font-semibold mb-2">Unsaved changes</h3>
-            <p className="text-sm text-neutral-400 mb-6">
-              You have unsaved changes in {tabs.filter((t) => t.dirty).length}{" "}
-              {tabs.filter((t) => t.dirty).length === 1 ? "file" : "files"}.
-            </p>
-            <div className="flex items-center justify-end gap-3">
-              <button
-                type="button"
-                onClick={cancelPrompt}
-                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-300 transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => void discardAndProceed()}
-                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-red-950/80 hover:bg-red-900 text-red-200 border border-red-800/80 transition-colors cursor-pointer"
-              >
-                Discard
-              </button>
-              <button
-                type="button"
-                onClick={async () => {
-                  if (await saveAll()) {
-                    await discardAndProceed();
-                  } else {
-                    cancelPrompt();
-                  }
-                }}
-                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-neutral-100 hover:bg-white text-neutral-900 transition-colors cursor-pointer"
-              >
-                Save all
-              </button>
-            </div>
-          </div>
-        </div>
+        <UnsavedChangesDialog
+          count={tabs.filter((t) => t.dirty).length}
+          discardLabel="Discard"
+          onCancel={cancelPrompt}
+          onDiscard={() => void discardAndProceed()}
+          onSaveAll={async () => {
+            if (await saveAll()) {
+              await discardAndProceed();
+            } else {
+              cancelPrompt();
+            }
+          }}
+        />
       )}
     </div>
   );

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("./lib/bindings", () => ({
@@ -245,6 +245,14 @@ describe("App", () => {
     expect(container.querySelector("aside")?.classList.contains("app-surface")).toBe(true);
     expect(screen.getByPlaceholderText(/type a message/i).closest(".app-inset")).not.toBeNull();
     expect(screen.getByRole("button", { name: "Send" }).classList.contains("app-accent")).toBe(true);
+  });
+
+  it("the header shows the app icon, named for screen readers", () => {
+    const { container } = render(<App />);
+    const header = container.querySelector("header") as HTMLElement;
+    const logo = within(header).getByRole("img", { name: "A.I.D.P" });
+    expect(logo.getAttribute("src")).toMatch(/128x128\.png/);
+    expect(within(header).queryByText("A.I.D.P")).toBeNull();
   });
 
   it("shows Settings in the nav", () => {
