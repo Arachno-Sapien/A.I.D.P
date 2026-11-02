@@ -1,14 +1,20 @@
-# A.I.D.P
+<p align="center">
+  <img src="app-icon.png" alt="The A.I.D.P icon: a star in a purple-to-gold hexagon" width="128">
+</p>
 
-A.I.D.P is a desktop app for talking to AI models from one place. You connect cloud providers with your own API keys, add local models through Ollama, and pick whichever one you want for each conversation. Everything runs on your own computer. There's no server and no account, and nothing to pay for beyond what your providers charge.
+<h1 align="center">A.I.D.P</h1>
 
-The name stands for AI Independent Development Platform, at least for now. The main goal is the coding workspace: open a project folder, work on it with an AI that can see your code, and let it change files or run commands only when you say so. It runs on top of the chat layer, so chat comes first. A practice area for programming problems is planned after v0.1.
+<p align="center"><strong>AI Integrated Development Platform</strong></p>
+
+A.I.D.P, short for AI Integrated Development Platform, is a desktop app for working with AI models from one place. You connect cloud providers with your own API keys, add local models through Ollama, and pick whichever one you want for each conversation. Everything runs on your own computer. There's no server and no account, and nothing to pay for beyond what your providers charge.
+
+"Integrated" is the point of the name: the models and the tools you write code with sit in the same window. The main goal is the coding workspace. Open a project folder, work on it with an AI that can see your code, and let it change files or run commands only when you say so. It runs on top of the chat layer, so chat came first. A practice area for programming problems is planned after v0.1.
 
 ## Status
 
-v0.1 is in release candidates. Everything listed under "What v0.1 does" below is built: cloud models through OpenAI-compatible APIs and Anthropic, local models through Ollama, keys in the system keychain, the coding workspace with AI edits as diffs and agent tools that ask before every command, a terminal, chat history, settings, and signed updates.
+v0.1 is in release candidates, and the latest is 0.1.0-rc.4. Everything listed under "What v0.1 does" below is built: cloud models through OpenAI-compatible APIs and Anthropic, local models through Ollama, keys in the system keychain, the coding workspace with AI edits as diffs and agent tools that ask before every command, a terminal, attachments, themes, chat history, settings, and signed updates.
 
-It runs on Windows, macOS and Linux. Windows is the development machine and gets the most testing. CI builds and tests all three; Linux gets a hand check in a VM before 0.1.0, and the macOS build hasn't been tried on a real Mac yet.
+It runs on Windows, macOS and Linux. Windows is the development machine and gets the most testing. CI builds and tests all three, but the Linux and macOS builds haven't been tried by hand yet, and neither has an 8 GB RAM machine.
 
 ## Download
 
@@ -27,8 +33,10 @@ The installers aren't code-signed yet, so Windows and macOS warn the first time 
 - One model picker that lists cloud and local models together, with a status for each (key invalid, Ollama stopped, model not downloaded).
 - Support for OpenAI-compatible APIs (OpenAI, OpenRouter, Groq, DeepSeek, Gemini's compatible endpoint, LM Studio or any custom endpoint), Anthropic, and Ollama.
 - Ollama control from inside the app: detect it, start it, download models with a progress bar, delete them, and free the memory a loaded model is holding.
-- Streamed replies with a Stop button, Markdown and code blocks you can copy, and chat history that survives a restart.
-- A small footprint. The target is under 150 MB of RAM at idle with no model loaded, so your memory goes to the models instead of the app.
+- Streamed replies with a Stop button, Markdown and code blocks you can copy, and chat history that survives a restart. The chat list can be hidden (Ctrl+B) or resized, and chats can be pinned, archived or deleted.
+- Attachments: images, text or code files and PDFs, up to five per message, from the paperclip, a drop on the window, or a paste. Images go to models that can read them. A file's text, or a PDF's, goes in with your message.
+- Themes: Dark, Light, Glass, Soft, Cyber and Elegant, or follow your system's light or dark setting.
+- A small footprint. The target is under 150 MB of RAM at idle with no model loaded, so your memory goes to the models instead of the app. The installed app measures about 128 MB on Windows.
 
 ## How your API keys are handled
 
@@ -46,7 +54,7 @@ If the folder isn't a git repository, the app warns you before the first AI edit
 
 ## How it's built
 
-A.I.D.P is a Tauri 2 app. The frontend is React, TypeScript and Vite, styled with Tailwind, and the core is Rust. Tauri uses the WebView that already ships with the operating system instead of bundling a browser, which is why the release binary is about 4 MB.
+A.I.D.P is a Tauri 2 app. The frontend is React, TypeScript and Vite, styled with Tailwind, and the core is Rust. Tauri uses the WebView that already ships with the operating system instead of bundling a browser, which is why the Windows installer is under 5 MB.
 
 The window never touches the network or the disk itself. Every request goes through the Rust core, which holds the keys, calls the providers, manages Ollama, saves chats to a local SQLite file, and does all the reading, writing and running inside your project folder. The editor is CodeMirror 6, picked over Monaco because it's much lighter. The TypeScript functions the UI calls are generated from the Rust code by tauri-specta, and CI fails if the two ever drift apart.
 
@@ -99,6 +107,7 @@ src/            React frontend
 src-tauri/      Rust core
 docs/           design doc, setup guide, milestone notes, decision records
 .ai/memory/     progress notes and session logs shared by AI agents
+app-icon.png    source image for the app icon
 AGENTS.md       rules for anyone working on the code, human or AI
 ```
 
@@ -124,7 +133,7 @@ v0.1 is split into seven milestones, and each one ends with an app that runs. Th
 4. M3: the coding workspace. File tree, editor, the AI panel, and edits as diffs. Done.
 5. M4: agent tools and a terminal. The model can read, search and edit files and run commands, each with your approval. Done.
 6. M5: Ollama, chat history and settings. Done.
-7. M6: the v0.1 release. Installers for Windows, macOS and Linux built by CI, auto-update, and a test run on an 8 GB RAM machine.
+7. M6: the v0.1 release. Installers for Windows, macOS and Linux built by CI, auto-update, and a test run on an 8 GB RAM machine. In progress: CI builds the installers, four release candidates are out, and each one updated to the next. Still to do: hand checks on Linux, macOS and an 8 GB RAM machine, then 0.1.0.
 
 After v0.1 come an MCP client for outside tools, browser checks with Playwright, and the practice area.
 

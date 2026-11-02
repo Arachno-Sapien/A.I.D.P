@@ -480,7 +480,7 @@ The biggest risk is an agent-built Rust core you can't debug; the plan answers i
 
 **Open questions**
 
-- [x] App name: A.I.D.P (decision 0003). Repository: https://github.com/Arachno-Sapien/A.I.D.P
+- [x] App name: A.I.D.P (decision 0003), short for AI Integrated Development Platform (decision 0021). Repository: https://github.com/Arachno-Sapien/A.I.D.P
 - [x] v0.1 on Windows, macOS and Linux (decision 0016)
 - [x] Link to the Ollama installer, or download and run it from inside the app? Link to installer on ollama.com; the app starts it if stopped (decision 0013)
 - [ ] Chat export format: Markdown, JSON, or both?

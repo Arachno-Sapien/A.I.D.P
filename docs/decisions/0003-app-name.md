@@ -1,7 +1,7 @@
 # Decision Record 0003: App Name
 
 **Date:** 2026-10-29
-**Status:** Accepted
+**Status:** Accepted; the expansion was settled by decision 0021 (AI Integrated Development Platform)
 
 ---
 
@@ -27,5 +27,5 @@ Internal names stay `aidp`:
 
 ## Consequences
 
-- Renaming the display name later touches four places: `productName` and the window `title` in `src-tauri/tauri.conf.json`, `<title>` in `index.html`, and the heading in `src/App.tsx`.
+- Renaming the display name later touches four places: `productName` and the window `title` in `src-tauri/tauri.conf.json`, `<title>` in `index.html`, and the header icon's `alt` text in `src/App.tsx`.
 - Repository: https://github.com/Arachno-Sapien/A.I.D.P (settled 2026-10-29).
