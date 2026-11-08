@@ -433,10 +433,29 @@ pub fn delete_entry(
     put_away(&abs).map_err(|message| WorkspaceError::Io { message })
 }
 
+/// The path to give the system's file shell: on Windows without `\\?\`, which
+/// it doesn't read. A plain Windows path drops trailing dots and spaces from
+/// names (`weird.\f.txt` is `weird\f.txt`), so a path with such a name
+/// anywhere, through a link or in the opened folder's own path, is refused:
+/// it would name a different file than the one checked.
+pub fn shell_path(path: &Path) -> Result<std::path::PathBuf, String> {
+    let plain = std::path::PathBuf::from(super::display_path(path));
+    let changes = plain.components().any(|c| match c {
+        std::path::Component::Normal(name) => name.to_string_lossy().ends_with(['.', ' ']),
+        _ => false,
+    });
+    if cfg!(windows) && changes {
+        return Err(
+            "This can't go to the Recycle Bin: a folder or file on its path has a name ending in a dot or a space, which Windows would read as another name."
+                .to_string(),
+        );
+    }
+    Ok(plain)
+}
+
 /// The Recycle Bin on Windows, the Trash on macOS and Linux (decision 0024).
 pub fn to_trash(path: &Path) -> Result<(), String> {
-    // The Windows shell doesn't read `\\?\` paths.
-    let path = std::path::PathBuf::from(super::display_path(path));
+    let path = shell_path(path)?;
     #[allow(unused_mut)]
     let mut trash = trash::TrashContext::default();
     // NSFileManager, not Finder: Finder asks for permission to be controlled.
@@ -463,6 +482,29 @@ fn tree_path(rel: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(windows)]
+    #[test]
+    fn shell_path_drops_the_prefix_and_refuses_names_windows_would_change() {
+        use std::path::{Path, PathBuf};
+        assert_eq!(
+            shell_path(Path::new(r"\\?\C:\proj\src\a.ts")),
+            Ok(PathBuf::from(r"C:\proj\src\a.ts"))
+        );
+        assert_eq!(
+            shell_path(Path::new(r"\\?\UNC\srv\share\proj\a.ts")),
+            Ok(PathBuf::from(r"\\srv\share\proj\a.ts"))
+        );
+        for odd in [
+            r"\\?\C:\proj\weird.\f.txt",
+            r"\\?\C:\proj.\src\a.ts",
+            r"\\?\C:\proj\a \b.ts",
+            r"\\?\C:\proj\...",
+            r"\\?\UNC\srv\share\x.\a.ts",
+        ] {
+            assert!(shell_path(Path::new(odd)).is_err(), "{odd}");
+        }
+    }
 
     #[test]
     fn decode_detects_crlf_and_bom() {

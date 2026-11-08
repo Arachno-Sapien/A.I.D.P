@@ -605,6 +605,34 @@ fn names_windows_would_change_are_refused() {
     assert!(resolve_new(root, ".env.local").is_ok());
 }
 
+/// The names typed are checked, but a link can lead to a folder whose own name
+/// ends in a dot. The plain path the Recycle Bin gets would then name another
+/// folder, so `shell_path` refuses it before anything is put away.
+#[cfg(windows)]
+#[test]
+fn a_link_to_a_trailing_dot_folder_never_reaches_the_recycle_bin() {
+    use aidp_lib::workspace::files::shell_path;
+    let temp = TempDir::new();
+    let root = temp.path();
+    let verbatim = canonicalize(root).unwrap();
+    fs::create_dir(verbatim.join("weird.")).unwrap();
+    fs::write(verbatim.join("weird.").join("f.txt"), "x").unwrap();
+    fs::create_dir(root.join("weird")).unwrap();
+    fs::write(root.join("weird").join("f.txt"), "victim").unwrap();
+    // A symlink keeps its `\\?\...\weird.` target as written (`mklink /J` would
+    // drop the dot). Symlinks need Developer Mode or admin; skip without.
+    if std::os::windows::fs::symlink_dir(verbatim.join("weird."), root.join("lnk")).is_err() {
+        eprintln!("skipped: this machine refuses symlinks");
+        return;
+    }
+    let reached = resolve(root, "lnk").unwrap();
+    assert!(reached.to_string_lossy().ends_with("weird."), "{reached:?}");
+
+    let refused = delete_entry(root, "lnk/f.txt", |p| shell_path(p).map(|_| ()));
+    assert!(matches!(refused, Err(WorkspaceError::Io { .. })), "{refused:?}");
+    assert_eq!(fs::read_to_string(root.join("weird").join("f.txt")).unwrap(), "victim");
+}
+
 /// Puts a real file in the system's trash. Ignored because it leaves a file
 /// named `aidp-trash-check.txt` in the Recycle Bin; run it by name to check
 /// the trash crate on this machine.
