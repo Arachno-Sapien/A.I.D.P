@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - The Workspace screen with no folder open offers **Continue in &lt;folder&gt;**, which reopens the folder you used last in one click.
+- The code editor underlines syntax errors in Rust, JSON, YAML and XML files with a red squiggly line, shows the message on hover, and counts the problems below the file (`F8` next, `Ctrl+Shift+M` list). It uses the grammar the editor already has, so nothing extra is downloaded or run.
 
 ### Fixed
 - On Windows, installing or updating now tells Explorer to refresh its icons, so the taskbar shows the app's own icon instead of the Tauri icon it cached from an earlier version.

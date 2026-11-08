@@ -5,6 +5,7 @@ import { oneDark } from "@codemirror/theme-one-dark";
 import { languages } from "@codemirror/language-data";
 import { LanguageDescription } from "@codemirror/language";
 import { unifiedMergeView } from "@codemirror/merge";
+import { diagnostics } from "./diagnostics";
 
 export interface CreateStateOptions {
   /** Called with the editor's new state after every edit or selection change. */
@@ -53,6 +54,7 @@ export function createState(
     basicSetup,
     themeCompartment.of(themeExtension(theme)),
     languageFor(filename),
+    diagnostics(filename),
   ];
 
   if (options.onUpdate) {
