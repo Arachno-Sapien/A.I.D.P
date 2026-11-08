@@ -99,6 +99,34 @@ describe("WorkspaceScreen", () => {
     expect(screen.queryByText("Recent folders")).toBeNull();
   });
 
+  it("New file starts in the folder last clicked, and at the top in another workspace", () => {
+    useWorkspaceStore.setState({
+      info: { name: "my-app", path: "/projects/my-app", isGit: true },
+      children: { "": [{ name: "src", path: "src", isDir: true }] },
+      toggleDir: vi.fn(),
+    });
+    const { rerender } = render(<WorkspaceScreen />);
+    const nameBox = () => screen.getByRole("textbox", { name: "New file name" }) as HTMLInputElement;
+
+    fireEvent.click(screen.getByRole("button", { name: "New file" }));
+    expect(nameBox().value).toBe("");
+    fireEvent.click(screen.getByRole("button", { name: "New file" }));
+
+    fireEvent.click(screen.getByText("src"));
+    fireEvent.click(screen.getByRole("button", { name: "New file" }));
+    expect(nameBox().value).toBe("src/");
+    fireEvent.click(screen.getByRole("button", { name: "New file" }));
+
+    act(() => {
+      useWorkspaceStore.setState({
+        info: { name: "other", path: "/projects/other", isGit: true },
+      });
+    });
+    rerender(<WorkspaceScreen />);
+    fireEvent.click(screen.getByRole("button", { name: "New file" }));
+    expect(nameBox().value).toBe("");
+  });
+
   it("toggles the terminal panel", async () => {
     useWorkspaceStore.setState({
       info: { name: "my-app", path: "/projects/my-app", isGit: true },

@@ -135,6 +135,31 @@ pub async fn read_file(
         .map_err(io)?
 }
 
+/// New file from the file tree: the user's own action, so no diff or approval.
+#[tauri::command]
+#[specta::specta]
+pub async fn new_file(
+    path: String,
+    state: State<'_, WorkspaceState>,
+) -> Result<String, WorkspaceError> {
+    let root = state.root()?;
+    tauri::async_runtime::spawn_blocking(move || crate::workspace::files::new_file(&root, &path))
+        .await
+        .map_err(io)?
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn new_folder(
+    path: String,
+    state: State<'_, WorkspaceState>,
+) -> Result<String, WorkspaceError> {
+    let root = state.root()?;
+    tauri::async_runtime::spawn_blocking(move || crate::workspace::files::new_folder(&root, &path))
+        .await
+        .map_err(io)?
+}
+
 #[tauri::command]
 #[specta::specta]
 pub async fn write_file(

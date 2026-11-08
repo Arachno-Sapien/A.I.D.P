@@ -4,6 +4,8 @@ Bugs, gotchas, and approaches that failed. Newest first. If you hit one of the "
 
 ## Seen in this repo
 
+- **2026-11-09 · `autoFocus` runs only when an element mounts.** A box that changes role in place (New file → New folder) keeps the old element, so it isn't focused and typing goes to whatever was clicked. Give it a `key` per role (`NewEntry.tsx`). Tests: focus the clicked button first, then check `document.activeElement`.
+
 - **2026-11-09 · Keep `typescript` out of the main thread.** It is 3.5 MB minified. Only `diagnostics/typescriptWorker.ts` imports it at runtime; `typescriptSyntax.ts` takes `ts` as an argument and imports only its types. A runtime `import ts from "typescript"` anywhere else puts the compiler in the main bundle: check `dist/assets/index-*.js` stays near 1.08 MB after `npx vite build`. Use `getSyntacticDiagnostics` from a language service, not `transpileModule`, which throws on `.d.ts` files (no output).
 
 - **2026-11-09 · CodeMirror's grammars flag valid code in many languages.** Measured on real files (decision 0022): TypeScript misreads `export { type X }`, `(p): p is T`, `declare module`, labeled tuples, `typeof import()`, `{/* */}` in JSX; JavaScript misreads import attributes and `export default class extends`; Python misreads bare `yield` and `1.`; HTML misreads template tags; CSS misreads Tailwind's `@apply`. Updating doesn't help (`@lezer/*` were at their latest). Don't add a language to `CHECKED` in `diagnostics/syntax.ts` without running its grammar over real valid files first.

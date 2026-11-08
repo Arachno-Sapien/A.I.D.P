@@ -10,6 +10,8 @@ vi.mock("../../lib/bindings", () => ({
     listDir: vi.fn().mockResolvedValue({ status: "ok", data: [] }),
     readFile: vi.fn(),
     writeFile: vi.fn(),
+    newFile: vi.fn(),
+    newFolder: vi.fn(),
     setUnsaved: vi.fn().mockResolvedValue(undefined),
     answerTool: vi.fn().mockResolvedValue(true),
     stopReply: vi.fn().mockResolvedValue(undefined),
@@ -224,6 +226,53 @@ describe("useWorkspaceStore", () => {
     });
     await useWorkspaceStore.getState().openFile("lib.py");
     expect(buffers.get("lib.py")?.facet(language)?.name).toBe("python");
+  });
+
+  it("a new file shows in the tree, with its folders opened, and opens in a tab", async () => {
+    vi.mocked(commands.newFile).mockResolvedValue({ status: "ok", data: "src/util/date.ts" });
+    vi.mocked(commands.readFile).mockResolvedValue({
+      status: "ok",
+      data: {
+        path: "src/util/date.ts",
+        text: "",
+        version: "v1",
+        lineEnding: "lf",
+        hasBom: false,
+        isSecret: false,
+      },
+    });
+
+    expect(await useWorkspaceStore.getState().create("file", "src/util/date.ts")).toBeNull();
+
+    expect(commands.newFile).toHaveBeenCalledWith("src/util/date.ts");
+    const { expanded, active } = useWorkspaceStore.getState();
+    expect(expanded).toEqual({ src: true, "src/util": true });
+    for (const folder of ["", "src", "src/util"]) {
+      expect(commands.listDir).toHaveBeenCalledWith(folder);
+    }
+    expect(active).toBe("src/util/date.ts");
+  });
+
+  it("a new folder shows in the tree, opened", async () => {
+    vi.mocked(commands.newFolder).mockResolvedValue({ status: "ok", data: "docs/notes" });
+
+    expect(await useWorkspaceStore.getState().create("folder", "docs/notes")).toBeNull();
+
+    expect(useWorkspaceStore.getState().expanded).toEqual({ docs: true, "docs/notes": true });
+    expect(commands.readFile).not.toHaveBeenCalled();
+  });
+
+  it("a name that's taken comes back as a message and changes nothing", async () => {
+    vi.mocked(commands.newFile).mockResolvedValue({
+      status: "error",
+      error: { kind: "alreadyExists" },
+    });
+
+    expect(await useWorkspaceStore.getState().create("file", "a.ts")).toBe(
+      "A file or folder with that name already exists.",
+    );
+    expect(useWorkspaceStore.getState().expanded).toEqual({});
+    expect(useWorkspaceStore.getState().tabs).toEqual([]);
   });
 
   it("save sends expectedVersion, clears dirty on success", async () => {

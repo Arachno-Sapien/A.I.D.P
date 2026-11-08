@@ -9,7 +9,7 @@ export function workspaceErrorText(error: WorkspaceError): string {
     case "notFound":
       return "The requested file or folder was not found.";
     case "alreadyExists":
-      return "A file with that name already exists.";
+      return "A file or folder with that name already exists.";
     case "notText":
       return "The file is binary or does not contain valid text.";
     case "tooLarge":

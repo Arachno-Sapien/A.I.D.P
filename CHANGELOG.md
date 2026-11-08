@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **New file** and **New folder** buttons above the workspace file tree. Type a name or a path (missing folders are made too); the new item shows in the tree and a new file opens in a tab.
 - The Workspace screen with no folder open offers **Continue in &lt;folder&gt;**, which reopens the folder you used last in one click.
 - The code editor underlines syntax errors with a red squiggly line, shows the message on hover, and counts the problems below the file (`F8` next, `Ctrl+Shift+M` list). JavaScript and TypeScript are checked by TypeScript's own parser, loaded in the background only while you edit those files; Rust, JSON, YAML and XML by the grammar the editor already has.
 

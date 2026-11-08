@@ -5,6 +5,7 @@ import { useWorkspaceChatStore } from "./chatStore";
 import { DiffView } from "./DiffView";
 import { EditorPane } from "./EditorPane";
 import { FileTree } from "./FileTree";
+import { NewEntry } from "./NewEntry";
 import { Splitter } from "./Splitter";
 import { useWorkspaceStore } from "./store";
 import { awaitsAnswer } from "./ToolStepView";
@@ -24,6 +25,9 @@ const toggleClass = (on: boolean) =>
       ? "bg-neutral-800 text-neutral-100"
       : "text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800"
   }`;
+
+/** `src/app/main.ts` → `src/app`; a file at the top → "". */
+const parentOf = (path: string) => path.slice(0, Math.max(path.lastIndexOf("/"), 0));
 
 /** The last part of a Windows or Unix path: `C:\code\app` → `app`. */
 const folderName = (path: string) =>
@@ -48,9 +52,16 @@ export function WorkspaceScreen({ active = true }: WorkspaceScreenProps) {
     closeFolder,
     toggleDir,
     refreshTree,
+    create,
     clearError,
     openFile,
   } = useWorkspaceStore();
+
+  // Where New file and New folder start: the folder last clicked, or the folder
+  // of the file last opened. Another workspace starts at its top, so a path
+  // from the old one can't make folders in the new one.
+  const [here, setHere] = useState("");
+  useEffect(() => setHere(""), [info?.path]);
 
   const [terminalOpen, setTerminalOpen] = useState(false);
   const [terminalHeight, setTerminalHeight] = useState<number>(240);
@@ -261,12 +272,31 @@ export function WorkspaceScreen({ active = true }: WorkspaceScreenProps) {
           className="app-surface bg-neutral-900/30 overflow-hidden flex flex-col"
           style={{ flex: `0 1 ${filesWidth}px`, minWidth: FILES_MIN }}
         >
-          <FileTree
-            childrenMap={children}
-            expanded={expanded}
-            onToggleDir={(path) => void toggleDir(path)}
-            onOpenFile={(path) => void openFile(path)}
+          <NewEntry
+            folder={here}
+            onCreate={async (kind, path) => {
+              const problem = await create(kind, path);
+              if (!problem) {
+                const tidy = path.split("/").filter((p) => p && p !== ".").join("/");
+                setHere(kind === "folder" ? tidy : parentOf(tidy));
+              }
+              return problem;
+            }}
           />
+          <div className="flex-1 min-h-0">
+            <FileTree
+              childrenMap={children}
+              expanded={expanded}
+              onToggleDir={(path) => {
+                setHere(path);
+                void toggleDir(path);
+              }}
+              onOpenFile={(path) => {
+                setHere(parentOf(path));
+                void openFile(path);
+              }}
+            />
+          </div>
         </div>
         {filesOpen && (
           <Splitter

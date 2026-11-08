@@ -22,6 +22,9 @@ export const commands = {
 	listDir: (path: string) => typedError<DirEntry[], WorkspaceError>(__TAURI_INVOKE("list_dir", { path })),
 	readFile: (path: string) => typedError<FileContent, WorkspaceError>(__TAURI_INVOKE("read_file", { path })),
 	writeFile: (req: WriteFile_Deserialize) => typedError<string, WorkspaceError>(__TAURI_INVOKE("write_file", { req })),
+	/**  New file from the file tree: the user's own action, so no diff or approval. */
+	newFile: (path: string) => typedError<string, WorkspaceError>(__TAURI_INVOKE("new_file", { path })),
+	newFolder: (path: string) => typedError<string, WorkspaceError>(__TAURI_INVOKE("new_folder", { path })),
 	runAgent: (connectionId: number, modelId: string, messages: ChatInput_Deserialize[], onEvent: Channel<ChatEvent_Deserialize>) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("run_agent", { connectionId, modelId, messages, onEvent })),
 	answerTool: (id: number, approve: boolean) => __TAURI_INVOKE<boolean>("answer_tool", { id, approve }),
 	terminalOpen: (cols: number, rows: number, onEvent: Channel<TerminalEvent>) => typedError<null, WorkspaceError>(__TAURI_INVOKE("terminal_open", { cols, rows, onEvent })),

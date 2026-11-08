@@ -342,6 +342,42 @@ pub fn create_file(root: &Path, rel: &str, text: &str) -> Result<String, Workspa
     Ok(format!("{mtime_nanos}-{}", meta.len()))
 }
 
+/// The user's New file: an empty file, with any folders it needs. Returns its
+/// path the way the file tree writes it (`./src//a.ts` → `src/a.ts`).
+pub fn new_file(root: &Path, rel: &str) -> Result<String, WorkspaceError> {
+    create_file(root, rel, "")?;
+    Ok(tree_path(rel))
+}
+
+/// The user's New folder, with any folders above it.
+pub fn new_folder(root: &Path, rel: &str) -> Result<String, WorkspaceError> {
+    let abs = super::paths::resolve_new(root, rel)?;
+    let io_error = |e: io::Error| WorkspaceError::Io {
+        message: e.to_string(),
+    };
+    if let Some(parent) = abs.parent() {
+        fs::create_dir_all(parent).map_err(io_error)?;
+    }
+    // `create_dir`, not `create_dir_all`, so a folder made since the check still answers "already exists".
+    fs::create_dir(&abs).map_err(|e| match e.kind() {
+        io::ErrorKind::AlreadyExists => WorkspaceError::AlreadyExists,
+        _ => io_error(e),
+    })?;
+    Ok(tree_path(rel))
+}
+
+/// Only called after `resolve_new` accepted `rel`, so every part is a plain name.
+fn tree_path(rel: &str) -> String {
+    Path::new(rel)
+        .components()
+        .filter_map(|c| match c {
+            std::path::Component::Normal(part) => Some(part.to_string_lossy()),
+            _ => None,
+        })
+        .collect::<Vec<_>>()
+        .join("/")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -68,6 +68,8 @@ export interface WorkspaceStore {
   forceCloseFolder(): Promise<void>;
   toggleDir(path: string): Promise<void>;
   refreshTree(): Promise<void>;
+  /** New file or folder from the tree: the message to show, or null once it's made and shown. */
+  create(kind: "file" | "folder", path: string): Promise<string | null>;
   clearError(): void;
 
   openFile(path: string): Promise<void>;
@@ -270,6 +272,21 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       }
     }
     set({ children: nextChildren });
+  },
+
+  create: async (kind, path) => {
+    const res = kind === "file" ? await commands.newFile(path) : await commands.newFolder(path);
+    if (res.status === "error") return workspaceErrorText(res.error);
+    // Open every folder down to it (a new folder too), then list them again.
+    const parts = res.data.split("/");
+    const expanded = { ...get().expanded };
+    for (let i = 1; i <= (kind === "file" ? parts.length - 1 : parts.length); i++) {
+      expanded[parts.slice(0, i).join("/")] = true;
+    }
+    set({ expanded });
+    await get().refreshTree();
+    if (kind === "file") await get().openFile(res.data);
+    return null;
   },
 
   clearError: () => set({ error: null }),

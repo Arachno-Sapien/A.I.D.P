@@ -1,7 +1,8 @@
 mod common;
 
 use aidp_lib::workspace::files::{
-    create_file, list_dir, list_tree, read_file, write_file, LineEnding, WriteFile,
+    create_file, list_dir, list_tree, new_file, new_folder, read_file, write_file, LineEnding,
+    WriteFile,
 };
 use aidp_lib::workspace::paths::{resolve, resolve_new};
 use aidp_lib::workspace::search::search;
@@ -399,6 +400,54 @@ fn resolve_new_table() {
     // A file that exists outside must not answer "already exists": that would tell the model it is there.
     fs::write(outside.path().join("there.txt"), "x").unwrap();
     assert_eq!(resolve_new(root, "out/there.txt"), Err(WorkspaceError::OutsideFolder));
+}
+
+#[test]
+fn new_file_makes_an_empty_file_and_its_folders() {
+    let temp = TempDir::new();
+    let root = temp.path();
+
+    assert_eq!(new_file(root, "./src//util/date.ts"), Ok("src/util/date.ts".to_string()));
+    assert_eq!(fs::read(root.join("src/util/date.ts")).unwrap(), b"");
+    // The answer uses the same paths as the file tree, so the UI can open and show it.
+    assert_eq!(list_dir(root, "src").unwrap()[0].path, "src/util");
+    assert_eq!(list_dir(root, "src/util").unwrap()[0].path, "src/util/date.ts");
+}
+
+#[test]
+fn new_folder_makes_nested_folders() {
+    let temp = TempDir::new();
+    let root = temp.path();
+
+    assert_eq!(new_folder(root, "docs/notes/"), Ok("docs/notes".to_string()));
+    assert!(root.join("docs/notes").is_dir());
+    assert_eq!(list_dir(root, "docs").unwrap()[0].path, "docs/notes");
+}
+
+#[test]
+fn new_file_and_folder_refuse_names_taken_or_outside() {
+    let temp = TempDir::new();
+    let root = temp.path();
+    fs::write(root.join("a.txt"), "keep").unwrap();
+    fs::create_dir(root.join("dir")).unwrap();
+
+    for taken in ["a.txt", "dir"] {
+        assert_eq!(new_file(root, taken), Err(WorkspaceError::AlreadyExists), "{taken}");
+        assert_eq!(new_folder(root, taken), Err(WorkspaceError::AlreadyExists), "{taken}");
+    }
+    assert_eq!(fs::read_to_string(root.join("a.txt")).unwrap(), "keep");
+
+    for outside in ["../x", "/x", "a/../../x", ".git/hooks/pre-commit", ".GIT/config"] {
+        assert_eq!(new_file(root, outside), Err(WorkspaceError::OutsideFolder), "{outside}");
+        assert_eq!(new_folder(root, outside), Err(WorkspaceError::OutsideFolder), "{outside}");
+    }
+    assert!(!root.join(".git").exists());
+
+    let elsewhere = TempDir::new();
+    link_dir(&root.join("out"), elsewhere.path());
+    assert_eq!(new_file(root, "out/x.ts"), Err(WorkspaceError::OutsideFolder));
+    assert_eq!(new_folder(root, "out/x"), Err(WorkspaceError::OutsideFolder));
+    assert_eq!(fs::read_dir(elsewhere.path()).unwrap().count(), 0);
 }
 
 #[test]

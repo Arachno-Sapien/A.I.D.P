@@ -1,0 +1,9 @@
+# 2026-11-09 · M6 · New file and New folder in the workspace
+Agent: Claude Code (Opus 5.5)
+Task: the human's "We have to add options to create new files & folders in a working workspace"
+Changed: src-tauri/src/workspace/files.rs (`new_file` reuses `create_file` with ""; `new_folder` via `resolve_new` + `create_dir`; both return the tree path, `./src//a` → `src/a`); commands/workspace.rs + lib.rs (`new_file`, `new_folder` commands; no new permission: app commands need none); bindings.ts regenerated; tests/workspace.rs (3 tests: empty file with folders, nested folder, refusals for taken names, `..`, `/x`, `.git`/`.GIT`, a link out); store.ts `create(kind, path)` (expands every folder down to it, refreshes, opens a new file); NewEntry.tsx (header "Files" with New file / New folder, name box prefilled with the current folder, `cleanPath`, Enter/Esc, inline error); WorkspaceScreen.tsx (current folder = last clicked folder or opened file's folder, reset when the workspace changes; after creating, the new folder or the file's folder); workspaceErrorText "A file or folder with that name already exists."; docs: user-guide, security.md, design.md, CHANGELOG
+Problems: switching New file → New folder kept the same `<form>`, so `autoFocus` didn't run and typing went to the button (seen in the browser when the human clicked during the check); fixed with `key={kind}`, test added
+Checked in Chromium with a page standing in for Rust (removed): click src → New file prefilled `src/`, `util/date.ts` + Enter made the folder and file, tree expanded, tab opened ("No problems" from the TS checker); `../escape` and `src` refused with their messages; `docs/notes` made and expanded; next New file starts in `docs/notes/`
+Tests: 306 Vitest (13 new), 251 Rust (3 new), clippy and typecheck clean
+Not yet: seen in the Tauri app with real files
+Next: the human tries it in the app
