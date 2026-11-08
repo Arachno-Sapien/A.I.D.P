@@ -27,6 +27,15 @@ fn check_components(rel: &str) -> Result<Vec<Component<'_>>, WorkspaceError> {
     let mut parts = Vec::new();
     for c in rel_path.components() {
         match c {
+            // Windows drops trailing dots and spaces from a name ("a." is "a",
+            // "..." the folder it's in), but `\\?\` paths keep them. Such a name
+            // would mean one entry here and another wherever a path loses its
+            // `\\?\` (the Recycle Bin), so it is refused.
+            Component::Normal(name)
+                if cfg!(windows) && name.to_string_lossy().ends_with(['.', ' ']) =>
+            {
+                return Err(WorkspaceError::OutsideFolder);
+            }
             Component::Normal(_) => parts.push(c),
             Component::CurDir => {}
             Component::ParentDir | Component::RootDir | Component::Prefix(_) => {

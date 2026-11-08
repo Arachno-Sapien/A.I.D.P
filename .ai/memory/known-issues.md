@@ -4,6 +4,8 @@ Bugs, gotchas, and approaches that failed. Newest first. If you hit one of the "
 
 ## Seen in this repo
 
+- **2026-11-09 · `\\?\` and plain Windows paths can name different entries.** Plain paths drop trailing dots and spaces (`notes.` is `notes`, `sub\...` is `sub`); `\\?\` paths keep them. `to_trash` strips `\\?\` for the shell, so before the fix deleting a file named `...` (which the agent's `create_file` could make) would have sent its folder to the Recycle Bin; the test reproduced it. `check_components` now refuses such names on Windows. Any new code that turns a checked `\\?\` path into a plain one must keep this in mind.
+
 - **2026-11-09 · CodeMirror's panels are z-index 300.** With nothing containing them, the editor's count line (and the Ctrl+F search bar) painted over z-50 dialogs and menus. The editor container in `EditorPane.tsx` has `isolate`; keep it, and keep new overlays out of panels with a theme blur (`createPortal` to `document.body`, as `TreeMenu`, `ConfirmDialog` and the drag label do).
 - **2026-11-09 · HTML drag-and-drop doesn't reach the page in Tauri on Windows.** The window takes drag events for files dropped from the OS (attachments). Dragging inside the app uses mouse events (`FileTree.tsx`); `document.elementFromPoint` finds the drop row, which jsdom lacks, so tests stub it.
 - **2026-11-09 · The `trash` crate gets a plain path.** `resolve_entry` gives `\\?\C:\...`; `to_trash` passes `display_path` of it, because the Windows shell API it uses doesn't read `\\?\` paths (not tried without). Tests pass their own put-away function; only the ignored `to_trash_really_moves_a_file_to_the_trash` uses the real Recycle Bin.

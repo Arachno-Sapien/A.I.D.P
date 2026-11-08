@@ -576,6 +576,35 @@ fn delete_entry_refuses_the_folder_itself_git_and_outside() {
     assert!(root.join("a.ts").exists());
 }
 
+/// Windows drops trailing dots and spaces from names, but `\\?\` paths keep
+/// them. `to_trash` hands the shell a path without `\\?\`, where a file named
+/// `...` would be the folder it is in, and `notes.` would be `notes`. Such
+/// names are refused everywhere, so no path means two different entries.
+#[cfg(windows)]
+#[test]
+fn names_windows_would_change_are_refused() {
+    let temp = TempDir::new();
+    let root = temp.path();
+    fs::create_dir(root.join("sub")).unwrap();
+    fs::write(root.join("notes"), "keep").unwrap();
+    // Only a `\\?\` path can make these.
+    let verbatim = canonicalize(root).unwrap();
+    fs::write(verbatim.join("sub").join("..."), "x").unwrap();
+    fs::write(verbatim.join("notes."), "x").unwrap();
+
+    let never = |_: &Path| -> Result<(), String> { panic!("nothing may be put away") };
+    for p in ["sub/...", "...", "notes.", "notes ", "sub./a.ts", "a. /b"] {
+        assert_eq!(delete_entry(root, p, never), Err(WorkspaceError::OutsideFolder), "{p}");
+        assert_eq!(resolve(root, p), Err(WorkspaceError::OutsideFolder), "{p}");
+        assert_eq!(resolve_new(root, p), Err(WorkspaceError::OutsideFolder), "{p}");
+        assert_eq!(rename_entry(root, "notes", p), Err(WorkspaceError::OutsideFolder), "{p}");
+    }
+    assert_eq!(fs::read_to_string(root.join("notes")).unwrap(), "keep");
+    // Dots inside a name are fine.
+    assert!(resolve_new(root, "a.b.ts").is_ok());
+    assert!(resolve_new(root, ".env.local").is_ok());
+}
+
 /// Puts a real file in the system's trash. Ignored because it leaves a file
 /// named `aidp-trash-check.txt` in the Recycle Bin; run it by name to check
 /// the trash crate on this machine.
