@@ -147,7 +147,7 @@ The coding workspace is the main goal of A.I.D.P (decision 0005). It uses the mo
 
 All file and process access is in Rust. The UI never hands a filesystem path to the OS, and the Tauri fs and shell plugins stay off.
 
-**New files and folders.** Buttons above the tree create an empty file or a folder (with any missing folders on the way) through Rust's `new_file` and `new_folder`. They are the user's own action, so no diff, but they use the same path check as the agent's `create_file`: inside the folder, never `.git`, never over an existing name.
+**Managing files in the tree (decision 0024).** Buttons above the tree and a right-click menu create, rename, move (drag onto a folder) and delete files and folders through Rust's `new_file`, `new_folder`, `rename_entry` and `delete_entry`. They are the user's own actions, so no diff, but they use the same path checks as the agent's tools: inside the folder, never `.git`, never over an existing name, and a link is moved or deleted as itself. Delete asks first and goes to the Recycle Bin or Trash. Anything with unsaved changes or a waiting AI change is left alone until it's saved, closed or answered.
 
 **Error underlines (decisions 0022, 0023).** The editor underlines syntax errors, with a problem count below the file. JavaScript and TypeScript are checked by TypeScript's own parser in a Web Worker that starts on the first check and stops after 5 idle minutes; Rust, JSON, YAML and XML by the grammar the editor already uses for colouring. Other languages aren't checked, because their grammars flag valid code. Checkers sit behind one interface in `src/features/workspace/diagnostics/`, so type errors or language servers can be added later without changing the editor.
 

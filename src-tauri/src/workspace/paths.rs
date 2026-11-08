@@ -132,6 +132,25 @@ pub fn resolve_new(root: &Path, rel: &str) -> Result<PathBuf, WorkspaceError> {
     Ok(result)
 }
 
+/// The file or folder `rel` names, for renaming, moving and deleting. A link is
+/// the link itself, not where it points, so only its folder is resolved. Never
+/// the opened folder itself (`""`, `"."`) and never `.git`.
+pub fn resolve_entry(root: &Path, rel: &str) -> Result<PathBuf, WorkspaceError> {
+    let parts = check_components(rel)?;
+    let Some((Component::Normal(name), folders)) = parts.split_last() else {
+        return Err(WorkspaceError::OutsideFolder);
+    };
+    let folder: PathBuf = folders.iter().collect();
+    let abs = resolve(root, &folder.to_string_lossy())?.join(name);
+    match std::fs::symlink_metadata(&abs) {
+        Ok(_) => Ok(abs),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Err(WorkspaceError::NotFound),
+        Err(e) => Err(WorkspaceError::Io {
+            message: e.to_string(),
+        }),
+    }
+}
+
 pub fn to_rel(root: &Path, abs: &Path) -> Option<String> {
     let stripped = abs.strip_prefix(root).ok()?;
     let parts: Vec<String> = stripped

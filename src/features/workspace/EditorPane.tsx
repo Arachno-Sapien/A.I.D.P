@@ -190,10 +190,11 @@ export function EditorPane() {
         </div>
       )}
 
-      {/* Editor view container */}
+      {/* Editor view container. `isolate` keeps CodeMirror's own layers (its
+          panels are z-index 300) inside the editor, under dialogs and menus. */}
       <div
         ref={editorContainerRef}
-        className="flex-1 overflow-auto bg-neutral-950 font-mono text-xs"
+        className="isolate flex-1 overflow-auto bg-neutral-950 font-mono text-xs"
       />
     </div>
   );

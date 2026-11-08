@@ -160,6 +160,37 @@ pub async fn new_folder(
         .map_err(io)?
 }
 
+/// Rename, or move by dragging in the tree; returns the new path.
+#[tauri::command]
+#[specta::specta]
+pub async fn rename_entry(
+    from: String,
+    to: String,
+    state: State<'_, WorkspaceState>,
+) -> Result<String, WorkspaceError> {
+    let root = state.root()?;
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::workspace::files::rename_entry(&root, &from, &to)
+    })
+    .await
+    .map_err(io)?
+}
+
+/// Delete from the tree: to the Recycle Bin or Trash, after the UI asked.
+#[tauri::command]
+#[specta::specta]
+pub async fn delete_entry(
+    path: String,
+    state: State<'_, WorkspaceState>,
+) -> Result<(), WorkspaceError> {
+    let root = state.root()?;
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::workspace::files::delete_entry(&root, &path, crate::workspace::files::to_trash)
+    })
+    .await
+    .map_err(io)?
+}
+
 #[tauri::command]
 #[specta::specta]
 pub async fn write_file(

@@ -1,4 +1,5 @@
-import { useEffect, useId, useRef } from "react";
+import { useId, useRef } from "react";
+import { useModalFocus } from "./useModalFocus";
 
 export interface UnsavedChangesDialogProps {
   /** How many files have unsaved changes. */
@@ -27,45 +28,7 @@ export function UnsavedChangesDialog({
   const messageId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
-  const cancel = useRef(onCancel);
-  cancel.current = onCancel;
-
-  useEffect(() => {
-    const before = document.activeElement as HTMLElement | null;
-    cancelRef.current?.focus();
-
-    // On the window, so keys work even if a click moved focus off the dialog.
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        cancel.current();
-        return;
-      }
-      if (e.key !== "Tab") return;
-      const buttons = Array.from(
-        panelRef.current?.querySelectorAll<HTMLButtonElement>("button:not([disabled])") ?? [],
-      );
-      const first = buttons[0];
-      const last = buttons[buttons.length - 1];
-      if (!first || !last) return;
-      const active = document.activeElement;
-      if (!panelRef.current?.contains(active)) {
-        e.preventDefault();
-        (e.shiftKey ? last : first).focus();
-      } else if (e.shiftKey && active === first) {
-        e.preventDefault();
-        last.focus();
-      } else if (!e.shiftKey && active === last) {
-        e.preventDefault();
-        first.focus();
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      window.removeEventListener("keydown", onKeyDown);
-      if (before?.isConnected) before.focus();
-    };
-  }, []);
+  useModalFocus(panelRef, cancelRef, onCancel);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">

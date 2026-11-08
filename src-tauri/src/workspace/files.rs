@@ -366,6 +366,88 @@ pub fn new_folder(root: &Path, rel: &str) -> Result<String, WorkspaceError> {
     Ok(tree_path(rel))
 }
 
+/// Renames or moves a file or folder inside the opened folder, making any
+/// missing folders on the way. Never replaces another entry, and a folder can't
+/// go inside itself. A name that differs only in case renames in place.
+/// Returns the new path the way the file tree writes it.
+pub fn rename_entry(root: &Path, from: &str, to: &str) -> Result<String, WorkspaceError> {
+    let io_error = |e: io::Error| WorkspaceError::Io {
+        message: e.to_string(),
+    };
+    let src = super::paths::resolve_entry(root, from)?;
+    let dst = match super::paths::resolve_new(root, to) {
+        Ok(dst) => dst,
+        // Where names ignore case (Windows, macOS), "README.md" is taken by "readme.md" itself.
+        Err(WorkspaceError::AlreadyExists) => {
+            let taken = super::paths::resolve_entry(root, to)?;
+            if !same_entry_in_other_case(&src, &taken) {
+                return Err(WorkspaceError::AlreadyExists);
+            }
+            if taken.file_name() == src.file_name() {
+                return Ok(tree_path(to));
+            }
+            taken
+        }
+        Err(e) => return Err(e),
+    };
+    if dst.starts_with(&src) {
+        return Err(WorkspaceError::IntoItself);
+    }
+    if let Some(parent) = dst.parent() {
+        fs::create_dir_all(parent).map_err(io_error)?;
+    }
+    fs::rename(&src, &dst).map_err(io_error)?;
+    Ok(tree_path(to))
+}
+
+/// The same entry, named in two cases: same folder, names equal but for case,
+/// and the same file on disk (on a case-sensitive disk they are two files).
+fn same_entry_in_other_case(a: &Path, b: &Path) -> bool {
+    let lower = |p: &Path| p.file_name().map(|n| n.to_string_lossy().to_lowercase());
+    if a.parent() != b.parent() || lower(a) != lower(b) {
+        return false;
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        match (fs::symlink_metadata(a), fs::symlink_metadata(b)) {
+            (Ok(x), Ok(y)) => x.dev() == y.dev() && x.ino() == y.ino(),
+            _ => false,
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        matches!((fs::canonicalize(a), fs::canonicalize(b)), (Ok(x), Ok(y)) if x == y)
+    }
+}
+
+/// Deletes a file or folder by handing it to `put_away` (`to_trash` in the
+/// app; tests pass their own so they don't fill the Recycle Bin). A link goes
+/// itself, not what it points to.
+pub fn delete_entry(
+    root: &Path,
+    rel: &str,
+    put_away: impl FnOnce(&Path) -> Result<(), String>,
+) -> Result<(), WorkspaceError> {
+    let abs = super::paths::resolve_entry(root, rel)?;
+    put_away(&abs).map_err(|message| WorkspaceError::Io { message })
+}
+
+/// The Recycle Bin on Windows, the Trash on macOS and Linux (decision 0024).
+pub fn to_trash(path: &Path) -> Result<(), String> {
+    // The Windows shell doesn't read `\\?\` paths.
+    let path = std::path::PathBuf::from(super::display_path(path));
+    #[allow(unused_mut)]
+    let mut trash = trash::TrashContext::default();
+    // NSFileManager, not Finder: Finder asks for permission to be controlled.
+    #[cfg(target_os = "macos")]
+    {
+        use trash::macos::{DeleteMethod, TrashContextExtMacos};
+        trash.set_delete_method(DeleteMethod::NsFileManager);
+    }
+    trash.delete(&path).map_err(|e| e.to_string())
+}
+
 /// Only called after `resolve_new` accepted `rel`, so every part is a plain name.
 fn tree_path(rel: &str) -> String {
     Path::new(rel)

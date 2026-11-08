@@ -267,6 +267,8 @@ pub fn refused(err: &WorkspaceError, path: &str) -> ToolRun {
         WorkspaceError::AlreadyExists => {
             format!("{path} already exists. Use edit_file to change it.")
         }
+        // Only moving makes this; no tool moves files.
+        WorkspaceError::IntoItself => format!("{path} can't be moved into itself."),
         WorkspaceError::Io { message } => message.clone(),
         WorkspaceError::Storage { message } => message.clone(),
         WorkspaceError::NoFolder => "No folder is open.".to_string(),

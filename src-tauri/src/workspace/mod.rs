@@ -87,6 +87,8 @@ pub enum WorkspaceError {
     OutsideFolder,
     NotFound,
     AlreadyExists,
+    /// A folder can't be moved into itself or a folder inside it.
+    IntoItself,
     NotText,
     TooLarge { bytes: u32 },
     ChangedOnDisk,

@@ -58,6 +58,8 @@ fn specta_builder() -> Builder<tauri::Wry> {
         commands::workspace::write_file,
         commands::workspace::new_file,
         commands::workspace::new_folder,
+        commands::workspace::rename_entry,
+        commands::workspace::delete_entry,
         commands::chat::run_agent,
         commands::tools::answer_tool,
         commands::terminal::terminal_open,

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { language } from "@codemirror/language";
 
 vi.mock("../../lib/bindings", () => ({
@@ -12,6 +12,8 @@ vi.mock("../../lib/bindings", () => ({
     writeFile: vi.fn(),
     newFile: vi.fn(),
     newFolder: vi.fn(),
+    renameEntry: vi.fn(),
+    deleteEntry: vi.fn(),
     setUnsaved: vi.fn().mockResolvedValue(undefined),
     answerTool: vi.fn().mockResolvedValue(true),
     stopReply: vi.fn().mockResolvedValue(undefined),
@@ -273,6 +275,98 @@ describe("useWorkspaceStore", () => {
     );
     expect(useWorkspaceStore.getState().expanded).toEqual({});
     expect(useWorkspaceStore.getState().tabs).toEqual([]);
+  });
+
+  describe("rename, move and delete", () => {
+    const fileOnDisk = (path: string) => ({
+      status: "ok" as const,
+      data: { path, text: "x", version: "v1", lineEnding: "lf" as const, hasBom: false, isSecret: false },
+    });
+    beforeEach(() => {
+      vi.mocked(commands.readFile).mockImplementation(async (path) => fileOnDisk(path));
+    });
+    afterEach(() => {
+      vi.mocked(commands.readFile).mockReset();
+      buffers.clear();
+    });
+
+    it("renaming an open file renames its tab and keeps it active", async () => {
+      await useWorkspaceStore.getState().openFile("src/a.ts");
+      useWorkspaceStore.setState({ expanded: { src: true } });
+      vi.mocked(commands.renameEntry).mockResolvedValue({ status: "ok", data: "src/b.ts" });
+
+      expect(await useWorkspaceStore.getState().move("src/a.ts", "src/b.ts")).toBeNull();
+
+      expect(commands.renameEntry).toHaveBeenCalledWith("src/a.ts", "src/b.ts");
+      const { tabs, active } = useWorkspaceStore.getState();
+      expect(tabs.map((t) => t.path)).toEqual(["src/b.ts"]);
+      expect(active).toBe("src/b.ts");
+      expect(buffers.get("src/a.ts")).toBeUndefined();
+    });
+
+    it("moving a folder carries its open tabs and open subfolders", async () => {
+      await useWorkspaceStore.getState().openFile("src/util/d.ts");
+      await useWorkspaceStore.getState().openFile("other.ts");
+      useWorkspaceStore.setState({ expanded: { src: true, "src/util": true } });
+      vi.mocked(commands.renameEntry).mockResolvedValue({ status: "ok", data: "lib/util" });
+
+      expect(await useWorkspaceStore.getState().move("src/util", "lib/util")).toBeNull();
+
+      const { tabs, active, expanded } = useWorkspaceStore.getState();
+      expect(tabs.map((t) => t.path).sort()).toEqual(["lib/util/d.ts", "other.ts"]);
+      expect(active).toBe("other.ts");
+      expect(expanded).toEqual({ src: true, lib: true, "lib/util": true });
+      expect(commands.listDir).toHaveBeenCalledWith("lib/util");
+    });
+
+    it("deleting a folder closes its tabs and forgets its open subfolders", async () => {
+      await useWorkspaceStore.getState().openFile("src/util/d.ts");
+      await useWorkspaceStore.getState().openFile("other.ts");
+      useWorkspaceStore.setState({ expanded: { src: true, "src/util": true } });
+      vi.mocked(commands.deleteEntry).mockResolvedValue({ status: "ok", data: null });
+
+      expect(await useWorkspaceStore.getState().remove("src/util")).toBeNull();
+
+      expect(commands.deleteEntry).toHaveBeenCalledWith("src/util");
+      const { tabs, expanded } = useWorkspaceStore.getState();
+      expect(tabs.map((t) => t.path)).toEqual(["other.ts"]);
+      expect(expanded).toEqual({ src: true });
+      expect(commands.listDir).toHaveBeenCalledWith("src");
+    });
+
+    it("leaves unsaved changes and a proposed change alone", async () => {
+      useWorkspaceStore.setState({ tabs: [tab("src/a.ts", true)] });
+      const saveFirst = "Save or close a.ts first: it has unsaved changes.";
+      expect(await useWorkspaceStore.getState().move("src", "lib")).toBe(saveFirst);
+      expect(await useWorkspaceStore.getState().remove("src/a.ts")).toBe(saveFirst);
+
+      useWorkspaceStore.setState({
+        tabs: [],
+        proposal: { path: "src/b.ts", original: "", proposed: "x" },
+      });
+      expect(await useWorkspaceStore.getState().remove("src")).toBe(
+        "Accept or reject the proposed change to b.ts first.",
+      );
+      // A sibling whose name starts the same is not inside.
+      vi.mocked(commands.deleteEntry).mockResolvedValue({ status: "ok", data: null });
+      expect(await useWorkspaceStore.getState().remove("sr")).toBeNull();
+
+      expect(commands.renameEntry).not.toHaveBeenCalled();
+      expect(commands.deleteEntry).toHaveBeenCalledTimes(1);
+      expect(commands.deleteEntry).toHaveBeenCalledWith("sr");
+    });
+
+    it("a failed move comes back as a message and changes nothing", async () => {
+      useWorkspaceStore.setState({ expanded: { src: true } });
+      vi.mocked(commands.renameEntry).mockResolvedValue({
+        status: "error",
+        error: { kind: "intoItself" },
+      });
+      expect(await useWorkspaceStore.getState().move("src", "src/inner/src")).toBe(
+        "A folder can't be moved into itself or a folder inside it.",
+      );
+      expect(useWorkspaceStore.getState().expanded).toEqual({ src: true });
+    });
   });
 
   it("save sends expectedVersion, clears dirty on success", async () => {

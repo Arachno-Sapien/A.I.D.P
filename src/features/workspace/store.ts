@@ -70,6 +70,12 @@ export interface WorkspaceStore {
   refreshTree(): Promise<void>;
   /** New file or folder from the tree: the message to show, or null once it's made and shown. */
   create(kind: "file" | "folder", path: string): Promise<string | null>;
+  /** Rename or move (drag) a file or folder: the message to show, or null once done. */
+  move(from: string, to: string): Promise<string | null>;
+  /** Delete to the Recycle Bin or Trash: the message to show, or null once done. */
+  remove(path: string): Promise<string | null>;
+  /** Why `path` can't be renamed, moved or deleted right now, or null if it can. */
+  blocked(path: string): string | null;
   clearError(): void;
 
   openFile(path: string): Promise<void>;
@@ -96,6 +102,26 @@ export interface WorkspaceStore {
   saveAll(): Promise<boolean>;
   discardAndProceed(): Promise<void>;
   cancelPrompt(): void;
+}
+
+/** Whether a path is `base` or inside it ("src" holds "src/a.ts", not "src2"). */
+const within = (base: string) => (path: string) => path === base || path.startsWith(`${base}/`);
+
+/** Every folder above a path: "a/b/c.ts" → ["a", "a/b"]. */
+function foldersAbove(path: string): string[] {
+  const parts = path.split("/");
+  return parts.slice(1).map((_, i) => parts.slice(0, i + 1).join("/"));
+}
+
+/** Renaming, moving or deleting must not lose unsaved text or a change waiting for an answer. */
+function blockedBy(tabs: Tab[], proposal: Proposal | null, path: string): string | null {
+  const inside = within(path);
+  const dirty = tabs.find((t) => t.dirty && inside(t.path));
+  if (dirty) return `Save or close ${dirty.name} first: it has unsaved changes.`;
+  if (proposal && inside(proposal.path)) {
+    return `Accept or reject the proposed change to ${proposal.path.split("/").pop()} first.`;
+  }
+  return null;
 }
 
 function syncUnsaved(tabs: Tab[]) {
@@ -286,6 +312,55 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
     set({ expanded });
     await get().refreshTree();
     if (kind === "file") await get().openFile(res.data);
+    return null;
+  },
+
+  move: async (from, to) => {
+    const blocked = blockedBy(get().tabs, get().proposal, from);
+    if (blocked) return blocked;
+    const res = await commands.renameEntry(from, to);
+    if (res.status === "error") return workspaceErrorText(res.error);
+    const moved = res.data;
+    if (moved === from) return null;
+
+    const inside = within(from);
+    const renamed = (path: string) => moved + path.slice(from.length);
+    const { active } = get();
+    // Tabs close and reopen at the new path (they were saved, so nothing is lost).
+    const carried = get().tabs.filter((t) => inside(t.path));
+    for (const t of carried) get().closeTab(t.path);
+
+    const expanded: Record<string, true> = {};
+    for (const folder of Object.keys(get().expanded)) {
+      expanded[inside(folder) ? renamed(folder) : folder] = true;
+    }
+    for (const folder of foldersAbove(moved)) expanded[folder] = true;
+    const children = Object.fromEntries(
+      Object.entries(get().children).filter(([folder]) => !inside(folder)),
+    );
+    set({ expanded, children });
+    await get().refreshTree();
+
+    for (const t of carried) await get().openFile(renamed(t.path));
+    // Opening makes a tab active; the one that was active stays so.
+    set({ active: active && inside(active) ? renamed(active) : active });
+    return null;
+  },
+
+  blocked: (path) => blockedBy(get().tabs, get().proposal, path),
+
+  remove: async (path) => {
+    const blocked = blockedBy(get().tabs, get().proposal, path);
+    if (blocked) return blocked;
+    const res = await commands.deleteEntry(path);
+    if (res.status === "error") return workspaceErrorText(res.error);
+
+    const inside = within(path);
+    for (const t of get().tabs.filter((t) => inside(t.path))) get().closeTab(t.path);
+    const keep = <T,>(record: Record<string, T>) =>
+      Object.fromEntries(Object.entries(record).filter(([folder]) => !inside(folder)));
+    set({ expanded: keep(get().expanded), children: keep(get().children) });
+    await get().refreshTree();
     return null;
   },
 

@@ -25,6 +25,10 @@ export const commands = {
 	/**  New file from the file tree: the user's own action, so no diff or approval. */
 	newFile: (path: string) => typedError<string, WorkspaceError>(__TAURI_INVOKE("new_file", { path })),
 	newFolder: (path: string) => typedError<string, WorkspaceError>(__TAURI_INVOKE("new_folder", { path })),
+	/**  Rename, or move by dragging in the tree; returns the new path. */
+	renameEntry: (from: string, to: string) => typedError<string, WorkspaceError>(__TAURI_INVOKE("rename_entry", { from, to })),
+	/**  Delete from the tree: to the Recycle Bin or Trash, after the UI asked. */
+	deleteEntry: (path: string) => typedError<null, WorkspaceError>(__TAURI_INVOKE("delete_entry", { path })),
 	runAgent: (connectionId: number, modelId: string, messages: ChatInput_Deserialize[], onEvent: Channel<ChatEvent_Deserialize>) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("run_agent", { connectionId, modelId, messages, onEvent })),
 	answerTool: (id: number, approve: boolean) => __TAURI_INVOKE<boolean>("answer_tool", { id, approve }),
 	terminalOpen: (cols: number, rows: number, onEvent: Channel<TerminalEvent>) => typedError<null, WorkspaceError>(__TAURI_INVOKE("terminal_open", { cols, rows, onEvent })),
@@ -435,7 +439,9 @@ export type Usage_Serialize = {
 	tokensOut: number | null,
 };
 
-export type WorkspaceError = { kind: "noFolder" } | { kind: "outsideFolder" } | { kind: "notFound" } | { kind: "alreadyExists" } | { kind: "notText" } | { kind: "tooLarge"; bytes: number } | { kind: "changedOnDisk" } | { kind: "io"; message: string } | { kind: "storage"; message: string };
+export type WorkspaceError = { kind: "noFolder" } | { kind: "outsideFolder" } | { kind: "notFound" } | { kind: "alreadyExists" } | 
+/**  A folder can't be moved into itself or a folder inside it. */
+{ kind: "intoItself" } | { kind: "notText" } | { kind: "tooLarge"; bytes: number } | { kind: "changedOnDisk" } | { kind: "io"; message: string } | { kind: "storage"; message: string };
 
 export type WorkspaceInfo = {
 	name: string,

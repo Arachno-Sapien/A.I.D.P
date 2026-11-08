@@ -32,6 +32,28 @@ describe("EditorPane", () => {
     cleanup();
   });
 
+  it("keeps CodeMirror's layers (panels are z-index 300) under dialogs and menus", () => {
+    buffers.set("a.ts", createState("const a = 1;", "a.ts"));
+    useWorkspaceStore.setState({
+      tabs: [
+        {
+          path: "a.ts",
+          name: "a.ts",
+          version: "v1",
+          lineEnding: "lf",
+          hasBom: false,
+          isSecret: false,
+          dirty: false,
+        },
+      ],
+      active: "a.ts",
+    });
+    const { container } = render(<EditorPane />);
+    const editor = container.querySelector(".cm-editor")?.parentElement;
+    // `isolate` makes the editor its own stacking context.
+    expect(editor?.classList.contains("isolate")).toBe(true);
+  });
+
   it("tabs render dirty dots, clicking close on a dirty tab asks to discard", () => {
     const stateA = createState("const a = 1;", "a.ts");
     buffers.set("a.ts", stateA);

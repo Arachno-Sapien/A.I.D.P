@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../lib/bindings", () => ({
@@ -125,6 +125,98 @@ describe("WorkspaceScreen", () => {
     rerender(<WorkspaceScreen />);
     fireEvent.click(screen.getByRole("button", { name: "New file" }));
     expect(nameBox().value).toBe("");
+  });
+
+  describe("tree actions", () => {
+    const show = (extra: Record<string, unknown> = {}) => {
+      useWorkspaceStore.setState({
+        info: { name: "my-app", path: "/projects/my-app", isGit: true },
+        children: {
+          "": [
+            { name: "src", path: "src", isDir: true },
+            { name: "a.ts", path: "a.ts", isDir: false },
+          ],
+        },
+        toggleDir: vi.fn(),
+        ...extra,
+      });
+      return render(<WorkspaceScreen />);
+    };
+
+    it("Delete from the menu asks first, then deletes", async () => {
+      const remove = vi.fn().mockResolvedValue(null);
+      show({ remove });
+      fireEvent.contextMenu(screen.getByText("a.ts"), { clientX: 20, clientY: 30 });
+      fireEvent.click(screen.getByRole("menuitem", { name: "Delete" }));
+      const dialog = screen.getByRole("dialog", { name: "Delete a.ts?" });
+      expect(remove).not.toHaveBeenCalled();
+
+      await act(async () => {
+        fireEvent.click(within(dialog).getByRole("button", { name: /^Move to/ }));
+      });
+      expect(remove).toHaveBeenCalledWith("a.ts");
+      expect(screen.queryByRole("dialog")).toBeNull();
+    });
+
+    it("Rename from the menu renames in place", async () => {
+      const move = vi.fn().mockResolvedValue(null);
+      show({ move });
+      fireEvent.contextMenu(screen.getByText("a.ts"));
+      fireEvent.click(screen.getByRole("menuitem", { name: "Rename" }));
+      const box = screen.getByRole("textbox", { name: "New name for a.ts" });
+      fireEvent.change(box, { target: { value: "b.ts" } });
+      await act(async () => {
+        fireEvent.keyDown(box, { key: "Enter" });
+      });
+      expect(move).toHaveBeenCalledWith("a.ts", "b.ts");
+    });
+
+    it("New file from a folder's menu starts in that folder", () => {
+      show();
+      fireEvent.contextMenu(screen.getByText("src"));
+      fireEvent.click(screen.getByRole("menuitem", { name: "New file" }));
+      const box = screen.getByRole("textbox", { name: "New file name" }) as HTMLInputElement;
+      expect(box.value).toBe("src/");
+    });
+
+    it("Delete on a file with unsaved changes says why at once, without asking", () => {
+      const remove = vi.fn();
+      show({
+        remove,
+        tabs: [
+          {
+            path: "a.ts",
+            name: "a.ts",
+            version: "v1",
+            lineEnding: "lf",
+            hasBom: false,
+            isSecret: false,
+            dirty: true,
+          },
+        ],
+      });
+      const files = within(screen.getByTestId("files-panel"));
+      const row = files.getByText("a.ts").closest("[data-tree-row]") as HTMLElement;
+      fireEvent.keyDown(row, { key: "Delete" });
+
+      expect(screen.queryByRole("dialog")).toBeNull();
+      expect(screen.getByText("Save or close a.ts first: it has unsaved changes.")).toBeDefined();
+      expect(remove).not.toHaveBeenCalled();
+      useWorkspaceStore.setState({ tabs: [], active: null });
+    });
+
+    it("a refused rename shows why", async () => {
+      const move = vi.fn().mockResolvedValue("Save or close a.ts first: it has unsaved changes.");
+      show({ move });
+      const row = screen.getByText("a.ts").closest("[data-tree-row]") as HTMLElement;
+      fireEvent.keyDown(row, { key: "F2" });
+      const box = screen.getByRole("textbox", { name: "New name for a.ts" });
+      fireEvent.change(box, { target: { value: "b.ts" } });
+      await act(async () => {
+        fireEvent.keyDown(box, { key: "Enter" });
+      });
+      expect(screen.getByText("Save or close a.ts first: it has unsaved changes.")).toBeDefined();
+    });
   });
 
   it("toggles the terminal panel", async () => {

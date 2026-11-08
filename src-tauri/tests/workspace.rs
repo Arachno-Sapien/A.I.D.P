@@ -1,8 +1,8 @@
 mod common;
 
 use aidp_lib::workspace::files::{
-    create_file, list_dir, list_tree, new_file, new_folder, read_file, write_file, LineEnding,
-    WriteFile,
+    create_file, delete_entry, list_dir, list_tree, new_file, new_folder, read_file,
+    rename_entry, write_file, LineEnding, WriteFile,
 };
 use aidp_lib::workspace::paths::{resolve, resolve_new};
 use aidp_lib::workspace::search::search;
@@ -448,6 +448,148 @@ fn new_file_and_folder_refuse_names_taken_or_outside() {
     assert_eq!(new_file(root, "out/x.ts"), Err(WorkspaceError::OutsideFolder));
     assert_eq!(new_folder(root, "out/x"), Err(WorkspaceError::OutsideFolder));
     assert_eq!(fs::read_dir(elsewhere.path()).unwrap().count(), 0);
+}
+
+#[test]
+fn rename_entry_renames_and_moves_files_and_folders() {
+    let temp = TempDir::new();
+    let root = temp.path();
+    fs::create_dir_all(root.join("src/util")).unwrap();
+    fs::write(root.join("src/util/date.ts"), "d").unwrap();
+    fs::write(root.join("a.ts"), "a").unwrap();
+
+    assert_eq!(rename_entry(root, "a.ts", "b.ts"), Ok("b.ts".to_string()));
+    assert_eq!(fs::read_to_string(root.join("b.ts")).unwrap(), "a");
+    assert_eq!(rename_entry(root, "b.ts", "src/b.ts"), Ok("src/b.ts".to_string()));
+    assert!(root.join("src/b.ts").is_file());
+
+    // A folder moves with everything in it, into folders that don't exist yet.
+    assert_eq!(rename_entry(root, "src/util", "lib/util"), Ok("lib/util".to_string()));
+    assert_eq!(fs::read_to_string(root.join("lib/util/date.ts")).unwrap(), "d");
+    assert!(!root.join("src/util").exists());
+}
+
+#[test]
+fn rename_entry_can_change_only_the_case() {
+    let temp = TempDir::new();
+    let root = temp.path();
+    fs::write(root.join("readme.md"), "r").unwrap();
+
+    assert_eq!(rename_entry(root, "readme.md", "README.md"), Ok("README.md".to_string()));
+    let names: Vec<String> = list_dir(root, "").unwrap().into_iter().map(|e| e.name).collect();
+    assert_eq!(names, ["README.md"]);
+    // The same name is nothing to do.
+    assert_eq!(rename_entry(root, "README.md", "README.md"), Ok("README.md".to_string()));
+}
+
+#[test]
+fn rename_entry_refuses_taken_names_itself_and_outside() {
+    let temp = TempDir::new();
+    let root = temp.path();
+    fs::write(root.join("a.ts"), "a").unwrap();
+    fs::write(root.join("b.ts"), "b").unwrap();
+    fs::create_dir_all(root.join("src/inner")).unwrap();
+
+    assert_eq!(rename_entry(root, "a.ts", "b.ts"), Err(WorkspaceError::AlreadyExists));
+    assert_eq!(fs::read_to_string(root.join("b.ts")).unwrap(), "b");
+    for into in ["src/inner/src", "src/new"] {
+        assert_eq!(rename_entry(root, "src", into), Err(WorkspaceError::IntoItself), "{into}");
+    }
+    for to in ["../a.ts", "/a.ts", ".git/a.ts", ".GIT/x"] {
+        assert_eq!(rename_entry(root, "a.ts", to), Err(WorkspaceError::OutsideFolder), "{to}");
+    }
+    // "" and "." are the opened folder itself.
+    for from in ["", ".", "../x", ".git", ".git/config"] {
+        assert_eq!(rename_entry(root, from, "z"), Err(WorkspaceError::OutsideFolder), "{from}");
+    }
+    assert_eq!(rename_entry(root, "missing.ts", "z.ts"), Err(WorkspaceError::NotFound));
+    assert!(!root.join(".git").exists());
+}
+
+#[test]
+fn rename_entry_moves_a_link_not_where_it_points() {
+    let temp = TempDir::new();
+    let root = temp.path();
+    let elsewhere = TempDir::new();
+    fs::write(elsewhere.path().join("t.txt"), "t").unwrap();
+    link_dir(&root.join("out"), elsewhere.path());
+
+    // Through the link is outside the folder.
+    assert_eq!(rename_entry(root, "out/t.txt", "t.txt"), Err(WorkspaceError::OutsideFolder));
+    assert_eq!(rename_entry(root, "out", "out2"), Ok("out2".to_string()));
+    assert!(fs::symlink_metadata(root.join("out2")).is_ok());
+    assert_eq!(fs::read_to_string(elsewhere.path().join("t.txt")).unwrap(), "t");
+}
+
+#[test]
+fn delete_entry_puts_away_the_entry_itself() {
+    let temp = TempDir::new();
+    let root = temp.path();
+    fs::create_dir_all(root.join("src/util")).unwrap();
+    fs::write(root.join("src/util/date.ts"), "d").unwrap();
+    let elsewhere = TempDir::new();
+    link_dir(&root.join("out"), elsewhere.path());
+
+    let mut put_away = Vec::new();
+    assert_eq!(
+        delete_entry(root, "src/util", |p| {
+            put_away.push(p.to_path_buf());
+            Ok(())
+        }),
+        Ok(())
+    );
+    // A link goes itself, not the folder it points to.
+    assert_eq!(
+        delete_entry(root, "out", |p| {
+            put_away.push(p.to_path_buf());
+            Ok(())
+        }),
+        Ok(())
+    );
+    let canon = canonicalize(root).unwrap();
+    assert_eq!(put_away, [canon.join("src").join("util"), canon.join("out")]);
+}
+
+#[test]
+fn delete_entry_refuses_the_folder_itself_git_and_outside() {
+    let temp = TempDir::new();
+    let root = temp.path();
+    fs::create_dir_all(root.join(".git")).unwrap();
+    fs::write(root.join(".git/config"), "[core]\n").unwrap();
+    let elsewhere = TempDir::new();
+    fs::write(elsewhere.path().join("t.txt"), "t").unwrap();
+    link_dir(&root.join("out"), elsewhere.path());
+
+    let never = |_: &Path| -> Result<(), String> { panic!("nothing may be put away") };
+    for p in ["", ".", "..", "../x", "/x", ".git", ".git/config", ".GIT", "out/t.txt"] {
+        assert_eq!(delete_entry(root, p, never), Err(WorkspaceError::OutsideFolder), "{p}");
+    }
+    assert_eq!(delete_entry(root, "missing.ts", never), Err(WorkspaceError::NotFound));
+
+    fs::write(root.join("a.ts"), "a").unwrap();
+    assert_eq!(
+        delete_entry(root, "a.ts", |_| Err("no Recycle Bin here".to_string())),
+        Err(WorkspaceError::Io {
+            message: "no Recycle Bin here".to_string()
+        })
+    );
+    assert!(root.join("a.ts").exists());
+}
+
+/// Puts a real file in the system's trash. Ignored because it leaves a file
+/// named `aidp-trash-check.txt` in the Recycle Bin; run it by name to check
+/// the trash crate on this machine.
+#[test]
+#[ignore]
+fn to_trash_really_moves_a_file_to_the_trash() {
+    let temp = TempDir::new();
+    let root = temp.path();
+    fs::write(root.join("aidp-trash-check.txt"), "check").unwrap();
+    assert_eq!(
+        delete_entry(root, "aidp-trash-check.txt", aidp_lib::workspace::files::to_trash),
+        Ok(())
+    );
+    assert!(!root.join("aidp-trash-check.txt").exists());
 }
 
 #[test]

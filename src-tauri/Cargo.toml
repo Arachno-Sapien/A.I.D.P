@@ -42,6 +42,9 @@ pdf-extract = "0.12"
 sha2 = "0.10"
 # Attachment bytes cross IPC as one base64 string, not a JSON array of numbers.
 base64 = "0.22"
+# Delete in the file tree goes to the Recycle Bin or Trash, not gone for good
+# (decision 0024). Uses the windows 0.62 and objc2 0.6 already in the tree.
+trash = "5.3"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Globalization", "Win32_Security", "Win32_System_JobObjects", "Win32_System_Threading"] }

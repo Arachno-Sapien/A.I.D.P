@@ -1,8 +1,28 @@
 // @vitest-environment jsdom
 
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanPath, NewEntry } from "./NewEntry";
+import { cleanPath, NewEntry, type Kind } from "./NewEntry";
+
+/** Holds which box is open, the way the workspace screen does. */
+function Harness({
+  folder,
+  onCreate,
+}: {
+  folder: string;
+  onCreate: (kind: Kind, path: string) => Promise<string | null>;
+}) {
+  const [open, setOpen] = useState<{ kind: Kind; folder: string } | null>(null);
+  return (
+    <NewEntry
+      open={open}
+      onToggle={(kind) => setOpen(open?.kind === kind ? null : { kind, folder })}
+      onClose={() => setOpen(null)}
+      onCreate={onCreate}
+    />
+  );
+}
 
 afterEach(() => {
   cleanup();
@@ -19,7 +39,7 @@ async function submit(value: string) {
 
 describe("NewEntry", () => {
   it("New file opens a name box in the current folder", () => {
-    render(<NewEntry folder="src/app" onCreate={vi.fn()} />);
+    render(<Harness folder="src/app" onCreate={vi.fn()} />);
     expect(box()).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "New file" }));
@@ -29,7 +49,7 @@ describe("NewEntry", () => {
   });
 
   it("switching from New file to New folder focuses the new box", () => {
-    render(<NewEntry folder="src" onCreate={vi.fn()} />);
+    render(<Harness folder="src" onCreate={vi.fn()} />);
     fireEvent.click(screen.getByRole("button", { name: "New file" }));
     const folderButton = screen.getByRole("button", { name: "New folder" });
     folderButton.focus();
@@ -41,7 +61,7 @@ describe("NewEntry", () => {
   });
 
   it("starts empty at the top of the folder", () => {
-    render(<NewEntry folder="" onCreate={vi.fn()} />);
+    render(<Harness folder="" onCreate={vi.fn()} />);
     fireEvent.click(screen.getByRole("button", { name: "New folder" }));
     expect((box() as HTMLInputElement).value).toBe("");
     expect(box()?.getAttribute("aria-label")).toBe("New folder name");
@@ -49,7 +69,7 @@ describe("NewEntry", () => {
 
   it("Enter creates it and closes the box", async () => {
     const onCreate = vi.fn().mockResolvedValue(null);
-    render(<NewEntry folder="" onCreate={onCreate} />);
+    render(<Harness folder="" onCreate={onCreate} />);
     fireEvent.click(screen.getByRole("button", { name: "New file" }));
     await submit(" src\\util\\date.ts ");
 
@@ -59,7 +79,7 @@ describe("NewEntry", () => {
 
   it("keeps the box open with the message when it can't be made", async () => {
     const onCreate = vi.fn().mockResolvedValue("A file or folder with that name already exists.");
-    render(<NewEntry folder="" onCreate={onCreate} />);
+    render(<Harness folder="" onCreate={onCreate} />);
     fireEvent.click(screen.getByRole("button", { name: "New folder" }));
     await submit("docs");
 
@@ -72,7 +92,7 @@ describe("NewEntry", () => {
 
   it("asks for a name before creating anything", async () => {
     const onCreate = vi.fn();
-    render(<NewEntry folder="src" onCreate={onCreate} />);
+    render(<Harness folder="src" onCreate={onCreate} />);
     fireEvent.click(screen.getByRole("button", { name: "New file" }));
     await submit("src/");
     expect(screen.getByRole("alert").textContent).toBe("Type a name for the new file.");
@@ -83,7 +103,7 @@ describe("NewEntry", () => {
 
   it("Escape closes the box without creating anything", () => {
     const onCreate = vi.fn();
-    render(<NewEntry folder="src" onCreate={onCreate} />);
+    render(<Harness folder="src" onCreate={onCreate} />);
     fireEvent.click(screen.getByRole("button", { name: "New file" }));
     fireEvent.keyDown(box()!, { key: "Escape" });
     expect(box()).toBeNull();

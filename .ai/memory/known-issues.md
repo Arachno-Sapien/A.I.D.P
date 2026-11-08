@@ -4,6 +4,10 @@ Bugs, gotchas, and approaches that failed. Newest first. If you hit one of the "
 
 ## Seen in this repo
 
+- **2026-11-09 · CodeMirror's panels are z-index 300.** With nothing containing them, the editor's count line (and the Ctrl+F search bar) painted over z-50 dialogs and menus. The editor container in `EditorPane.tsx` has `isolate`; keep it, and keep new overlays out of panels with a theme blur (`createPortal` to `document.body`, as `TreeMenu`, `ConfirmDialog` and the drag label do).
+- **2026-11-09 · HTML drag-and-drop doesn't reach the page in Tauri on Windows.** The window takes drag events for files dropped from the OS (attachments). Dragging inside the app uses mouse events (`FileTree.tsx`); `document.elementFromPoint` finds the drop row, which jsdom lacks, so tests stub it.
+- **2026-11-09 · The `trash` crate gets a plain path.** `resolve_entry` gives `\\?\C:\...`; `to_trash` passes `display_path` of it, because the Windows shell API it uses doesn't read `\\?\` paths (not tried without). Tests pass their own put-away function; only the ignored `to_trash_really_moves_a_file_to_the_trash` uses the real Recycle Bin.
+
 - **2026-11-09 · `autoFocus` runs only when an element mounts.** A box that changes role in place (New file → New folder) keeps the old element, so it isn't focused and typing goes to whatever was clicked. Give it a `key` per role (`NewEntry.tsx`). Tests: focus the clicked button first, then check `document.activeElement`.
 
 - **2026-11-09 · Keep `typescript` out of the main thread.** It is 3.5 MB minified. Only `diagnostics/typescriptWorker.ts` imports it at runtime; `typescriptSyntax.ts` takes `ts` as an argument and imports only its types. A runtime `import ts from "typescript"` anywhere else puts the compiler in the main bundle: check `dist/assets/index-*.js` stays near 1.08 MB after `npx vite build`. Use `getSyntacticDiagnostics` from a language service, not `transpileModule`, which throws on `.d.ts` files (no output).

@@ -99,8 +99,10 @@ Folder selection uses `tauri-plugin-dialog` v2:
 - **Rust-only invocation:** The dialog plugin is registered in Rust with zero permissions granted in `src-tauri/capabilities/default.json`. The web frontend cannot invoke dialog APIs directly.
 - **Recent folder validation:** `open_recent` verifies that any requested path matches an entry in the SQLite `settings` table before opening, preventing arbitrary path opening via forged IPC calls.
 
-### New files and folders
-`new_file` and `new_folder` are the user's own actions from the file tree, so they show no diff and ask no approval (rule 3 covers AI edits). They go through `resolve_new`, the check the agent's `create_file` uses: no `..`, no absolute path or drive, no `.git` in any case, no link that leads out of the folder. A name that exists is refused, never overwritten; missing folders on the way are made inside the opened folder. A new file is empty.
+### New, rename, move and delete in the file tree
+`new_file`, `new_folder`, `rename_entry` and `delete_entry` are the user's own actions from the file tree, so they show no diff and ask no approval (rule 3 covers AI edits); no tool can call them. New paths and rename or move destinations go through `resolve_new`, the check the agent's `create_file` uses: no `..`, no absolute path or drive, no `.git` in any case, no link that leads out of the folder. A name that exists is refused, never overwritten; missing folders on the way are made inside the opened folder. A new file is empty.
+
+Rename, move and delete act on the entry itself (`resolve_entry`): its folder is resolved and checked, its own name isn't followed, so a link is renamed or deleted as a link and what it points to is never touched. The opened folder itself and `.git` are refused, and a folder can't move into itself. Delete goes to the system's Recycle Bin or Trash (decision 0024), after a confirm dialog; nothing is removed for good. The UI refuses to rename, move or delete anything with unsaved changes or a proposed AI change waiting.
 
 ### Release CSP and the editor
 - The release CSP is `default-src 'self' ipc: http://ipc.localhost; style-src 'self' 'unsafe-inline'; img-src 'self' data:` (decision 0009; `img-src` since decision 0019). Scripts are still limited to the app's own files: `script-src` falls back to `default-src 'self'`.

@@ -9,6 +9,7 @@ describe("workspaceErrorText", () => {
       { kind: "outsideFolder" },
       { kind: "notFound" },
       { kind: "alreadyExists" },
+      { kind: "intoItself" },
       { kind: "notText" },
       { kind: "tooLarge", bytes: 3000000 },
       { kind: "changedOnDisk" },

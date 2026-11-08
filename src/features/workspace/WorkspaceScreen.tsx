@@ -1,11 +1,15 @@
 import React, { Suspense, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { FolderX, MessagesSquare, PanelLeft, RotateCw, SquareTerminal } from "lucide-react";
+import type { DirEntry } from "../../lib/bindings";
 import { AiPanel } from "./AiPanel";
 import { useWorkspaceChatStore } from "./chatStore";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { DiffView } from "./DiffView";
 import { EditorPane } from "./EditorPane";
 import { FileTree } from "./FileTree";
-import { NewEntry } from "./NewEntry";
+import { NewEntry, type Kind } from "./NewEntry";
+import { TreeMenu, type MenuItem } from "./TreeMenu";
 import { Splitter } from "./Splitter";
 import { useWorkspaceStore } from "./store";
 import { awaitsAnswer } from "./ToolStepView";
@@ -28,6 +32,13 @@ const toggleClass = (on: boolean) =>
 
 /** `src/app/main.ts` → `src/app`; a file at the top → "". */
 const parentOf = (path: string) => path.slice(0, Math.max(path.lastIndexOf("/"), 0));
+
+/** What the system calls the place deleted files go. */
+const BIN = /Windows/i.test(navigator.userAgent) ? "Recycle Bin" : "Trash";
+
+/** New items made from an entry's menu go in it (a folder) or beside it (a file). */
+const folderFor = (entry: DirEntry | null) =>
+  entry ? (entry.isDir ? entry.path : parentOf(entry.path)) : "";
 
 /** The last part of a Windows or Unix path: `C:\code\app` → `app`. */
 const folderName = (path: string) =>
@@ -53,6 +64,9 @@ export function WorkspaceScreen({ active = true }: WorkspaceScreenProps) {
     toggleDir,
     refreshTree,
     create,
+    move,
+    remove,
+    blocked,
     clearError,
     openFile,
   } = useWorkspaceStore();
@@ -61,7 +75,50 @@ export function WorkspaceScreen({ active = true }: WorkspaceScreenProps) {
   // of the file last opened. Another workspace starts at its top, so a path
   // from the old one can't make folders in the new one.
   const [here, setHere] = useState("");
-  useEffect(() => setHere(""), [info?.path]);
+  const [newAt, setNewAt] = useState<{ kind: Kind; folder: string } | null>(null);
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const [menu, setMenu] = useState<{ entry: DirEntry | null; x: number; y: number } | null>(null);
+  const [deleting, setDeleting] = useState<DirEntry | null>(null);
+  useEffect(() => {
+    setHere("");
+    setNewAt(null);
+    setRenaming(null);
+    setMenu(null);
+    setDeleting(null);
+  }, [info?.path]);
+
+  /** A refused rename, move or delete shows in the error bar. */
+  const report = (message: string | null) => {
+    if (message) useWorkspaceStore.setState({ error: message });
+  };
+  const moveTo = async (from: string, folder: string, name: string) =>
+    report(await move(from, folder ? `${folder}/${name}` : name));
+  // Say why before asking or showing the rename box, not after.
+  const startRename = (entry: DirEntry) => {
+    const why = blocked(entry.path);
+    if (why) report(why);
+    else setRenaming(entry.path);
+  };
+  const startDelete = (entry: DirEntry) => {
+    const why = blocked(entry.path);
+    if (why) report(why);
+    else setDeleting(entry);
+  };
+
+  const menuItems = (entry: DirEntry | null): MenuItem[] => {
+    const folder = folderFor(entry);
+    const items: MenuItem[] = [
+      { label: "New file", onSelect: () => setNewAt({ kind: "file", folder }) },
+      { label: "New folder", onSelect: () => setNewAt({ kind: "folder", folder }) },
+    ];
+    if (entry) {
+      items.push(
+        { label: "Rename", hint: "F2", onSelect: () => startRename(entry) },
+        { label: "Delete", hint: "Del", onSelect: () => startDelete(entry) },
+      );
+    }
+    return items;
+  };
 
   const [terminalOpen, setTerminalOpen] = useState(false);
   const [terminalHeight, setTerminalHeight] = useState<number>(240);
@@ -273,7 +330,9 @@ export function WorkspaceScreen({ active = true }: WorkspaceScreenProps) {
           style={{ flex: `0 1 ${filesWidth}px`, minWidth: FILES_MIN }}
         >
           <NewEntry
-            folder={here}
+            open={newAt}
+            onToggle={(kind) => setNewAt(newAt?.kind === kind ? null : { kind, folder: here })}
+            onClose={() => setNewAt(null)}
             onCreate={async (kind, path) => {
               const problem = await create(kind, path);
               if (!problem) {
@@ -295,6 +354,16 @@ export function WorkspaceScreen({ active = true }: WorkspaceScreenProps) {
                 setHere(parentOf(path));
                 void openFile(path);
               }}
+              renaming={renaming}
+              onRename={(path, name) => {
+                setRenaming(null);
+                void moveTo(path, parentOf(path), name);
+              }}
+              onRenameCancel={() => setRenaming(null)}
+              onMenu={(entry, x, y) => setMenu({ entry, x, y })}
+              onStartRename={startRename}
+              onDelete={startDelete}
+              onMove={(from, folder) => void moveTo(from, folder, from.split("/").pop() ?? from)}
             />
           </div>
         </div>
@@ -351,6 +420,38 @@ export function WorkspaceScreen({ active = true }: WorkspaceScreenProps) {
           <AiPanel />
         </div>
       </div>
+
+      {/* On the page itself: a theme's blur on a panel would move fixed elements. */}
+      {menu &&
+        createPortal(
+          <TreeMenu
+            x={menu.x}
+            y={menu.y}
+            label={menu.entry ? `Actions for ${menu.entry.name}` : `Actions for ${info.name}`}
+            items={menuItems(menu.entry)}
+            onClose={() => setMenu(null)}
+          />,
+          document.body,
+        )}
+      {deleting &&
+        createPortal(
+          <ConfirmDialog
+            title={deleting.isDir ? `Delete the folder ${deleting.name}?` : `Delete ${deleting.name}?`}
+            message={
+              deleting.isDir
+                ? `It and everything in it go to the ${BIN}, where you can restore them.`
+                : `It goes to the ${BIN}, where you can restore it.`
+            }
+            confirmLabel={`Move to ${BIN}`}
+            onCancel={() => setDeleting(null)}
+            onConfirm={() => {
+              const path = deleting.path;
+              setDeleting(null);
+              void remove(path).then(report);
+            }}
+          />,
+          document.body,
+        )}
     </div>
   );
 }

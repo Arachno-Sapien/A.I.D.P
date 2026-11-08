@@ -1,0 +1,11 @@
+# 2026-11-09 · M6 · Rename, move and delete in the file tree
+Agent: Claude Code (Opus 5.5)
+Task: the human's "Can you add this aswell? also with click-drag & moving of files from the file tree" (rename, delete, right-click menu, drag to move)
+Rust: paths.rs `resolve_entry` (the entry itself, link not followed; not the folder itself, not .git); files.rs `rename_entry` (dest via `resolve_new`, `IntoItself`, case-only rename via same folder + same file), `delete_entry(root, rel, put_away)`, `to_trash` (`trash` 5.3, `display_path` to drop `\\?\`, NSFileManager on macOS); `WorkspaceError::IntoItself` (+ tools/run.rs text); commands `rename_entry`, `delete_entry`; Cargo.toml `trash` (lockfile adds only trash, urlencoding). 7 tests + 1 ignored real-trash test, run once: the file landed in the Recycle Bin with its original folder
+UI: store `move`, `remove`, `blocked` (unsaved or proposed change → refused; tabs reopen at new paths, active kept; expanded remapped); TreeMenu.tsx (menu pattern, portal); ConfirmDialog.tsx + useModalFocus.ts (shared with UnsavedChangesDialog); NewEntry now controlled (`open`, `onToggle`, `onClose`); FileTree: focusable rows (Enter, Space, F2, Delete, Shift+F10, menu key), right-click, RenameBox, mouse-event drag with drop highlight and label; WorkspaceScreen wiring, checks before asking; EditorPane `isolate`
+Problems: (1) reopening moved tabs made the last one active: active restored; (2) CodeMirror panels are z-index 300 and painted over dialogs ("No problems" line over the delete dialog): editor container `isolate`; (3) confirm-then-refuse for dirty files: `blocked` checked before the dialog or rename box
+Checked in Chromium with a stand-in for Rust (removed): right-click menu at the pointer, keyboard Rename with "notes" selected, real mouse drags (file into folder; folder with an open tab, tab followed), Delete key → dialog (Cancel focused, "Recycle Bin") → deleted; unsaved file refused at once; dialog now covers the editor; Escape returns focus to the row
+Docs: decision 0024, security.md, user-guide, design.md, CHANGELOG, AGENTS.md stack row
+Tests: 331 Vitest (25 new), 257 Rust (6 new, plus 1 ignored real-trash test), clippy and typecheck clean
+Not yet: seen in the Tauri app; macOS and Linux trash not tried (CI builds them)
+Next: the human tries it in the app
