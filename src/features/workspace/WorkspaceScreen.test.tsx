@@ -63,7 +63,21 @@ describe("WorkspaceScreen", () => {
     ).toBeNull();
   });
 
-  it("opens a recent folder", () => {
+  it("offers to continue in the last folder", () => {
+    const openRecentMock = vi.fn();
+    useWorkspaceStore.setState({
+      info: null,
+      recent: ["C:\\code\\first", "/projects/second"],
+      openRecent: openRecentMock,
+    });
+
+    render(<WorkspaceScreen />);
+    fireEvent.click(screen.getByRole("button", { name: /^Continue in first/ }));
+
+    expect(openRecentMock).toHaveBeenCalledWith("C:\\code\\first");
+  });
+
+  it("lists the older folders under Recent folders", () => {
     const openRecentMock = vi.fn();
     useWorkspaceStore.setState({
       info: null,
@@ -72,10 +86,17 @@ describe("WorkspaceScreen", () => {
     });
 
     render(<WorkspaceScreen />);
-    const recentItem = screen.getByText("/projects/first");
-    fireEvent.click(recentItem);
+    const list = screen.getByRole("list");
+    expect(list.textContent).not.toContain("/projects/first");
+    fireEvent.click(screen.getByRole("button", { name: "/projects/second" }));
 
-    expect(openRecentMock).toHaveBeenCalledWith("/projects/first");
+    expect(openRecentMock).toHaveBeenCalledWith("/projects/second");
+  });
+
+  it("shows no Continue button before any folder was opened", () => {
+    render(<WorkspaceScreen />);
+    expect(screen.queryByRole("button", { name: /^Continue in/ })).toBeNull();
+    expect(screen.queryByText("Recent folders")).toBeNull();
   });
 
   it("toggles the terminal panel", async () => {

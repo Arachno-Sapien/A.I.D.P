@@ -44,6 +44,11 @@ describe("themes", () => {
           `${id}: secondary text on ${surface}`,
         ).toBeGreaterThanOrEqual(4.5);
       }
+      // The path line on the light-filled "Continue in" button (WorkspaceScreen).
+      expect(
+        contrast(v(700), v(100)),
+        `${id}: secondary text on a neutral-100 button`,
+      ).toBeGreaterThanOrEqual(4.5);
       expect(
         contrast(v(100), t.vars["--color-popup"]),
         `${id}: text in an open dropdown`,

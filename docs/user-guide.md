@@ -86,6 +86,8 @@ A.I.D.P supports both cloud providers (OpenAI, Anthropic, OpenRouter, Groq, Deep
 
 Open any folder on your computer to edit files alongside an AI assistant that can inspect your code and propose changes safely.
 
+With no folder open, **Continue in &lt;folder&gt;** reopens the folder you used last; older folders are listed under **Recent folders**.
+
 ### The Workspace Interface
 - **File tree (Left):** Explore files and folders. Automatically respects `.gitignore`. Secret files (such as `.env`, private keys, and credential stores) are highlighted with a shield icon and excluded from model context.
 - **Editor tabs (Centre):** CodeMirror 6 editor with syntax highlighting, dirty tab indicators, conflict detection for files modified on disk, and preservation of line endings (LF/CRLF) and UTF-8 BOM.

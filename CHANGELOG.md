@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- The Workspace screen with no folder open offers **Continue in &lt;folder&gt;**, which reopens the folder you used last in one click.
+
 ### Fixed
 - On Windows, installing or updating now tells Explorer to refresh its icons, so the taskbar shows the app's own icon instead of the Tauri icon it cached from an earlier version.
 

@@ -25,6 +25,10 @@ const toggleClass = (on: boolean) =>
       : "text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800"
   }`;
 
+/** The last part of a Windows or Unix path: `C:\code\app` → `app`. */
+const folderName = (path: string) =>
+  path.split(/[\\/]/).filter(Boolean).pop() ?? path;
+
 export interface WorkspaceScreenProps {
   /** Whether the workspace is the screen shown; its shortcuts act only then. */
   active?: boolean;
@@ -93,6 +97,8 @@ export function WorkspaceScreen({ active = true }: WorkspaceScreenProps) {
     (columnsRef.current?.clientWidth ?? 0) - other - EDITOR_MIN;
 
   if (!info) {
+    // `recent` is newest first, so its head is the folder used last.
+    const [last, ...older] = recent;
     return (
       <div className="app-shell flex-1 flex flex-col items-center justify-center p-6 bg-neutral-950 text-neutral-100">
         <div className="max-w-md w-full bg-neutral-900 border border-neutral-800 rounded-xl p-8 shadow-xl text-center">
@@ -102,21 +108,40 @@ export function WorkspaceScreen({ active = true }: WorkspaceScreenProps) {
           <p className="text-xs text-neutral-400 mb-6">
             Open a folder to edit code and work with AI in your workspace.
           </p>
+          {last && (
+            <button
+              type="button"
+              title={last}
+              onClick={() => void openRecent(last)}
+              className="w-full mb-3 px-4 py-2 rounded-lg text-neutral-900 bg-neutral-100 hover:bg-white transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-neutral-400 focus-visible:outline-none"
+            >
+              <span className="block text-xs font-semibold truncate">
+                Continue in {folderName(last)}
+              </span>
+              <span className="block text-[11px] font-mono text-neutral-700 truncate">
+                {last}
+              </span>
+            </button>
+          )}
           <button
             type="button"
             onClick={() => void openFolder()}
-            className="px-4 py-2 text-xs font-semibold text-neutral-900 bg-neutral-100 hover:bg-white rounded-lg transition-colors cursor-pointer"
+            className={`px-4 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-neutral-400 focus-visible:outline-none ${
+              last
+                ? "text-neutral-200 border border-neutral-700 hover:bg-neutral-800"
+                : "text-neutral-900 bg-neutral-100 hover:bg-white"
+            }`}
           >
             Open folder
           </button>
 
-          {recent.length > 0 && (
+          {older.length > 0 && (
             <div className="mt-8 text-left border-t border-neutral-800 pt-6">
               <h3 className="text-xs font-medium text-neutral-400 mb-3">
                 Recent folders
               </h3>
               <ul className="space-y-1.5 text-xs">
-                {recent.map((path) => (
+                {older.map((path) => (
                   <li key={path}>
                     <button
                       type="button"
