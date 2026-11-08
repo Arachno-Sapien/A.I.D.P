@@ -1,7 +1,7 @@
 # Decision Record 0022: Error Underlines in the Code Editor
 
 **Date:** 2026-11-09
-**Status:** Accepted (the human chose the editor's parser, built so the checker can be upgraded)
+**Status:** Accepted (the human chose the editor's parser, built so the checker can be upgraded). JavaScript and TypeScript are now checked by TypeScript's own parser: decision 0023.
 
 ---
 

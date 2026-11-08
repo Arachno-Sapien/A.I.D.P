@@ -10,7 +10,7 @@ async function problems(filename: string, doc: string) {
   await loadLanguage(filename);
   const checker = checkerFor(filename);
   if (!checker) throw new Error(`no checker for ${filename}`);
-  return checker.check(createState(doc, filename));
+  return checker.check(createState(doc, filename), filename);
 }
 
 const error = (from: number, to: number, message: string) => ({
@@ -27,8 +27,14 @@ describe("checkerFor", () => {
     }
   });
 
+  it("sends JavaScript and TypeScript to TypeScript's own parser", () => {
+    for (const f of ["a.js", "a.mjs", "a.jsx", "a.ts", "a.tsx", "vite.config.mts", "a.d.ts"]) {
+      expect(checkerFor(f)?.name, f).toBe("TypeScript");
+    }
+  });
+
   it("skips languages whose grammar misreads valid code, and plain text", () => {
-    for (const f of ["a.js", "a.jsx", "a.ts", "a.tsx", "a.py", "a.css", "a.html", "a.c", "a.cpp", "a.md", "notes.txt", "Makefile"]) {
+    for (const f of ["a.py", "a.css", "a.html", "a.c", "a.cpp", "a.md", "notes.txt", "Makefile"]) {
       expect(checkerFor(f), f).toBeUndefined();
     }
   });

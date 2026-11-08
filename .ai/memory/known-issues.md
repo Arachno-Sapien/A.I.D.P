@@ -4,6 +4,8 @@ Bugs, gotchas, and approaches that failed. Newest first. If you hit one of the "
 
 ## Seen in this repo
 
+- **2026-11-09 · Keep `typescript` out of the main thread.** It is 3.5 MB minified. Only `diagnostics/typescriptWorker.ts` imports it at runtime; `typescriptSyntax.ts` takes `ts` as an argument and imports only its types. A runtime `import ts from "typescript"` anywhere else puts the compiler in the main bundle: check `dist/assets/index-*.js` stays near 1.08 MB after `npx vite build`. Use `getSyntacticDiagnostics` from a language service, not `transpileModule`, which throws on `.d.ts` files (no output).
+
 - **2026-11-09 · CodeMirror's grammars flag valid code in many languages.** Measured on real files (decision 0022): TypeScript misreads `export { type X }`, `(p): p is T`, `declare module`, labeled tuples, `typeof import()`, `{/* */}` in JSX; JavaScript misreads import attributes and `export default class extends`; Python misreads bare `yield` and `1.`; HTML misreads template tags; CSS misreads Tailwind's `@apply`. Updating doesn't help (`@lezer/*` were at their latest). Don't add a language to `CHECKED` in `diagnostics/syntax.ts` without running its grammar over real valid files first.
 - **2026-11-09 · Lint and partial parse trees.** `ensureSyntaxTree` returns null when its time budget runs out (it did under the full parallel Vitest run), and a cut-off tree can end in error nodes that aren't in the code. Lint re-runs only on edits unless `needsRefresh` says so. The syntax checker returns nothing for an unfinished tree and refreshes when `syntaxTree` changes. Also: deleting a problem's text removes the diagnostic by mapping with no `setDiagnosticsEffect`, so read `diagnosticCount(state)` rather than counting effects.
 

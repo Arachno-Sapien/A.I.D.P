@@ -76,6 +76,7 @@ Chosen for low memory use and tools agents know well. **No new dependency withou
 | Long lists | @tanstack/react-virtual (messages, file tree) |
 | Folder picker (M3) | tauri-plugin-dialog, called from Rust only |
 | Code editor (M3) | CodeMirror 6, with @codemirror/merge for diffs, @codemirror/language-data (not Monaco: too heavy for the RAM target), @codemirror/lint for error underlines (decision 0022) |
+| JS/TS syntax errors | `typescript` (its parser, in a Web Worker that stops when idle; decision 0023). Never imported on the main thread |
 | File walking and search (M3) | `ignore` crate (respects .gitignore) |
 | Terminal (M4) | `@xterm/xterm` 6 + `@xterm/addon-fit` with `portable-pty` |
 | Tests | `cargo test` + wiremock (fake provider servers), Vitest |

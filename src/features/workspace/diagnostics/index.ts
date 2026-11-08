@@ -4,10 +4,10 @@
  * next problem, Ctrl+Shift+M lists them all).
  *
  * A checker finds the problems in one kind of file. To add or upgrade one
- * (TypeScript's own parser, a language server reached through Rust), write a
- * `Checker` and list it in `CHECKERS` above any checker it replaces. Nothing
- * else changes: the editor only calls `diagnostics(filename)`. Decision 0022
- * records which languages are checked and why.
+ * (type errors from TypeScript, a language server reached through Rust), write
+ * a `Checker` and list it in `CHECKERS` above any checker it replaces. Nothing
+ * else changes: the editor only calls `diagnostics(filename)`. Decisions 0022
+ * and 0023 record which languages are checked and why.
  */
 import {
   diagnosticCount,
@@ -18,20 +18,24 @@ import {
 import type { EditorState, Extension } from "@codemirror/state";
 import { EditorView, showPanel, type Panel, type ViewUpdate } from "@codemirror/view";
 import { syntaxChecker } from "./syntax";
+import { typescriptChecker } from "./typescript";
 
 export interface Checker {
   /** Shown with each message, so the user knows which checker found it. */
   name: string;
   /** Whether this checker reads the file; `filename` is a base name like `main.rs`. */
   appliesTo(filename: string): boolean;
-  /** The problems in the document. May be async, for checkers that ask Rust. */
-  check(state: EditorState): readonly Diagnostic[] | Promise<readonly Diagnostic[]>;
+  /** The problems in the document. May be async, for checkers in a worker or in Rust. */
+  check(
+    state: EditorState,
+    filename: string,
+  ): readonly Diagnostic[] | Promise<readonly Diagnostic[]>;
   /** Whether to check again without an edit: the parser read further, new results arrived. */
   refresh?(update: ViewUpdate): boolean;
 }
 
 /** In order of preference: a file gets the first checker that reads it, and only that one. */
-const CHECKERS: readonly Checker[] = [syntaxChecker];
+const CHECKERS: readonly Checker[] = [typescriptChecker, syntaxChecker];
 
 /** More than this many problems in a file is noise; the count then says "100+". */
 const MAX_PROBLEMS = 100;
@@ -47,7 +51,7 @@ export function diagnostics(filename: string): Extension {
   return [
     linter(
       async (view) =>
-        (await checker.check(view.state))
+        (await checker.check(view.state, filename))
           .slice(0, MAX_PROBLEMS)
           .map((d) => ({ ...d, source: checker.name })),
       { needsRefresh: (update) => checker.refresh?.(update) ?? false },

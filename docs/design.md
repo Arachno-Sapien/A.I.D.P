@@ -147,7 +147,7 @@ The coding workspace is the main goal of A.I.D.P (decision 0005). It uses the mo
 
 All file and process access is in Rust. The UI never hands a filesystem path to the OS, and the Tauri fs and shell plugins stay off.
 
-**Error underlines (decision 0022).** The editor underlines syntax errors found by the grammar it already uses for colouring, for the languages whose grammar reads real code without false errors (Rust, JSON, YAML, XML), with a problem count below the file. Checkers sit behind one interface in `src/features/workspace/diagnostics/`, so TypeScript's own parser or language servers can be added later without changing the editor.
+**Error underlines (decisions 0022, 0023).** The editor underlines syntax errors, with a problem count below the file. JavaScript and TypeScript are checked by TypeScript's own parser in a Web Worker that starts on the first check and stops after 5 idle minutes; Rust, JSON, YAML and XML by the grammar the editor already uses for colouring. Other languages aren't checked, because their grammars flag valid code. Checkers sit behind one interface in `src/features/workspace/diagnostics/`, so type errors or language servers can be added later without changing the editor.
 
 **Memory.** The 150 MB idle target applies with no folder open. An editor and a terminal cost more, so M3 measures RAM with a mid-sized repo open and records a workspace budget in its phase doc, and M4 does the same with the terminal running.
 
@@ -495,5 +495,5 @@ These wait until v1 ships. The model layer is designed so each one is an additio
 
 - **MCP client.** Lets the model use external tool servers on top of the built-in tools from M4.
 - **Browser checks with Playwright.** Connect Microsoft's Playwright MCP server as a sidecar. Offered only for models with tool calling (and ideally vision). The browser starts on demand and closes after, to save memory.
-- **Stronger error checking.** TypeScript's own parser for JS/TS syntax errors, then language servers for type errors, as new checkers behind the interface from decision 0022. Language servers need a "trust this folder" step, since some run project code.
+- **Type errors.** The TypeScript worker given the folder's files, then language servers for other languages, as new checkers behind the interface from decision 0022. Language servers need a "trust this folder" step, since some run project code.
 - **Practice area.** LeetCode-style problems with hidden test cases and an AI tutor that uses the user's chosen model. Code runs either in local language runtimes or through a sandbox service like Judge0.

@@ -18,9 +18,9 @@ type SyntaxNode = ReturnType<typeof syntaxTree>["topNode"];
 /**
  * Languages whose grammar read real, valid code without false errors (decision
  * 0022). Left out because the grammar flags valid code: JavaScript and
- * TypeScript (`export { type X }`, `p is T`, import attributes), Python (bare
- * `yield`, `1.`), CSS (Tailwind's `@apply`), HTML (template tags), C and C++
- * (macros).
+ * TypeScript (`export { type X }`, `p is T`, import attributes; checked by
+ * `typescript.ts` instead), Python (bare `yield`, `1.`), CSS (Tailwind's
+ * `@apply`), HTML (template tags), C and C++ (macros).
  */
 const CHECKED = new Set(["Rust", "JSON", "YAML", "XML"]);
 
