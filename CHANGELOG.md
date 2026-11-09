@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0-rc.5] - 2026-11-09
+
 ### Added
 - Rename, move and delete in the workspace file tree: a right-click menu (or `Shift+F10`), `F2` to rename in place, `Delete` to delete, and drag-and-drop onto a folder to move. Delete asks first and moves the item to the Recycle Bin or Trash. Open tabs follow renamed and moved files.
 - **New file** and **New folder** buttons above the workspace file tree. Type a name or a path (missing folders are made too); the new item shows in the tree and a new file opens in a tab.
@@ -17,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - On Windows, installing or updating now tells Explorer to refresh its icons, so the taskbar shows the app's own icon instead of the Tauri icon it cached from an earlier version.
+- The editor's own bars (the search bar, and now the problem count) no longer draw on top of dialogs and menus.
 
 ## [0.1.0-rc.4] - 2026-11-01
 

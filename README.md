@@ -12,7 +12,7 @@ A.I.D.P, short for AI Integrated Development Platform, is a desktop app for work
 
 ## Status
 
-v0.1 is in release candidates, and the latest is 0.1.0-rc.4. Everything listed under "What v0.1 does" below is built: cloud models through OpenAI-compatible APIs and Anthropic, local models through Ollama, keys in the system keychain, the coding workspace with AI edits as diffs and agent tools that ask before every command, a terminal, attachments, themes, chat history, settings, and signed updates.
+v0.1 is in release candidates, and the latest is 0.1.0-rc.5. Everything listed under "What v0.1 does" below is built: cloud models through OpenAI-compatible APIs and Anthropic, local models through Ollama, keys in the system keychain, the coding workspace with AI edits as diffs and agent tools that ask before every command, a terminal, attachments, themes, chat history, settings, and signed updates.
 
 It runs on Windows, macOS and Linux. Windows is the development machine and gets the most testing. CI builds and tests all three, but the Linux and macOS builds haven't been tried by hand yet, and neither has an 8 GB RAM machine.
 
