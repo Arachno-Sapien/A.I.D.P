@@ -6,3 +6,4 @@ Decisions: migration 5 adds pinned & archived columns to conversations table; ar
 Problems: None; all 6 acceptance gates in GATES.md passed
 Tests: 228 Vitest tests (38 test files), 220 cargo tests passing; typecheck clean; clippy clean
 Next: Push changes; human releases 0.1.0-rc.2 (Task 8)
+

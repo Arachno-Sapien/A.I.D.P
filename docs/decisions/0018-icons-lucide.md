@@ -27,3 +27,4 @@ Adopt `lucide-react` 1.66.0 for UI icons.
 - Workspace bar: icon only with accessible tooltip and aria-label (`PanelLeft`, `MessagesSquare`, `SquareTerminal`, `RotateCw`, `FolderX`).
 - Chat list: icon-only list toggle, icon + text "New chat" (`SquarePen`), and icon-only row actions (`Trash2`, `Pin`, `PinOff`, `Archive`, `ArchiveRestore`).
 - Icon size is 16 px in bars/nav and 14 px in list rows, with `aria-hidden="true"`.
+
