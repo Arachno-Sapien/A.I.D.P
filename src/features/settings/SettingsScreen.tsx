@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { parseModelKey, useModelsStore } from "../models/store";
 import { useSettingsStore } from "./store";
+import { OutsideTools } from "./OutsideTools";
 import { THEMES } from "./themes";
 import { useUpdatesStore } from "./updates";
 import { commands, type KeepAlive, type Theme } from "../../lib/bindings";
@@ -275,6 +276,9 @@ export function SettingsScreen() {
             {updateError && <span className="text-red-400">{updateError}</span>}
           </div>
         </div>
+
+        {/* Section 5: Outside tools (MCP) */}
+        <OutsideTools />
       </div>
     </div>
   );

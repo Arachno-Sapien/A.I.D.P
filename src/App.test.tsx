@@ -30,6 +30,7 @@ vi.mock("./lib/bindings", () => ({
     }),
     appVersion: vi.fn().mockResolvedValue("0.1.0"),
     checkUpdate: vi.fn().mockResolvedValue({ status: "ok", data: null }),
+    listMcpServers: vi.fn().mockResolvedValue({ status: "ok", data: [] }),
   },
 }));
 
