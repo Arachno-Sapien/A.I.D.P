@@ -200,13 +200,13 @@ async fn sends_tools_only_when_given() {
     let mut req_tools = base_req();
     req_tools.tools = vec![
         ToolSpec {
-            name: "t1",
-            description: "d1",
+            name: "t1".to_string(),
+            description: "d1".to_string(),
             schema: json!({}),
         },
         ToolSpec {
-            name: "t2",
-            description: "d2",
+            name: "t2".to_string(),
+            description: "d2".to_string(),
             schema: json!({}),
         },
     ];

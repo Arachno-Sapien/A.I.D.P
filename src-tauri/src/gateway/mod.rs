@@ -113,8 +113,8 @@ pub const TOOLS_UNSUPPORTED: &str =
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ToolSpec {
-    pub name: &'static str,
-    pub description: &'static str,
+    pub name: String,
+    pub description: String,
     pub schema: serde_json::Value,
 }
 

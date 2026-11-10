@@ -475,13 +475,13 @@ async fn sends_tools_only_when_given() {
     let mut request_with_tools = req();
     request_with_tools.tools = vec![
         ToolSpec {
-            name: "list_files",
-            description: "List files",
+            name: "list_files".to_string(),
+            description: "List files".to_string(),
             schema: json!({"type": "object", "properties": {"path": {"type": "string"}}}),
         },
         ToolSpec {
-            name: "read_file",
-            description: "Read a file",
+            name: "read_file".to_string(),
+            description: "Read a file".to_string(),
             schema: json!({"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}),
         },
     ];

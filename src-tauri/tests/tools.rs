@@ -191,7 +191,7 @@ fn command_with_ascii_lookalikes_is_refused() {
 #[test]
 fn specs_are_valid_schemas() {
     let list = specs();
-    let names: Vec<&str> = list.iter().map(|s| s.name).collect();
+    let names: Vec<&str> = list.iter().map(|s| s.name.as_str()).collect();
     assert_eq!(
         names,
         vec![

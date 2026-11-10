@@ -667,8 +667,8 @@ async fn sends_tools_and_more_tokens() {
 
     let mut request = req();
     request.tools = vec![ToolSpec {
-        name: "read_file",
-        description: "Read a file",
+        name: "read_file".to_string(),
+        description: "Read a file".to_string(),
         schema: json!({"type": "object", "properties": {"path": {"type": "string"}}}),
     }];
 

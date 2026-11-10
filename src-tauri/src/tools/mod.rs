@@ -54,8 +54,8 @@ pub fn specs() -> Vec<ToolSpec> {
 
     vec![
         ToolSpec {
-            name: "list_files",
-            description: "List files and folders in the project, skipping .gitignore'd and secret-looking files. One path per line; folders end with /. At most 500 entries.",
+            name: "list_files".to_string(),
+            description: "List files and folders in the project, skipping .gitignore'd and secret-looking files. One path per line; folders end with /. At most 500 entries.".to_string(),
             schema: json!({
                 "type": "object",
                 "properties": {
@@ -69,8 +69,8 @@ pub fn specs() -> Vec<ToolSpec> {
             }),
         },
         ToolSpec {
-            name: "read_file",
-            description: "Read a text file of the project. For a long file, read part of it with start_line and end_line (1-based, inclusive).",
+            name: "read_file".to_string(),
+            description: "Read a text file of the project. For a long file, read part of it with start_line and end_line (1-based, inclusive).".to_string(),
             schema: json!({
                 "type": "object",
                 "properties": {
@@ -94,8 +94,8 @@ pub fn specs() -> Vec<ToolSpec> {
             }),
         },
         ToolSpec {
-            name: "search",
-            description: "Find text in the project's files (not case-sensitive; .gitignore'd and secret-looking files are skipped). Returns path:line: text for each match, at most 100.",
+            name: "search".to_string(),
+            description: "Find text in the project's files (not case-sensitive; .gitignore'd and secret-looking files are skipped). Returns path:line: text for each match, at most 100.".to_string(),
             schema: json!({
                 "type": "object",
                 "properties": {
@@ -113,8 +113,8 @@ pub fn specs() -> Vec<ToolSpec> {
             }),
         },
         ToolSpec {
-            name: "edit_file",
-            description: "Propose replacing one exact piece of text in an existing file. old_text must appear exactly once; copy it from read_file, including indentation. The user sees a diff and decides.",
+            name: "edit_file".to_string(),
+            description: "Propose replacing one exact piece of text in an existing file. old_text must appear exactly once; copy it from read_file, including indentation. The user sees a diff and decides.".to_string(),
             schema: json!({
                 "type": "object",
                 "properties": {
@@ -136,8 +136,8 @@ pub fn specs() -> Vec<ToolSpec> {
             }),
         },
         ToolSpec {
-            name: "create_file",
-            description: "Propose a new file. Fails if the file exists (use edit_file). The user sees it and decides.",
+            name: "create_file".to_string(),
+            description: "Propose a new file. Fails if the file exists (use edit_file). The user sees it and decides.".to_string(),
             schema: json!({
                 "type": "object",
                 "properties": {
@@ -155,8 +155,8 @@ pub fn specs() -> Vec<ToolSpec> {
             }),
         },
         ToolSpec {
-            name: "run_command",
-            description: run_command_desc,
+            name: "run_command".to_string(),
+            description: run_command_desc.to_string(),
             schema: json!({
                 "type": "object",
                 "properties": {
