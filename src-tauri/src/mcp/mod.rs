@@ -7,6 +7,7 @@ use std::fmt;
 use std::time::Duration;
 
 pub mod client;
+pub mod hub;
 
 pub const PROTOCOL_VERSION: &str = "2025-06-18";
 pub const ACCEPTED_VERSIONS: [&str; 3] = ["2025-06-18", "2025-03-26", "2024-11-05"];

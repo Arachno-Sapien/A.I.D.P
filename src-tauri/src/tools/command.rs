@@ -52,7 +52,7 @@ async fn read_capped<R: tokio::io::AsyncRead + Unpin>(mut reader: R) -> Vec<u8> 
 /// including a process whose parent already exited, which `taskkill /T` misses.
 /// Elsewhere the command's process group does the same.
 #[cfg(windows)]
-struct Job(windows_sys::Win32::Foundation::HANDLE);
+pub(crate) struct Job(windows_sys::Win32::Foundation::HANDLE);
 
 // SAFETY: a job handle may be used and closed from any thread.
 #[cfg(windows)]
@@ -62,7 +62,7 @@ unsafe impl Send for Job {}
 impl Job {
     /// A job holding `child` that ends its processes when dropped, or `None` if
     /// Windows refuses; the command then relies on `taskkill /T` alone.
-    fn holding(child: &tokio::process::Child) -> Option<Job> {
+    pub(crate) fn holding(child: &tokio::process::Child) -> Option<Job> {
         use windows_sys::Win32::System::JobObjects::{
             AssignProcessToJobObject, CreateJobObjectW, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
             JOBOBJECT_EXTENDED_LIMIT_INFORMATION, JobObjectExtendedLimitInformation,
@@ -105,7 +105,7 @@ impl Drop for Job {
 /// How long the output readers get after a kill to reach the end of the output.
 const KILL_GRACE: Duration = Duration::from_secs(2);
 
-async fn kill_tree(pid: Option<u32>) {
+pub(crate) async fn kill_tree(pid: Option<u32>) {
     let Some(pid) = pid else { return };
     #[cfg(windows)]
     let mut killer = {
@@ -159,18 +159,10 @@ fn finished(
     })
 }
 
-pub async fn run_command(
-    root: &Path,
-    command: &str,
-    timeout: Duration,
-    cancel: &CancellationToken,
-    output_limit: usize,
-) -> Result<CommandEnd, WorkspaceError> {
-    if !root.exists() || !root.is_dir() {
-        return Err(WorkspaceError::NotFound);
-    }
-
-    let mut std_cmd = if cfg!(windows) {
+/// The shell that runs `command`: `cmd.exe /D /S /C "<command>"` with no window on
+/// Windows, `sh -c <command>` in its own process group elsewhere. No cwd or stdio set.
+pub(crate) fn shell_command(command: &str) -> std::process::Command {
+    if cfg!(windows) {
         let mut c = std::process::Command::new("cmd.exe");
         c.args(["/D", "/S", "/C"]);
         #[cfg(windows)]
@@ -189,7 +181,21 @@ pub async fn run_command(
             c.process_group(0);
         }
         c
-    };
+    }
+}
+
+pub async fn run_command(
+    root: &Path,
+    command: &str,
+    timeout: Duration,
+    cancel: &CancellationToken,
+    output_limit: usize,
+) -> Result<CommandEnd, WorkspaceError> {
+    if !root.exists() || !root.is_dir() {
+        return Err(WorkspaceError::NotFound);
+    }
+
+    let mut std_cmd = shell_command(command);
 
     std_cmd.current_dir(root);
     std_cmd.stdin(std::process::Stdio::null());
