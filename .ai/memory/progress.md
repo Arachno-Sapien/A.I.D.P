@@ -99,6 +99,7 @@ M6 outside tools Tasks 0–7 done 2026-11-10 by Antigravity (Gemini 3.1 Pro): de
 
 Review at end done 2026-11-10 by Claude Code (Opus 5.5), the human's "Add Option B" after edits asked one by one in a multi-file task: a "Review at end" switch beside Agent; Rust writes edit_file/create_file without waiting (commands and outside tools still ask), the UI lists every changed file after the reply with diff, Undo, Undo all, Keep all. Decision 0028; workspace rule 3 and the Never line amended. 303 Rust, 366 Vitest, clippy and typecheck clean. Not yet seen in the app, not pushed. Details: `log/2026-11-10-m6-review-at-end.md`.
 Next step: the human tries Review at end in `npm run tauri dev` (a multi-file task, then Undo one file, Undo all, Keep all; once in a folder without git), together with the outside-tools Task 8 live check.
+MCP review done 2026-11-10 by Claude Code (Opus 5.5), the human's request: Antigravity's outside-tools code read; approvals, Stop and exit clean-up held. Five bugs fixed test-first in `1c90e61` (a stop during a start now wins; an interrupted write closes the client; only offered MCP tools get a card; Settings locks Remove and On during Test; servers stop together on exit). 304 Rust, 366 Vitest. Details: `log/2026-11-10-m6-mcp-review-fixes.md`. Not pushed.
 
 ## Next 3 tasks
 
