@@ -1125,3 +1125,39 @@ async fn settings_round_trip() {
     let options = services.model_options(ollama_id, "any_model");
     assert_eq!(options.keep_alive, Some(3600));
 }
+
+#[test]
+fn mcp_server_rules() {
+    let store = Arc::new(MemoryStore::default());
+    let services = create_services(store);
+
+    assert!(matches!(
+        services.add_mcp_server("Browser", "npx x"),
+        Err(AppError::InvalidInput { .. })
+    ));
+
+    let added = services.add_mcp_server("browser", " npx x ").unwrap();
+    assert_eq!(added.name, "browser");
+    assert_eq!(added.command, "npx x");
+    assert!(added.enabled);
+    assert_eq!(services.mcp_servers().unwrap(), vec![added.clone()]);
+
+    assert_eq!(
+        services.add_mcp_server("browser", "node y"),
+        Err(AppError::InvalidInput {
+            message: "A server with that name already exists.".to_string(),
+        })
+    );
+
+    assert_eq!(
+        services.set_mcp_server_enabled(999, true),
+        Err(AppError::NotFound)
+    );
+    assert_eq!(services.delete_mcp_server(999), Err(AppError::NotFound));
+
+    services.set_mcp_server_enabled(added.id, false).unwrap();
+    assert!(!services.mcp_servers().unwrap()[0].enabled);
+
+    services.delete_mcp_server(added.id).unwrap();
+    assert!(services.mcp_servers().unwrap().is_empty());
+}

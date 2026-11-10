@@ -1,5 +1,6 @@
 pub mod connections;
 pub mod conversations;
+pub mod mcp;
 pub mod settings;
 
 use rusqlite::Connection;
@@ -63,6 +64,14 @@ ALTER TABLE conversations ADD COLUMN archived INTEGER NOT NULL DEFAULT 0;
     r#"
 ALTER TABLE models ADD COLUMN supports_vision INTEGER;
 "#,
+    r#"
+CREATE TABLE mcp_servers (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL UNIQUE,
+  command TEXT NOT NULL,
+  enabled INTEGER NOT NULL DEFAULT 1
+);
+"#,
 ];
 
 pub fn open(path: &Path) -> rusqlite::Result<Connection> {
@@ -105,13 +114,13 @@ mod tests {
         let version: i32 = conn
             .query_row("PRAGMA user_version;", [], |row| row.get(0))
             .unwrap();
-        assert_eq!(version, 6);
+        assert_eq!(version, 7);
 
         migrate(&mut conn).unwrap();
         let version_after: i32 = conn
             .query_row("PRAGMA user_version;", [], |row| row.get(0))
             .unwrap();
-        assert_eq!(version_after, 6);
+        assert_eq!(version_after, 7);
     }
 
     #[test]
