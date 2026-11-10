@@ -668,6 +668,30 @@ describe("useChatStore", () => {
     expect(useChatStore.getState().conversations[0].archived).toBe(false);
   });
 
+  it("a failed delete leaves the list and the open chat as they were", async () => {
+    const chat = { id: 3, title: "kept", workspacePath: null, updatedAt: 1, pinned: false, archived: false };
+    vi.mocked(commands.deleteConversation).mockResolvedValueOnce({
+      status: "error",
+      error: { kind: "storage", message: "disk full" },
+    } as never);
+    useChatStore.setState({ conversations: [chat], conversationId: 3 });
+
+    await useChatStore.getState().remove(3);
+
+    expect(useChatStore.getState().conversations).toEqual([chat]);
+    expect(useChatStore.getState().conversationId).toBe(3);
+  });
+
+  it("Send pressed twice at once sends one message", async () => {
+    const model = { connectionId: 1, modelId: "m" };
+    const first = useChatStore.getState().send("hello", model);
+    const second = useChatStore.getState().send("hello", model);
+    await Promise.all([first, second]);
+
+    expect(commands.sendMessage).toHaveBeenCalledTimes(1);
+    expect(useChatStore.getState().messages.filter((m) => m.role === "user")).toHaveLength(1);
+  });
+
   it("remove skips archived chats when choosing the next one", async () => {
     useChatStore.setState({
       conversationId: 3,

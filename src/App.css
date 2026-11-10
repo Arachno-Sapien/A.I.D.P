@@ -8,6 +8,12 @@
   color-scheme: light;
 }
 
+/* Thin scrollbars in the theme's own greys, not the system's wide ones. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-neutral-700) transparent;
+}
+
 /* Defaults; each theme's own values come from src/features/settings/themes.ts (decision 0020). */
 @theme {
   --color-accent: #4f46e5;
@@ -75,8 +81,9 @@ select option:checked {
 .reply-md :not(pre) > code {
   @apply rounded bg-neutral-800 px-1 py-0.5 text-[0.9em];
 }
+/* A wide table scrolls inside the message instead of pushing past it. */
 .reply-md table {
-  @apply border-collapse my-3 text-sm;
+  @apply block w-fit max-w-full overflow-x-auto border-collapse my-3 text-sm;
 }
 .reply-md th,
 .reply-md td {

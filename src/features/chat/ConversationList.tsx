@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useShallow } from "zustand/react/shallow";
 import {
   Archive,
   ArchiveRestore,
@@ -15,16 +16,15 @@ export const LIST_WIDTH = 240;
 export const LIST_MIN = 180;
 
 export function ConversationList({ width = LIST_WIDTH }: { width?: number } = {}) {
-  const {
-    conversations,
-    conversationId,
-    streaming,
-    load,
-    startNew,
-    remove,
-    setPinned,
-    setArchived,
-  } = useChatStore();
+  // Not `messages`: the list would render again on every streamed chunk.
+  const { conversations, conversationId, streaming } = useChatStore(
+    useShallow((s) => ({
+      conversations: s.conversations,
+      conversationId: s.conversationId,
+      streaming: s.streaming,
+    })),
+  );
+  const { load, startNew, remove, setPinned, setArchived } = useChatStore.getState();
 
   // Switching mid-reply would leave the reply unsaved, so the list waits for it.
   const busyTitle = streaming ? "Wait for the reply to finish" : undefined;
@@ -99,6 +99,7 @@ export function ConversationList({ width = LIST_WIDTH }: { width?: number } = {}
         <button
           type="button"
           aria-current={isActive ? "true" : undefined}
+          title={isActive ? undefined : busyTitle}
           onClick={() => {
             if (!streaming && c.id !== conversationId) {
               void load(c.id);

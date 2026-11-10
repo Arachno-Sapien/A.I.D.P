@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { Composer } from "../chat/Composer";
 import { MessageList } from "../chat/MessageList";
 import { ModelPicker } from "../chat/ModelPicker";
@@ -29,7 +30,10 @@ export function textBudget(contextTokens?: number | null): number {
 }
 
 export function AiPanel({ onApply }: AiPanelProps) {
-  const { tabs, active, selection, propose } = useWorkspaceStore();
+  const { tabs, active, selection } = useWorkspaceStore(
+    useShallow((s) => ({ tabs: s.tabs, active: s.active, selection: s.selection })),
+  );
+  const { propose } = useWorkspaceStore.getState();
   const {
     messages,
     streaming,

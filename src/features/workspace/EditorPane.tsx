@@ -1,21 +1,21 @@
 import { useEffect, useRef, useState } from "react";
 import type { EditorView } from "@codemirror/view";
+import { useShallow } from "zustand/react/shallow";
 import { buffers } from "./buffers";
 import { mountView, setEditorTheme } from "./cm";
 import { useSettingsStore } from "../settings/store";
 import { useWorkspaceStore } from "./store";
 
 export function EditorPane() {
-  const {
-    tabs,
-    active,
-    revision,
-    conflict,
-    setActive,
-    save,
-    reload,
-    closeTab,
-  } = useWorkspaceStore();
+  const { tabs, active, revision, conflict } = useWorkspaceStore(
+    useShallow((s) => ({
+      tabs: s.tabs,
+      active: s.active,
+      revision: s.revision,
+      conflict: s.conflict,
+    })),
+  );
+  const { setActive, save, reload, closeTab } = useWorkspaceStore.getState();
 
   const [confirmDiscard, setConfirmDiscard] = useState<string | null>(null);
   const editorContainerRef = useRef<HTMLDivElement>(null);
@@ -90,16 +90,21 @@ export function EditorPane() {
                 key={tab.path}
                 className={`flex items-center gap-1.5 px-3 py-1.5 border-r border-neutral-800 text-xs font-mono cursor-pointer transition-colors ${
                   isActive
-                    ? "bg-neutral-950 text-neutral-100 border-b-2 border-b-blue-500"
+                    ? "bg-neutral-950 text-neutral-100 border-b-2 border-b-accent"
                     : "bg-neutral-900/40 text-neutral-400 hover:bg-neutral-800/60 hover:text-neutral-200"
                 }`}
+                title={tab.path}
                 onClick={() => setActive(tab.path)}
+                // The middle button closes a tab, as in a browser.
+                onAuxClick={(e) => {
+                  if (e.button === 1) handleClose(tab.path, tab.dirty);
+                }}
               >
                 <span>{tab.name}</span>
                 {tab.dirty && (
                   <span
                     data-testid={`dirty-dot-${tab.path}`}
-                    className="w-1.5 h-1.5 rounded-full bg-blue-400"
+                    className="w-1.5 h-1.5 rounded-full bg-accent"
                   />
                 )}
                 <button

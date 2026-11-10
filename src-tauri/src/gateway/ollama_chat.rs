@@ -129,13 +129,13 @@ impl ModelProvider for OllamaChat {
             body["keep_alive"] = json!(keep_alive);
         }
 
-        let resp = self
-            .client
-            .post(&url)
-            .json(&body)
-            .send()
-            .await
-            .map_err(map_reqwest_error)?;
+        // Ollama answers only once the model is loaded, which can take a
+        // minute: Stop must end the wait too, not just the stream after it.
+        let send = self.client.post(&url).json(&body).send();
+        let resp = match cancel.run_until_cancelled(send).await {
+            Some(sent) => sent.map_err(map_reqwest_error)?,
+            None => return Err(ProviderError::Cancelled),
+        };
 
         let status = resp.status();
         if !status.is_success() {

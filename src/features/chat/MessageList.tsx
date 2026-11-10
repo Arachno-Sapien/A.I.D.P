@@ -1,5 +1,5 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { memo, useEffect, useRef, type ReactNode } from "react";
+import { memo, useEffect, useRef, type ReactNode, type UIEvent } from "react";
 import { observeRectOrInitial } from "../../lib/virtual";
 import { appErrorText } from "./appErrorText";
 import { AttachmentChip } from "./AttachmentChip";
@@ -37,12 +37,31 @@ export function MessageList({
     observeElementRect: observeRectOrInitial,
   });
 
-  // Follow the end of the conversation as messages arrive and replies grow.
+  // Follow the end of the conversation as messages arrive and replies grow,
+  // unless the reader scrolled up: then a growing reply leaves the view alone
+  // until they come back to the end. A new message or another chat follows again.
+  const following = useRef(true);
+  const lastTop = useRef(0);
+  const shown = useRef<{ count: number; first?: string }>({ count: 0 });
   useEffect(() => {
-    if (messages.length > 0) {
+    const first = messages[0]?.id;
+    if (messages.length !== shown.current.count || first !== shown.current.first) {
+      following.current = true;
+    }
+    shown.current = { count: messages.length, first };
+    if (messages.length > 0 && following.current) {
       virtualizer.scrollToIndex(messages.length - 1, { align: "end" });
     }
   }, [messages, virtualizer]);
+  const onScroll = (e: UIEvent<HTMLDivElement>) => {
+    const box = e.currentTarget;
+    // Following only ever moves down, so a move up is the reader's.
+    if (box.scrollTop < lastTop.current) following.current = false;
+    if (box.scrollHeight - box.scrollTop - box.clientHeight < END_SLACK) {
+      following.current = true;
+    }
+    lastTop.current = box.scrollTop;
+  };
 
   if (messages.length === 0) {
     return (
@@ -53,7 +72,7 @@ export function MessageList({
   }
 
   return (
-    <div ref={scrollRef} className="flex-1 overflow-y-auto">
+    <div ref={scrollRef} onScroll={onScroll} className="flex-1 overflow-y-auto">
       <div
         className="relative w-full"
         style={{ height: `${virtualizer.getTotalSize()}px` }}
@@ -80,6 +99,8 @@ export function MessageList({
 
 /** A first guess at a message's height; each row is measured once it renders. */
 const ESTIMATED_HEIGHT = 120;
+/** This close to the bottom still counts as reading the end. */
+const END_SLACK = 80;
 
 interface MessageItemProps {
   msg: UiMessage;
@@ -105,7 +126,7 @@ const MessageItem = memo(function MessageItem({
           }`}
         >
           <div
-            className={`max-w-[85%] rounded-xl px-4 py-3 text-sm ${
+            className={`min-w-0 max-w-[85%] break-words rounded-xl px-4 py-3 text-sm ${
               msg.role === "user"
                 ? "app-raised bg-accent/15 border border-accent/30 text-neutral-100 whitespace-pre-wrap"
                 : "app-raised bg-neutral-900 border border-neutral-800 text-neutral-100"

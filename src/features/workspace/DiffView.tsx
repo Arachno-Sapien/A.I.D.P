@@ -1,16 +1,14 @@
 import { useEffect, useRef } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { loadLanguage, mountDiff } from "./cm";
 import { useSettingsStore } from "../settings/store";
 import { useWorkspaceStore } from "./store";
 
 export function DiffView() {
-  const {
-    proposal,
-    needsGitConfirm,
-    acceptProposal,
-    rejectProposal,
-    confirmGit,
-  } = useWorkspaceStore();
+  const { proposal, needsGitConfirm } = useWorkspaceStore(
+    useShallow((s) => ({ proposal: s.proposal, needsGitConfirm: s.needsGitConfirm })),
+  );
+  const { acceptProposal, rejectProposal, confirmGit } = useWorkspaceStore.getState();
   const resolved = useSettingsStore((s) => s.resolved);
   const editorRef = useRef<HTMLDivElement>(null);
 

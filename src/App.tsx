@@ -17,10 +17,16 @@ import { useWorkspaceStore } from "./features/workspace/store";
 import appIcon from "../src-tauri/icons/128x128.png";
 import "./App.css";
 
+const SCREENS = [
+  { id: "chat", label: "Chat", Icon: MessageSquare },
+  { id: "workspace", label: "Workspace", Icon: FolderCode },
+  { id: "models", label: "Models", Icon: Boxes },
+  { id: "settings", label: "Settings", Icon: Settings },
+] as const;
+type Screen = (typeof SCREENS)[number]["id"];
+
 function App() {
-  const [screen, setScreen] = useState<
-    "chat" | "workspace" | "models" | "settings"
-  >("chat");
+  const [screen, setScreen] = useState<Screen>("chat");
   const [hasVisitedWorkspace, setHasVisitedWorkspace] = useState(false);
   const screenRef = useRef(screen);
   useEffect(() => {
@@ -29,8 +35,14 @@ function App() {
   const [startAdding, setStartAdding] = useState(false);
   const [quitPrompt, setQuitPrompt] = useState(false);
 
-  const { tabs, dirtyPrompt, saveAll, discardAndProceed, cancelPrompt } =
-    useWorkspaceStore();
+  // Only what the two dialogs need: the workspace store changes on every
+  // move of the editor's cursor, and the whole app would render with it.
+  const dirtyCount = useWorkspaceStore(
+    (s) => s.tabs.filter((t) => t.dirty).length,
+  );
+  const dirtyPrompt = useWorkspaceStore((s) => s.dirtyPrompt);
+  const { saveAll, discardAndProceed, cancelPrompt } =
+    useWorkspaceStore.getState();
 
   useEffect(() => {
     void useModelsStore.getState().refreshOllama();
@@ -72,9 +84,7 @@ function App() {
     };
   }, []);
 
-  const handleSelectScreen = (
-    next: "chat" | "workspace" | "models" | "settings",
-  ) => {
+  const handleSelectScreen = (next: Screen) => {
     if (next === "workspace") {
       setHasVisitedWorkspace(true);
     }
@@ -93,58 +103,22 @@ function App() {
           draggable={false}
         />
         <nav className="flex items-center gap-1 bg-neutral-950 p-1 border border-neutral-800 rounded-lg">
-          <button
-            type="button"
-            aria-current={screen === "chat" ? "page" : undefined}
-            onClick={() => handleSelectScreen("chat")}
-            className={`flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer focus-visible:ring-1 focus-visible:ring-neutral-400 focus-visible:outline-none ${
-              screen === "chat"
-                ? "app-accent bg-accent/20 text-neutral-50"
-                : "text-neutral-400 hover:text-neutral-200"
-            }`}
-          >
-            <MessageSquare size={16} aria-hidden="true" />
-            <span>Chat</span>
-          </button>
-          <button
-            type="button"
-            aria-current={screen === "workspace" ? "page" : undefined}
-            onClick={() => handleSelectScreen("workspace")}
-            className={`flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer focus-visible:ring-1 focus-visible:ring-neutral-400 focus-visible:outline-none ${
-              screen === "workspace"
-                ? "app-accent bg-accent/20 text-neutral-50"
-                : "text-neutral-400 hover:text-neutral-200"
-            }`}
-          >
-            <FolderCode size={16} aria-hidden="true" />
-            <span>Workspace</span>
-          </button>
-          <button
-            type="button"
-            aria-current={screen === "models" ? "page" : undefined}
-            onClick={() => handleSelectScreen("models")}
-            className={`flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer focus-visible:ring-1 focus-visible:ring-neutral-400 focus-visible:outline-none ${
-              screen === "models"
-                ? "app-accent bg-accent/20 text-neutral-50"
-                : "text-neutral-400 hover:text-neutral-200"
-            }`}
-          >
-            <Boxes size={16} aria-hidden="true" />
-            <span>Models</span>
-          </button>
-          <button
-            type="button"
-            aria-current={screen === "settings" ? "page" : undefined}
-            onClick={() => handleSelectScreen("settings")}
-            className={`flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer focus-visible:ring-1 focus-visible:ring-neutral-400 focus-visible:outline-none ${
-              screen === "settings"
-                ? "app-accent bg-accent/20 text-neutral-50"
-                : "text-neutral-400 hover:text-neutral-200"
-            }`}
-          >
-            <Settings size={16} aria-hidden="true" />
-            <span>Settings</span>
-          </button>
+          {SCREENS.map(({ id, label, Icon }) => (
+            <button
+              key={id}
+              type="button"
+              aria-current={screen === id ? "page" : undefined}
+              onClick={() => handleSelectScreen(id)}
+              className={`flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer focus-visible:ring-1 focus-visible:ring-neutral-400 focus-visible:outline-none ${
+                screen === id
+                  ? "app-accent bg-accent/20 text-neutral-50"
+                  : "text-neutral-400 hover:text-neutral-200"
+              }`}
+            >
+              <Icon size={16} aria-hidden="true" />
+              <span>{label}</span>
+            </button>
+          ))}
         </nav>
       </header>
       <UpdateBar />
@@ -181,7 +155,7 @@ function App() {
 
       {quitPrompt && (
         <UnsavedChangesDialog
-          count={tabs.filter((t) => t.dirty).length}
+          count={dirtyCount}
           discardLabel="Discard and quit"
           onCancel={() => setQuitPrompt(false)}
           onDiscard={() => void commands.quitApp()}
@@ -199,7 +173,7 @@ function App() {
       {/* Leaving or switching the folder */}
       {dirtyPrompt && (
         <UnsavedChangesDialog
-          count={tabs.filter((t) => t.dirty).length}
+          count={dirtyCount}
           discardLabel="Discard"
           onCancel={cancelPrompt}
           onDiscard={() => void discardAndProceed()}

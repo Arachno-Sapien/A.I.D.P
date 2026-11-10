@@ -566,3 +566,36 @@ async fn cut_off_tool_call() {
         other => panic!("expected cut off error, got {:?}", other),
     }
 }
+
+#[tokio::test]
+async fn stop_works_while_the_model_loads() {
+    // Ollama answers only once the model is in memory, which can take a minute.
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/api/chat"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_string(ndjson(&[r#"{"done":true}"#]))
+                .set_delay(std::time::Duration::from_secs(30)),
+        )
+        .mount(&server)
+        .await;
+
+    let adapter = OllamaChat::new(reqwest::Client::new(), server.uri());
+    let (ch, _) = capture();
+    let cancel = CancellationToken::new();
+    let stopper = cancel.clone();
+    tokio::spawn(async move {
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        stopper.cancel();
+    });
+
+    let err = tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        adapter.stream_chat(base_req(), ch, cancel),
+    )
+    .await
+    .expect("Stop must not wait for the model")
+    .expect_err("stopped");
+    assert_eq!(err, ProviderError::Cancelled);
+}

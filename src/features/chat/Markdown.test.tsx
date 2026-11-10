@@ -37,6 +37,20 @@ describe("Markdown", () => {
     expect(img?.getAttribute("src") ?? "").not.toMatch(/^data:/);
   });
 
+  it("a finished code block is not highlighted again as the reply grows", () => {
+    // Each streamed chunk renders the reply again, with a new onApply.
+    const block = "```ts\nconst a = 1;\n```\n\n";
+    const view = render(<Markdown text={`${block}Now`} onApply={() => {}} />);
+    const before = view.container.querySelector("pre");
+    vi.mocked(Highlight).mockClear();
+
+    view.rerender(<Markdown text={`${block}Now the rest`} onApply={() => {}} />);
+
+    expect(Highlight).not.toHaveBeenCalled();
+    expect(view.container.querySelector("pre")).toBe(before);
+    view.unmount();
+  });
+
   it("copies a code block's exact text", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", {

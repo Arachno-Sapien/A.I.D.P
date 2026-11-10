@@ -41,6 +41,24 @@ function attachmentRefs(list?: MessageAttachment[]) {
     : {};
 }
 
+/** A streamed chunk joins the last text part, or starts one after a tool step. */
+function withText(parts: MessagePart[] | undefined, text: string) {
+  if (!parts) return parts;
+  const last = parts[parts.length - 1];
+  return last?.kind === "text"
+    ? [...parts.slice(0, -1), { kind: "text" as const, text: last.text + text }]
+    : [...parts, { kind: "text" as const, text }];
+}
+
+/** Steps still running when the reply ends are shown as stopped. */
+function withStepsStopped(parts: MessagePart[] | undefined) {
+  return parts?.map((p) =>
+    p.kind === "step" && !p.step.outcome
+      ? { kind: "step" as const, step: { ...p.step, outcome: { status: "stopped" as const } } }
+      : p,
+  );
+}
+
 export interface ApplyTarget {
   path: string;
   selection: string | null;
@@ -128,6 +146,9 @@ export const createChatStore = (surface: ChatSurface, hooks?: ChatHooks) => {
     string,
     { message: UiMessage; convId: number | null }
   >();
+  // True from Send until the reply starts streaming: a second Send in between
+  // (Enter twice, with only attachments to send) would post the message twice.
+  let sending = false;
 
   return create<ChatStore>((set, get) => ({
     messages: [],
@@ -252,7 +273,9 @@ export const createChatStore = (surface: ChatSurface, hooks?: ChatHooks) => {
     },
 
     remove: async (id: number) => {
-      await commands.deleteConversation(id);
+      // The list changes only once the database has.
+      const res = await commands.deleteConversation(id);
+      if (res.status !== "ok") return;
       const remaining = get().conversations.filter((c) => c.id !== id);
       set({ conversations: remaining });
       if (get().conversationId === id) {
@@ -272,7 +295,7 @@ export const createChatStore = (surface: ChatSurface, hooks?: ChatHooks) => {
     ) => {
       const trimmed = text.trim();
       const pending = get().pending;
-      if ((!trimmed && pending.length === 0) || get().streaming) {
+      if ((!trimmed && pending.length === 0) || get().streaming || sending) {
         return;
       }
 
@@ -290,102 +313,106 @@ export const createChatStore = (surface: ChatSurface, hooks?: ChatHooks) => {
       }
 
       const isAgent = Boolean(extra?.agent);
-
-      let activeConvId = get().conversationId;
-      if (activeConvId === null) {
-        const createRes = await commands.createConversation(
-          trimmed || pending[0].name,
-          get().place,
-        );
-        if (createRes.status === "ok") {
-          activeConvId = createRes.data.id;
-          set((state) => ({
-            conversationId: activeConvId,
-            conversations: [createRes.data, ...state.conversations],
-          }));
-        } else {
-          set({ saveError: "Couldn't save this message." });
-        }
-      }
-
       const modelRef = `${model.connectionId}:${model.modelId}`;
       const modelName =
         knownModel?.displayName || knownModel?.modelId || model.modelId;
-
-      const userMessage: UiMessage = {
-        id: crypto.randomUUID(),
-        role: "user",
-        text: trimmed,
-        content: extra?.content,
-        chips: extra?.chips,
-        attachments: pending.length > 0 ? pending : undefined,
-        status: "complete",
-      };
-
-      if (activeConvId !== null) {
-        const appendRes = await commands.appendMessage(activeConvId, {
-          role: "user",
-          contentParts: toStored(userMessage),
-          modelRef: null,
-          modelName: null,
-          status: "complete",
-          errorKind: null,
-          tokensIn: null,
-          tokensOut: null,
-        });
-        if (appendRes.status === "error") {
-          set({ saveError: "Couldn't save this message." });
-        }
-      }
-
       const assistantId = crypto.randomUUID();
-      const assistantPlaceholder: UiMessage = {
-        id: assistantId,
-        role: "assistant",
-        text: "",
-        target: extra?.target,
-        parts: isAgent ? [] : undefined,
-        status: "streaming",
-        modelRef,
-        modelName,
-      };
-
       const history: ChatInput_Deserialize[] = [];
-      if (extra?.system && !isAgent) {
-        history.push({ role: "system", content: extra.system });
-      }
-      for (const m of get().messages) {
-        if (
-          (m.status === "complete" || m.status === "stopped") &&
-          (m.text.trim() !== "" || (m.attachments?.length ?? 0) > 0)
-        ) {
-          history.push({
-            role: m.role,
-            content: m.content ?? m.text,
-            ...attachmentRefs(m.attachments),
-          });
+      let activeConvId = get().conversationId;
+
+      sending = true;
+      try {
+        if (activeConvId === null) {
+          const createRes = await commands.createConversation(
+            trimmed || pending[0].name,
+            get().place,
+          );
+          if (createRes.status === "ok") {
+            activeConvId = createRes.data.id;
+            set((state) => ({
+              conversationId: activeConvId,
+              conversations: [createRes.data, ...state.conversations],
+            }));
+          } else {
+            set({ saveError: "Couldn't save this message." });
+          }
         }
+
+        const userMessage: UiMessage = {
+          id: crypto.randomUUID(),
+          role: "user",
+          text: trimmed,
+          content: extra?.content,
+          chips: extra?.chips,
+          attachments: pending.length > 0 ? pending : undefined,
+          status: "complete",
+        };
+
+        if (activeConvId !== null) {
+          const appendRes = await commands.appendMessage(activeConvId, {
+            role: "user",
+            contentParts: toStored(userMessage),
+            modelRef: null,
+            modelName: null,
+            status: "complete",
+            errorKind: null,
+            tokensIn: null,
+            tokensOut: null,
+          });
+          if (appendRes.status === "error") {
+            set({ saveError: "Couldn't save this message." });
+          }
+        }
+
+        const assistantPlaceholder: UiMessage = {
+          id: assistantId,
+          role: "assistant",
+          text: "",
+          target: extra?.target,
+          parts: isAgent ? [] : undefined,
+          status: "streaming",
+          modelRef,
+          modelName,
+        };
+
+        if (extra?.system && !isAgent) {
+          history.push({ role: "system", content: extra.system });
+        }
+        for (const m of get().messages) {
+          if (
+            (m.status === "complete" || m.status === "stopped") &&
+            (m.text.trim() !== "" || (m.attachments?.length ?? 0) > 0)
+          ) {
+            history.push({
+              role: m.role,
+              content: m.content ?? m.text,
+              ...attachmentRefs(m.attachments),
+            });
+          }
+        }
+        history.push({
+          role: "user",
+          content: extra?.content ?? trimmed,
+          ...attachmentRefs(pending),
+        });
+
+        inFlightReplies.set(assistantId, {
+          message: assistantPlaceholder,
+          convId: activeConvId,
+        });
+
+        set((state) => ({
+          conversations: state.conversations.map((c) =>
+            c.id === activeConvId ? { ...c, archived: false } : c,
+          ),
+          messages: [...state.messages, userMessage, assistantPlaceholder],
+          streaming: true,
+          pending: [],
+          attachNotice: null,
+        }));
+      } finally {
+        sending = false;
       }
-      history.push({
-        role: "user",
-        content: extra?.content ?? trimmed,
-        ...attachmentRefs(pending),
-      });
-
-      inFlightReplies.set(assistantId, {
-        message: assistantPlaceholder,
-        convId: activeConvId,
-      });
-
-      set((state) => ({
-        conversations: state.conversations.map((c) =>
-          c.id === activeConvId ? { ...c, archived: false } : c,
-        ),
-        messages: [...state.messages, userMessage, assistantPlaceholder],
-        streaming: true,
-        pending: [],
-        attachNotice: null,
-      }));
 
       const channel = new Channel<ChatEvent_Deserialize>();
       channel.onmessage = (ev: ChatEvent_Deserialize) => {
@@ -421,49 +448,20 @@ export const createChatStore = (surface: ChatSurface, hooks?: ChatHooks) => {
 
     applyEvent: (id: string, ev: ChatEvent, convId?: number | null) => {
       const inFlight = inFlightReplies.get(id);
+      // The same change goes to the message on screen and to the copy kept
+      // for saving a reply whose chat is no longer the one open.
+      const change = (fn: (m: UiMessage) => UiMessage) => {
+        if (inFlight) inFlight.message = fn(inFlight.message);
+        set((state) => ({
+          messages: state.messages.map((m) => (m.id === id ? fn(m) : m)),
+        }));
+      };
 
       if (ev.event === "delta") {
-        if (inFlight) {
-          let parts = inFlight.message.parts;
-          if (parts) {
-            const last = parts[parts.length - 1];
-            if (last && last.kind === "text") {
-              parts = [
-                ...parts.slice(0, -1),
-                { kind: "text", text: last.text + ev.data },
-              ];
-            } else {
-              parts = [...parts, { kind: "text", text: ev.data }];
-            }
-          }
-          inFlight.message = {
-            ...inFlight.message,
-            text: inFlight.message.text + ev.data,
-            parts,
-          };
-        }
-
-        set((state) => ({
-          messages: state.messages.map((m) => {
-            if (m.id !== id) return m;
-            let parts = m.parts;
-            if (parts) {
-              const last = parts[parts.length - 1];
-              if (last && last.kind === "text") {
-                parts = [
-                  ...parts.slice(0, -1),
-                  { kind: "text", text: last.text + ev.data },
-                ];
-              } else {
-                parts = [...parts, { kind: "text", text: ev.data }];
-              }
-            }
-            return {
-              ...m,
-              text: m.text + ev.data,
-              parts,
-            };
-          }),
+        change((m) => ({
+          ...m,
+          text: m.text + ev.data,
+          parts: withText(m.parts, ev.data),
         }));
       } else if (ev.event === "toolCall") {
         const step: ToolStep = {
@@ -471,162 +469,65 @@ export const createChatStore = (surface: ChatSurface, hooks?: ChatHooks) => {
           action: ev.data.action,
           needsAnswer: ev.data.needsAnswer,
         };
-        if (inFlight) {
-          const parts = inFlight.message.parts
-            ? [...inFlight.message.parts, { kind: "step" as const, step }]
-            : inFlight.message.parts;
-          inFlight.message = { ...inFlight.message, parts };
-        }
-        set((state) => ({
-          messages: state.messages.map((m) => {
-            if (m.id !== id) return m;
-            const parts = m.parts ? [...m.parts, { kind: "step" as const, step }] : m.parts;
-            return { ...m, parts };
-          }),
-        }));
+        change((m) =>
+          m.parts ? { ...m, parts: [...m.parts, { kind: "step", step }] } : m,
+        );
         hooks?.onToolCall?.(step);
       } else if (ev.event === "toolResult") {
         let updatedStep: ToolStep | undefined;
-        if (inFlight && inFlight.message.parts) {
-          const parts = inFlight.message.parts.map((p) => {
-            if (p.kind === "step" && p.step.id === ev.data.id) {
-              updatedStep = { ...p.step, outcome: ev.data.outcome };
-              return { kind: "step" as const, step: updatedStep };
-            }
-            return p;
-          });
-          inFlight.message = { ...inFlight.message, parts };
-        }
-        set((state) => ({
-          messages: state.messages.map((m) => {
-            if (m.id !== id || !m.parts) return m;
-            const parts = m.parts.map((p) => {
-              if (p.kind === "step" && p.step.id === ev.data.id) {
-                updatedStep = { ...p.step, outcome: ev.data.outcome };
-                return { kind: "step" as const, step: updatedStep };
+        change((m) =>
+          m.parts
+            ? {
+                ...m,
+                parts: m.parts.map((p) => {
+                  if (p.kind !== "step" || p.step.id !== ev.data.id) return p;
+                  updatedStep = { ...p.step, outcome: ev.data.outcome };
+                  return { kind: "step" as const, step: updatedStep };
+                }),
               }
-              return p;
-            });
-            return { ...m, parts };
-          }),
-        }));
+            : m,
+        );
         if (updatedStep) {
           hooks?.onToolResult?.(updatedStep);
         }
-      } else if (ev.event === "done") {
+      } else {
+        // The reply is over: finished, stopped by the user, or failed.
         inFlightReplies.delete(id);
         const targetConvId =
           inFlight?.convId ??
           (convId !== undefined ? convId : get().conversationId);
 
-        let completedMsg: UiMessage | undefined;
-        set((state) => ({
-          messages: state.messages.map((m) => {
-            if (m.id !== id) return m;
-            const parts = m.parts?.map((p) => {
-              if (p.kind === "step" && !p.step.outcome) {
-                return {
-                  kind: "step" as const,
-                  step: { ...p.step, outcome: { status: "stopped" as const } },
-                };
-              }
-              return p;
-            });
-            completedMsg = { ...m, status: "complete", parts };
-            return completedMsg;
-          }),
-          streaming: false,
-        }));
-
-        if (!completedMsg && inFlight) {
-          completedMsg = {
-            ...inFlight.message,
-            status: "complete",
-            parts: inFlight.message.parts?.map((p) => {
-              if (p.kind === "step" && !p.step.outcome) {
-                return {
-                  kind: "step" as const,
-                  step: { ...p.step, outcome: { status: "stopped" as const } },
-                };
-              }
-              return p;
-            }),
-          };
-        }
-
-        if (targetConvId !== null && completedMsg) {
-          const usage = (ev.data as any)?.usage ?? ev.data;
-          const msgToSave = completedMsg;
-          void commands
-            .appendMessage(targetConvId, {
-              role: "assistant",
-              contentParts: toStored(msgToSave),
-              modelRef: msgToSave.modelRef ?? null,
-              modelName: msgToSave.modelName ?? null,
-              status: "complete",
-              errorKind: null,
-              tokensIn: usage?.tokensIn ?? null,
-              tokensOut: usage?.tokensOut ?? null,
-            })
-            .then((res) => {
-              if (res.status === "error") {
-                set({ saveError: "Couldn't save this message." });
-              }
-            });
-        }
-      } else if (ev.event === "error") {
-        inFlightReplies.delete(id);
-        const targetConvId =
-          inFlight?.convId ??
-          (convId !== undefined ? convId : get().conversationId);
-
-        const isCancelled = ev.data.kind === "cancelled";
-        const status: MessageStatus = isCancelled ? "stopped" : "error";
-        const errorKind = isCancelled ? null : ev.data.kind;
+        const failed = ev.event === "error" ? ev.data : undefined;
+        const isCancelled = failed?.kind === "cancelled";
+        const status: MessageStatus = !failed
+          ? "complete"
+          : isCancelled
+            ? "stopped"
+            : "error";
+        const end = (m: UiMessage): UiMessage => ({
+          ...m,
+          status,
+          ...(failed ? { error: isCancelled ? undefined : failed } : {}),
+          parts: withStepsStopped(m.parts),
+        });
 
         let endedMsg: UiMessage | undefined;
         set((state) => ({
           messages: state.messages.map((m) => {
             if (m.id !== id) return m;
-            const parts = m.parts?.map((p) => {
-              if (p.kind === "step" && !p.step.outcome) {
-                return {
-                  kind: "step" as const,
-                  step: { ...p.step, outcome: { status: "stopped" as const } },
-                };
-              }
-              return p;
-            });
-            endedMsg = {
-              ...m,
-              status,
-              error: isCancelled ? undefined : ev.data,
-              parts,
-            };
+            endedMsg = end(m);
             return endedMsg;
           }),
           streaming: false,
         }));
-
         if (!endedMsg && inFlight) {
-          endedMsg = {
-            ...inFlight.message,
-            status,
-            error: isCancelled ? undefined : ev.data,
-            parts: inFlight.message.parts?.map((p) => {
-              if (p.kind === "step" && !p.step.outcome) {
-                return {
-                  kind: "step" as const,
-                  step: { ...p.step, outcome: { status: "stopped" as const } },
-                };
-              }
-              return p;
-            }),
-          };
+          endedMsg = end(inFlight.message);
         }
 
         if (targetConvId !== null && endedMsg) {
-          const msgToSave = endedMsg;
+          const usage =
+            ev.event === "done" ? ((ev.data as any)?.usage ?? ev.data) : null;
+          const msgToSave: UiMessage = endedMsg;
           void commands
             .appendMessage(targetConvId, {
               role: "assistant",
@@ -634,9 +535,9 @@ export const createChatStore = (surface: ChatSurface, hooks?: ChatHooks) => {
               modelRef: msgToSave.modelRef ?? null,
               modelName: msgToSave.modelName ?? null,
               status,
-              errorKind,
-              tokensIn: null,
-              tokensOut: null,
+              errorKind: failed && !isCancelled ? failed.kind : null,
+              tokensIn: usage?.tokensIn ?? null,
+              tokensOut: usage?.tokensOut ?? null,
             })
             .then((res) => {
               if (res.status === "error") {

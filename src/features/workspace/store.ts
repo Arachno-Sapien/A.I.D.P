@@ -151,6 +151,10 @@ async function editorState(path: string, text: string, filename: string) {
   });
 }
 
+// Saves of one file run one after another: each needs the version the one
+// before it wrote, or it looks like a change on disk.
+const saves = new Map<string, Promise<void>>();
+
 const folderReset = {
   children: {},
   expanded: {},
@@ -290,14 +294,15 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
 
   refreshTree: async () => {
     const paths = ["", ...Object.keys(get().expanded)];
-    const nextChildren = { ...get().children };
-    for (const folder of paths) {
-      const res = await commands.listDir(folder);
-      if (res.status === "ok") {
-        nextChildren[folder] = res.data;
-      }
-    }
-    set({ children: nextChildren });
+    const listed = await Promise.all(paths.map((folder) => commands.listDir(folder)));
+    // Merged into what is there now: a folder opened meanwhile keeps its listing.
+    set((state) => {
+      const children = { ...state.children };
+      listed.forEach((res, i) => {
+        if (res.status === "ok") children[paths[i]!] = res.data;
+      });
+      return { children };
+    });
   },
 
   create: async (kind, path) => {
@@ -379,7 +384,13 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       // The tab and its buffer use the path that was asked for. Rust may answer
       // with the link target's path, and two keys for one tab lose its text.
       const filename = path.split("/").pop() || path;
-      buffers.open(path, await editorState(path, file.text, filename));
+      const state = await editorState(path, file.text, filename);
+      // A second open of the same file (a double-click) may have finished first.
+      if (get().tabs.some((t) => t.path === path)) {
+        set({ active: path });
+        return;
+      }
+      buffers.open(path, state);
 
       const tab: Tab = {
         path,
@@ -424,49 +435,16 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   },
 
   save: async (path: string, options?: { overwrite?: boolean }) => {
-    const tab = get().tabs.find((t) => t.path === path);
-    if (!tab) return;
-
-    const state = buffers.get(path);
-    if (!state) {
-      set({
-        error: `The text of ${tab.name} is not loaded, so nothing was written. Copy your changes, then reopen the file.`,
-      });
-      return;
-    }
-    const written = state.doc;
-    const expectedVersion = options?.overwrite ? null : tab.version;
-
-    const res = await commands.writeFile({
-      path,
-      text: written.toString(),
-      lineEnding: tab.lineEnding,
-      hasBom: tab.hasBom,
-      expectedVersion,
-    });
-
-    if (res.status === "ok") {
-      const newVersion = res.data;
-      buffers.markSaved(path, written);
-      // Still dirty if the user typed while the file was being written.
-      const dirty = buffers.isDirty(path);
-      const nextTabs = get().tabs.map((t) =>
-        t.path === path ? { ...t, version: newVersion, dirty } : t,
-      );
-      set((s) => ({
-        tabs: nextTabs,
-        conflict: s.conflict?.path === path ? null : s.conflict,
-        error: null,
-      }));
-      syncUnsaved(nextTabs);
-    } else {
-      if (res.error.kind === "changedOnDisk") {
-        set({ conflict: { path, kind: "changedOnDisk" } });
-      } else if (res.error.kind === "notFound") {
-        set({ conflict: { path, kind: "deleted" } });
-      } else {
-        set({ error: workspaceErrorText(res.error) });
-      }
+    const earlier = saves.get(path);
+    // With nothing ahead of it, the text is read now, not a tick later.
+    const run = earlier
+      ? earlier.catch(() => undefined).then(() => writeTab(path, options))
+      : writeTab(path, options);
+    saves.set(path, run);
+    try {
+      await run;
+    } finally {
+      if (saves.get(path) === run) saves.delete(path);
     }
   },
 
@@ -688,3 +666,52 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
     set({ dirtyPrompt: null });
   },
 }));
+
+/** Writes a tab's text to its file; `save` runs these one at a time per file. */
+async function writeTab(path: string, options?: { overwrite?: boolean }) {
+  const { getState: get, setState: set } = useWorkspaceStore;
+  const tab = get().tabs.find((t) => t.path === path);
+  if (!tab) return;
+
+  const state = buffers.get(path);
+  if (!state) {
+    set({
+      error: `The text of ${tab.name} is not loaded, so nothing was written. Copy your changes, then reopen the file.`,
+    });
+    return;
+  }
+  const written = state.doc;
+  const expectedVersion = options?.overwrite ? null : tab.version;
+
+  const res = await commands.writeFile({
+    path,
+    text: written.toString(),
+    lineEnding: tab.lineEnding,
+    hasBom: tab.hasBom,
+    expectedVersion,
+  });
+
+  if (res.status === "ok") {
+    const newVersion = res.data;
+    buffers.markSaved(path, written);
+    // Still dirty if the user typed while the file was being written.
+    const dirty = buffers.isDirty(path);
+    const nextTabs = get().tabs.map((t) =>
+      t.path === path ? { ...t, version: newVersion, dirty } : t,
+    );
+    set((s) => ({
+      tabs: nextTabs,
+      conflict: s.conflict?.path === path ? null : s.conflict,
+      error: null,
+    }));
+    syncUnsaved(nextTabs);
+  } else {
+    if (res.error.kind === "changedOnDisk") {
+      set({ conflict: { path, kind: "changedOnDisk" } });
+    } else if (res.error.kind === "notFound") {
+      set({ conflict: { path, kind: "deleted" } });
+    } else {
+      set({ error: workspaceErrorText(res.error) });
+    }
+  }
+}

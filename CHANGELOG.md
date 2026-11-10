@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Stop** now works while Ollama is still loading a local model into memory. Before, it did nothing until the first word arrived.
+- A chat no longer pulls you back to the bottom while a reply is being written. Scroll up to read and it stays there; scroll back to the end (or send a message) and it follows again.
+- Double-clicking a file in the workspace tree no longer opens it in two tabs.
+- Saving twice in quick succession (holding `Ctrl+S`) no longer reports "This file changed on disk".
+- A chat that couldn't be deleted stays in the list instead of vanishing until the next start.
+- Sending a message that has only attachments can no longer post it twice.
+- A wide table in a reply scrolls inside its message, and a long unbroken word or link wraps, instead of running past the edge.
+- **Copy** on a code block no longer says "Copied" when the clipboard refused.
+
+### Changed
+- The message box grows as you type, up to a few lines.
+- Scrollbars are thin and in the theme's colours.
+- The open editor tab and its unsaved dot use the theme's accent colour; the middle mouse button closes a tab, and hovering one shows its path.
+- Faster while a reply streams and while you edit: finished code blocks in a reply are no longer highlighted again on every word, and moving the editor's cursor no longer redraws the whole window.
+
 ## [0.1.0-rc.5] - 2026-11-09
 
 ### Added

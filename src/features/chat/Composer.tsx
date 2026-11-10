@@ -109,7 +109,7 @@ export function Composer({
               disabled={disabled}
               placeholder={placeholder}
               rows={1}
-              className="flex-1 bg-transparent resize-none px-2 py-1 text-sm text-neutral-100 placeholder-neutral-500 focus:outline-none max-h-32 min-h-[38px] disabled:opacity-50 disabled:cursor-not-allowed"
+              className="field-sizing-content flex-1 bg-transparent resize-none px-2 py-1 text-sm text-neutral-100 placeholder-neutral-500 focus:outline-none max-h-32 min-h-[38px] disabled:opacity-50 disabled:cursor-not-allowed"
             />
             {streaming ? (
               <button

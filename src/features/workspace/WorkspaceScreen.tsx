@@ -1,5 +1,6 @@
 import React, { Suspense, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useShallow } from "zustand/react/shallow";
 import { FolderX, MessagesSquare, PanelLeft, RotateCw, SquareTerminal } from "lucide-react";
 import type { DirEntry } from "../../lib/bindings";
 import { AiPanel } from "./AiPanel";
@@ -50,13 +51,19 @@ export interface WorkspaceScreenProps {
 }
 
 export function WorkspaceScreen({ active = true }: WorkspaceScreenProps) {
+  // Not the whole store: it also holds the editor's selection, which changes
+  // on every move of the cursor and would flatten the file tree again each time.
+  const { info, recent, children, expanded, error, proposal } = useWorkspaceStore(
+    useShallow((s) => ({
+      info: s.info,
+      recent: s.recent,
+      children: s.children,
+      expanded: s.expanded,
+      error: s.error,
+      proposal: s.proposal,
+    })),
+  );
   const {
-    info,
-    recent,
-    children,
-    expanded,
-    error,
-    proposal,
     loadRecent,
     openFolder,
     openRecent,
@@ -69,7 +76,7 @@ export function WorkspaceScreen({ active = true }: WorkspaceScreenProps) {
     blocked,
     clearError,
     openFile,
-  } = useWorkspaceStore();
+  } = useWorkspaceStore.getState();
 
   // Where New file and New folder start: the folder last clicked, or the folder
   // of the file last opened. Another workspace starts at its top, so a path

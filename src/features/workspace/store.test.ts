@@ -214,6 +214,38 @@ describe("useWorkspaceStore", () => {
     expect(useWorkspaceStore.getState().active).toBe("a.ts");
   });
 
+  it("opening the same file twice at once makes one tab", async () => {
+    // A double-click sends two opens before the first read comes back.
+    vi.mocked(commands.readFile).mockResolvedValue({
+      status: "ok",
+      data: { path: "a.ts", text: "x", version: "v1", lineEnding: "lf", hasBom: false, isSecret: false },
+    });
+    const store = useWorkspaceStore.getState();
+    await Promise.all([store.openFile("a.ts"), store.openFile("a.ts")]);
+
+    expect(useWorkspaceStore.getState().tabs.map((t) => t.path)).toEqual(["a.ts"]);
+  });
+
+  it("a second save waits for the first, so it isn't taken for a change on disk", async () => {
+    // Ctrl+S held down: each save must carry the version the one before it wrote.
+    buffers.open("a.ts", createState("x", "a.ts"));
+    useWorkspaceStore.setState({ tabs: [tab("a.ts", true)], active: "a.ts" });
+    let version = 1;
+    vi.mocked(commands.writeFile).mockImplementation(async (req) => {
+      if (req.expectedVersion !== `v${version}`) {
+        return { status: "error", error: { kind: "changedOnDisk" } } as never;
+      }
+      version += 1;
+      return { status: "ok", data: `v${version}` };
+    });
+    const store = useWorkspaceStore.getState();
+    await Promise.all([store.save("a.ts"), store.save("a.ts")]);
+
+    expect(commands.writeFile).toHaveBeenCalledTimes(2);
+    expect(useWorkspaceStore.getState().conflict).toBeNull();
+    expect(useWorkspaceStore.getState().tabs[0]?.version).toBe("v3");
+  });
+
   it("opening a code file loads its language, so it is coloured", async () => {
     vi.mocked(commands.readFile).mockResolvedValue({
       status: "ok",

@@ -32,7 +32,8 @@ export function awaitsAnswer(step: ToolStep): boolean {
 }
 
 export function ToolStepView({ step, onAnswer }: ToolStepViewProps) {
-  const { acceptProposal, rejectProposal } = useWorkspaceStore();
+  // The actions never change, so a step doesn't render with every store change.
+  const { acceptProposal, rejectProposal } = useWorkspaceStore.getState();
   const label = stepLabel(step.action);
   const isPending = !step.outcome;
   const showApproval = awaitsAnswer(step);
