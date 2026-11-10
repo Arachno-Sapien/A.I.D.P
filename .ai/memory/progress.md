@@ -95,7 +95,7 @@ Bug audit done 2026-11-10 by Claude Code (Fable 5.2), the human's request ("chec
 Next step: the human tries it in the dev app (scroll up during a reply, Stop while a local model loads, double-click a file, hold Ctrl+S, type several lines in the message box).
 
 Plan written 2026-11-10 by Claude Code (Fable 5.2), the human's request ("MCP client for outside tools, browser checks with Playwright", runnable by any model): `docs/superpowers/plans/2026-11-10-m7-mcp-and-browser-checks.md`. Plan only, no code. Both features are "Not in v1" in AGENTS.md, so its Task 0 asks the human D1–D7 (when, hand-written client, stdio only, no tokens, no screenshots, localhost only, Workspace only) and changes the rules before any code. The human approved the defaults for D1–D7 on 2026-11-10 ("Approve defaults") and then amended D1 on 2026-11-10 to **"Now, inside M6"** (`M6:` commits, no `M7.md` phase doc).
-M6 outside tools claimed 2026-11-10 by Antigravity (Gemini 3.1 Pro): Task 0 (decisions 0025–0027, `AGENTS.md` & `docs/design.md` rules, `docs/phases/M6.md`) and Task 1 (`ToolSpec` owns its strings) done. Next step: Task 2 (`src-tauri/src/mcp/client.rs` and `McpError` in `src-tauri/src/mcp/mod.rs`).
+M6 outside tools claimed 2026-11-10 by Antigravity (Gemini 3.1 Pro): Tasks 0–2 (`mcp::client`, 12 tests) done. Next step: Task 3 (`src-tauri/src/db/mcp.rs` migration 7, server validation & tool specs in `src-tauri/src/mcp/mod.rs`).
 
 ## Next 3 tasks
 

@@ -6,6 +6,7 @@ pub mod db;
 pub mod gateway;
 pub mod history;
 pub mod login_path;
+pub mod mcp;
 pub mod ollama;
 pub mod secrets;
 pub mod tools;
