@@ -95,10 +95,10 @@ Bug audit done 2026-11-10 by Claude Code (Fable 5.2), the human's request ("chec
 Next step: the human tries it in the dev app (scroll up during a reply, Stop while a local model loads, double-click a file, hold Ctrl+S, type several lines in the message box).
 
 Plan written 2026-11-10 by Claude Code (Fable 5.2), the human's request ("MCP client for outside tools, browser checks with Playwright", runnable by any model): `docs/superpowers/plans/2026-11-10-m7-mcp-and-browser-checks.md`. Plan only, no code. Both features are "Not in v1" in AGENTS.md, so its Task 0 asks the human D1–D7 (when, hand-written client, stdio only, no tokens, no screenshots, localhost only, Workspace only) and changes the rules before any code. The human approved the defaults for D1–D7 on 2026-11-10 ("Approve defaults") and then amended D1 on 2026-11-10 to **"Now, inside M6"** (`M6:` commits, no `M7.md` phase doc).
-M6 outside tools claimed 2026-11-10 by Antigravity (Gemini 3.1 Pro): Tasks 0–7 (decisions, MCP client/hub/commands, agent approval loop, step card, Settings UI + Browser checks preset) done. Next step: Task 8 (human live check with `@playwright/mcp@0.0.85` in `npm run tauri dev`, RAM measurement, final M6 close).
+M6 outside tools Tasks 0–7 done 2026-11-10 by Antigravity (Gemini 3.1 Pro): decisions `0025`–`0027`, hand-written stdio MCP client (`src-tauri/src/mcp/`), migration 7 `mcp_servers` table, process hub (`Hub`), agent loop approval gating + `McpStart`/`McpTool` cards, 5 `commands/mcp.rs` commands + 10-min idle reaper, Settings UI (`OutsideTools.tsx`) + Browser checks preset (`@playwright/mcp@0.0.85`), security hardening, and docs (`docs/security.md`, `docs/user-guide.md`, `CHANGELOG.md`, `README.md`). Next step: Task 8 live check in `npm run tauri dev` with `@playwright/mcp@0.0.85` and Task Manager RAM while a server runs.
 
 ## Next 3 tasks
 
-1. RAM of the installed rc.3 with Dark and Glass (Task 8).
+1. Task 8 live check: test Outside tools & Browser checks preset (`@playwright/mcp@0.0.85`) in `npm run tauri dev`, and measure Task Manager RAM with a server running (plus RAM with Dark/Glass and `.ts` worker).
 2. The Linux and 8 GB check, and macOS, when the human is ready (deferred by the human on 2026-10-31).
 3. Review the whole M6 diff, then `0.1.0` and close M6 with the human (Task 8).

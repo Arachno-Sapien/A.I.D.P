@@ -131,6 +131,14 @@ With Agent turned on, the model can iteratively explore your project:
 - **The `.git` folder is off limits:** Tools cannot read, modify, or create files inside `.git`.
 - **Hard timeouts & process cleanup:** Model commands run with a 120-second timeout. Clicking **Stop** kills the entire spawned process tree cleanly.
 
+### Outside tools & Browser checks
+
+- **Outside tools (MCP):** Connect external stdio tool servers in **Settings → Outside tools (MCP)**. Commands run as your user outside the project folder and are saved in SQLite as plain text, so never put passwords or tokens in a command. When **Agent** is on in the workspace, enabled servers start when a reply needs them (`Start outside tools: <name>`) and stop when idle for 10 minutes, turned off, removed, or when A.I.D.P closes. Every tool call pauses at an approval card showing the server, tool, and exact JSON arguments before anything runs.
+- **Browser checks:** Click **Fill in Browser checks (Playwright)** in Settings, then click **Add** (and optionally **Test**). Needs **Node.js 18 or newer** (`npx`). Start your local web server in the workspace terminal first, then ask the agent things like:
+  - *"Open http://localhost:5173 and tell me the page title and any console errors."*
+  - *"Open http://localhost:3000/login, try submitting an empty form, and check what errors appear."*
+  Cards labelled `browser: browser_*` show each browser action waiting for your **Run** or **Deny** decision.
+
 ---
 
 ## 6. Settings
@@ -140,6 +148,7 @@ Open the **Settings** tab in the top navigation:
 - **Theme:** Pick **System** (follows your OS light or dark mode), **Dark**, **Light**, **Glass** (frosted panels over a soft colour backdrop), **Soft** (raised and pressed shapes), **Cyber** (dark navy with cyan edges and monospace labels) or **Elegant** (ivory with serif headings). Each button shows the theme's colours. The code editor, code blocks in replies and the terminal match the theme's dark or light base.
 - **Keep local models loaded:** Configure how long Ollama models stay in memory after a reply (Ollama default 5 min, 5 min, 30 min, 1 hour, until Free memory, or unload after each reply).
 - **Updates:** Shows the version you run. The app checks GitHub for a new version once, 10 seconds after it starts; turn **Check for updates at start** off to stop that, and use **Check for updates** to check by hand. A new version shows a bar at the top with **Install and restart** and **Later**. Nothing installs until you click Install, and the app asks you to save your files first. Updates are signed, and the app refuses one whose signature doesn't match.
+- **Outside tools (MCP):** Add, test, turn on or off, and remove stdio MCP tool servers, or fill in the **Browser checks** preset. Never put passwords or tokens into commands (they are saved in SQLite as plain text).
 
 ---
 
@@ -158,3 +167,7 @@ Open the **Settings** tab in the top navigation:
 | **"Couldn't use the system keychain … GNOME Keyring or KWallet."** | On Linux, no Secret Service is running or it's locked. | Install GNOME Keyring or KWallet, log in to a desktop session that starts it, and unlock it. The app never falls back to storing keys in a file. |
 | **"Couldn't check for updates: …"** | No internet, GitHub unreachable, or no release published yet. | The app works without it; try **Check for updates** again later. |
 | **"Save or close your unsaved files first."** when installing an update | A workspace file has unsaved changes. | Save or close the file, then click **Install and restart** again. |
+| **Browser checks fails because `npx` is missing.** | Node.js 18 or newer isn't installed (or not on PATH). | Install Node.js 18+ from nodejs.org, restart A.I.D.P, and click **Test** again. |
+| **First Browser checks Test takes a while.** | `npx` is downloading `@playwright/mcp@0.0.85`. | Wait for the first download to finish (120 s start timeout); later starts are quick. |
+| **Browser checks reports a missing browser.** | Playwright's browser isn't installed yet. | Follow the browser install command shown in the error (for example `npx playwright install chromium`), then click **Test** again. |
+| **"The server did not answer in time."** | An outside tool server hung past its timeout. | Check the server command with **Test** in Settings, or press **Stop** in the agent panel and try again. |

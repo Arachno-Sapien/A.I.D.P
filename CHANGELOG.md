@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Outside tools (MCP):** Add, test, turn on/off, and remove stdio MCP servers under **Settings → Outside tools (MCP)** (`mcp_servers`, migration 7; decisions 0025–0026). Enabled servers expose tools (`mcp__<server>__<tool>`) to the Workspace agent with every call shown on a step card for explicit **Run** / **Deny** approval before running.
+- **Browser checks (Playwright):** One-click preset in Settings (`@playwright/mcp@0.0.85`, headless, isolated, screenshots omitted, `localhost`/`127.0.0.1` origins; decision 0027) so the Workspace agent can inspect locally running web apps with your approval.
+
 ### Fixed
 - **Stop** now works while Ollama is still loading a local model into memory. Before, it did nothing until the first word arrived.
 - A chat no longer pulls you back to the bottom while a reply is being written. Scroll up to read and it stays there; scroll back to the end (or send a message) and it follows again.

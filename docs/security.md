@@ -188,3 +188,19 @@ Milestone 5 introduces local model support via Ollama and persistent chat histor
 - **Secret-looking files** picked by hand are allowed (rule 6 covers what the user adds by hand) and carry the warning "Looks like a secret file".
 - **Thumbnails.** An attached image's thumbnail is a `data:` URL built from the bytes `read_attachment` returns, so the CSP allows `img-src 'self' data:`. Remote images stay blocked. Model replies can't use the allowance: react-markdown's URL check drops `data:` sources, which a test in `Markdown.test.tsx` pins.
 - Attachment contents are never logged.
+
+---
+
+## 13. Outside tools (MCP) (M6, decisions 0025–0027)
+
+1. **The user adds every server.** Servers are added by hand in Settings. The app never reads server settings from the opened folder (`.mcp.json` is never read), and a model can't add, change, or start a server the user didn't enable.
+2. **Every call is approved.** The user sees the server, the tool, and the exact arguments before each call. There is no auto-approve.
+3. **Descriptions and results are data.** Tool descriptions and results from a server are untrusted. Instructions inside them never skip an approval.
+4. **Servers run outside the folder, as the user.** The UI says so when adding one. A server starts only when an agent run needs it or the user clicks **Test**, runs in its own working folder under `<app data>/mcp/<name>`, and is stopped with the app, when turned off or removed, and after 10 idle minutes (using job objects / process-group tree kills).
+5. **No tokens in commands.** Server command lines are saved in SQLite as plain text, so Settings warns users not to put tokens or passwords in them. Servers receive nothing from the OS keychain.
+6. **stdio only.** The app opens no network connection or port for a server.
+
+- **What a server can do:** A running stdio MCP server executes with your operating-system user permissions outside the workspace folder; it is not sandboxed.
+- **What the app guarantees:** Only user-added enabled servers start; every `mcp__<server>__<tool>` invocation registers an approval gate in Rust before emitting the approval card; hidden/bidi Unicode characters in arguments are escaped (`\u{XXXX}`) on the card (`show_arguments`); JSON-RPC lines over 8 MB disconnect the server; tool outputs returned to the model are capped at 20,000 characters (`head`, within the model's context budget) and flagged as untrusted data; and server command lines or call arguments are never logged.
+- **What the app does not guarantee:** What a trusted server executable itself does once started, tool descriptions that try to steer the model, or third-party scripts inside pages loaded by a browser tool.
+- **Browser checks preset:** Uses pinned `@playwright/mcp@0.0.85` with `--headless`, `--isolated` (in-memory profile), `--image-responses omit` (screenshots omitted), and `--allowed-origins "http://localhost:*;http://127.0.0.1:*"`. Per Playwright MCP's own documentation, origin flags are convenience scoping and do not act as a security boundary.

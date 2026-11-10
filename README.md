@@ -29,7 +29,7 @@ The installers aren't code-signed yet, so Windows and macOS warn the first time 
 ## What v0.1 does
 
 - A coding workspace. Open a folder, browse it in a file tree, and edit files in tabs. An AI panel beside the editor sees the file you have open and whatever you've selected.
-- AI edits you approve. Suggested changes show up as a diff, and nothing touches the disk until you accept it. Models that support tool calling can also read and search your project and ask to run commands, such as your tests, one approval at a time.
+- AI edits you approve. Suggested changes show up as a diff, and nothing touches the disk until you accept it. Models that support tool calling can also read and search your project, ask to run commands (such as your tests), and call outside tools from stdio MCP servers you add in Settings (plus a one-click Playwright **Browser checks** preset for local web apps), one approval at a time.
 - One model picker that lists cloud and local models together, with a status for each (key invalid, Ollama stopped, model not downloaded).
 - Support for OpenAI-compatible APIs (OpenAI, OpenRouter, Groq, DeepSeek, Gemini's compatible endpoint, LM Studio or any custom endpoint), Anthropic, and Ollama.
 - Ollama control from inside the app: detect it, start it, download models with a progress bar, delete them, and free the memory a loaded model is holding.
@@ -133,9 +133,9 @@ v0.1 is split into seven milestones, and each one ends with an app that runs. Th
 4. M3: the coding workspace. File tree, editor, the AI panel, and edits as diffs. Done.
 5. M4: agent tools and a terminal. The model can read, search and edit files and run commands, each with your approval. Done.
 6. M5: Ollama, chat history and settings. Done.
-7. M6: the v0.1 release. Installers for Windows, macOS and Linux built by CI, auto-update, and a test run on an 8 GB RAM machine. In progress: CI builds the installers, four release candidates are out, and each one updated to the next. Still to do: hand checks on Linux, macOS and an 8 GB RAM machine, then 0.1.0.
+7. M6: the v0.1 release. Installers for Windows, macOS and Linux built by CI, auto-update, outside tools (MCP + Playwright Browser checks), and a test run on an 8 GB RAM machine. In progress: CI builds the installers, five release candidates are out, and outside tools (MCP client and Browser checks preset) are implemented. Still to do: live Browser checks + RAM reading with an outside server, hand checks on Linux, macOS and an 8 GB RAM machine, then 0.1.0.
 
-After v0.1 come an MCP client for outside tools, browser checks with Playwright, and the practice area.
+After v0.1 comes the practice area.
 
 ## Contributing
 

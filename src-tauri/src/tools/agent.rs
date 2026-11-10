@@ -78,12 +78,12 @@ pub async fn run_with_images(
                     return Err(ProviderError::Cancelled);
                 }
                 Err(e) => {
+                    let message =
+                        head(&e.to_string(), crate::tools::OUTPUT_LIMIT.min(args.text_limit));
                     args.out
                         .send(ChatEvent::ToolResult {
                             id,
-                            outcome: ToolOutcome::Error {
-                                message: e.to_string(),
-                            },
+                            outcome: ToolOutcome::Error { message },
                         })
                         .map_err(|_| ProviderError::Cancelled)?;
                 }
@@ -141,6 +141,7 @@ pub async fn run_with_images(
             let id = args.approvals.next_id();
             if let Some(mcp) = &args.mcp
                 && let Some((server, tool)) = split_name(&call.name)
+                && mcp.servers.iter().any(|s| s.name == server && s.enabled)
             {
                 if !call.input.is_object() {
                     let err = format!(
@@ -223,7 +224,10 @@ pub async fn run_with_images(
                                 return Err(ProviderError::Cancelled);
                             }
                             Err(e) => {
-                                let msg = e.to_string();
+                                let msg = head(
+                                    &e.to_string(),
+                                    crate::tools::OUTPUT_LIMIT.min(args.text_limit),
+                                );
                                 args.out
                                     .send(ChatEvent::ToolResult {
                                         id,

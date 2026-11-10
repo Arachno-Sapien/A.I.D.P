@@ -118,7 +118,22 @@ impl Client {
             "params": params,
         });
 
-        if let Err(err) = self.write_value(&payload).await {
+        let write_res = tokio::select! {
+            biased;
+            _ = cancel.cancelled() => {
+                let mut guard = self.pending.lock().unwrap_or_else(PoisonError::into_inner);
+                guard.remove(&id);
+                return Err(McpError::Stopped);
+            }
+            res = self.write_value(&payload) => res,
+            _ = tokio::time::sleep(timeout) => {
+                let mut guard = self.pending.lock().unwrap_or_else(PoisonError::into_inner);
+                guard.remove(&id);
+                return Err(McpError::Timeout);
+            }
+        };
+
+        if let Err(err) = write_res {
             let mut guard = self.pending.lock().unwrap_or_else(PoisonError::into_inner);
             guard.remove(&id);
             return Err(err);
@@ -131,12 +146,14 @@ impl Client {
                     let mut guard = self.pending.lock().unwrap_or_else(PoisonError::into_inner);
                     guard.remove(&id);
                 }
-                let _ = self
-                    .notify(
+                let _ = tokio::time::timeout(
+                    Duration::from_millis(200),
+                    self.notify(
                         "notifications/cancelled",
                         Some(json!({ "requestId": id, "reason": "stopped" })),
-                    )
-                    .await;
+                    ),
+                )
+                .await;
                 Err(McpError::Stopped)
             }
             res = rx => match res {
@@ -150,12 +167,14 @@ impl Client {
                     let mut guard = self.pending.lock().unwrap_or_else(PoisonError::into_inner);
                     guard.remove(&id);
                 }
-                let _ = self
-                    .notify(
+                let _ = tokio::time::timeout(
+                    Duration::from_millis(200),
+                    self.notify(
                         "notifications/cancelled",
                         Some(json!({ "requestId": id, "reason": "timeout" })),
-                    )
-                    .await;
+                    ),
+                )
+                .await;
                 Err(McpError::Timeout)
             }
         }
@@ -900,6 +919,39 @@ mod tests {
             .to_string(),
             "The server refused: Unknown tool"
         );
+    }
+
+    #[tokio::test]
+    async fn stalled_write_respects_timeout_and_cancel() {
+        let (client_out, _server_in) = tokio::io::duplex(8);
+        let (_server_out, client_in) = tokio::io::duplex(64);
+        let client = Client::new(client_in, client_out);
+
+        let err = client
+            .request(
+                "ping",
+                json!({}),
+                Duration::from_millis(40),
+                &CancellationToken::new(),
+            )
+            .await
+            .unwrap_err();
+        assert!(matches!(err, McpError::Timeout));
+
+        let (client_out2, _server_in2) = tokio::io::duplex(8);
+        let (_server_out2, client_in2) = tokio::io::duplex(64);
+        let client2 = Client::new(client_in2, client_out2);
+        let cancel = CancellationToken::new();
+        let c2 = cancel.clone();
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(20)).await;
+            c2.cancel();
+        });
+        let err2 = client2
+            .request("ping", json!({}), Duration::from_secs(5), &cancel)
+            .await
+            .unwrap_err();
+        assert!(matches!(err2, McpError::Stopped));
     }
 }
 
