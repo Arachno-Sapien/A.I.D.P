@@ -2,6 +2,7 @@ pub mod attachments;
 pub mod chat;
 pub mod connections;
 pub mod history;
+pub mod mcp;
 pub mod ollama;
 pub mod settings;
 pub mod terminal;

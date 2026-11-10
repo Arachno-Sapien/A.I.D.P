@@ -91,6 +91,11 @@ fn specta_builder() -> Builder<tauri::Wry> {
         commands::settings::set_theme,
         commands::settings::set_keep_alive,
         commands::settings::set_check_updates,
+        commands::mcp::list_mcp_servers,
+        commands::mcp::add_mcp_server,
+        commands::mcp::set_mcp_server_enabled,
+        commands::mcp::delete_mcp_server,
+        commands::mcp::test_mcp_server,
         commands::updates::app_version,
         commands::updates::check_update,
         commands::updates::install_update,
@@ -102,7 +107,7 @@ fn specta_builder() -> Builder<tauri::Wry> {
 
 pub fn run() -> tauri::Result<()> {
     let builder = specta_builder();
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         // Driven only from Rust (commands/updates.rs); no updater permission is
         // granted, so the window cannot call the plugin's own commands.
@@ -128,6 +133,14 @@ pub fn run() -> tauri::Result<()> {
             app.manage(attachments::AttachmentStore::new(
                 app_data_dir.join("attachments"),
             ));
+            let hub = mcp::hub::Hub::new(app_data_dir.join("mcp"));
+            app.manage(hub.clone());
+            tauri::async_runtime::spawn(async move {
+                loop {
+                    tokio::time::sleep(Duration::from_secs(60)).await;
+                    hub.stop_idle(mcp::IDLE_STOP).await;
+                }
+            });
             Ok(())
         })
         .manage(commands::attachments::DropWatch::default())
@@ -159,7 +172,13 @@ pub fn run() -> tauri::Result<()> {
             _ => {}
         })
         .invoke_handler(builder.invoke_handler())
-        .run(tauri::generate_context!())
+        .build(tauri::generate_context!())?;
+    app.run(|handle, event| {
+        if matches!(event, tauri::RunEvent::Exit) {
+            tauri::async_runtime::block_on(handle.state::<mcp::hub::Hub>().stop_all());
+        }
+    });
+    Ok(())
 }
 
 #[cfg(test)]

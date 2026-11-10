@@ -91,6 +91,7 @@ pub async fn run_agent(
     workspace: State<'_, WorkspaceState>,
     approvals: State<'_, Approvals>,
     store: State<'_, AttachmentStore>,
+    hub: State<'_, crate::mcp::hub::Hub>,
     connection_id: u32,
     model_id: String,
     messages: Vec<ChatInput>,
@@ -107,6 +108,7 @@ pub async fn run_agent(
 
     let (messages, images) =
         attachments::prepare(&services, &store, connection_id, &model_id, messages)?;
+    let servers = services.mcp_servers()?;
     let provider = services.provider_for(connection_id)?;
     let local = services.model_options(connection_id, &model_id);
     let context = services.context_tokens(connection_id, &model_id);
@@ -124,7 +126,10 @@ pub async fn run_agent(
         command_timeout: crate::tools::COMMAND_TIMEOUT,
         local,
         text_limit,
-        mcp: None,
+        mcp: Some(crate::tools::agent::McpAccess {
+            hub: &hub,
+            servers,
+        }),
     }, images)
     .await;
 

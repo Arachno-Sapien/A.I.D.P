@@ -62,6 +62,11 @@ export const commands = {
 	setTheme: (theme: Theme) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("set_theme", { theme })),
 	setKeepAlive: (keepAlive: KeepAlive) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("set_keep_alive", { keepAlive })),
 	setCheckUpdates: (enabled: boolean) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("set_check_updates", { enabled })),
+	listMcpServers: () => typedError<ServerConfig[], AppError_Serialize>(__TAURI_INVOKE("list_mcp_servers")),
+	addMcpServer: (name: string, command: string) => typedError<ServerConfig, AppError_Serialize>(__TAURI_INVOKE("add_mcp_server", { name, command })),
+	setMcpServerEnabled: (id: number, enabled: boolean) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("set_mcp_server_enabled", { id, enabled })),
+	deleteMcpServer: (id: number) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("delete_mcp_server", { id })),
+	testMcpServer: (id: number) => typedError<string[], AppError_Serialize>(__TAURI_INVOKE("test_mcp_server", { id })),
 	appVersion: () => __TAURI_INVOKE<string>("app_version"),
 	checkUpdate: () => typedError<UpdateInfo_Serialize | null, AppError_Serialize>(__TAURI_INVOKE("check_update")),
 	/**
@@ -365,6 +370,13 @@ export type PullEvent = { event: "progress"; data: {
 } };
 
 export type Role = "system" | "user" | "assistant";
+
+export type ServerConfig = {
+	id: number,
+	name: string,
+	command: string,
+	enabled: boolean,
+};
 
 export type StoredMessage = StoredMessage_Serialize | StoredMessage_Deserialize;
 
