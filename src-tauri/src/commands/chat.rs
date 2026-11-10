@@ -124,6 +124,7 @@ pub async fn run_agent(
         command_timeout: crate::tools::COMMAND_TIMEOUT,
         local,
         text_limit,
+        mcp: None,
     }, images)
     .await;
 

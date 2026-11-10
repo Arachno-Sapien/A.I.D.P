@@ -276,5 +276,28 @@ mod tests {
             .unwrap(),
             r#"{"event":"toolResult","data":{"id":3,"outcome":{"status":"command","exitCode":0,"output":"ok","timedOut":false}}}"#
         );
+        assert_eq!(
+            serde_json::to_string(&ChatEvent::ToolCall {
+                id: 4,
+                action: crate::tools::ToolAction::McpTool {
+                    server: "browser".to_string(),
+                    name: "browser_click".to_string(),
+                    arguments: "{}".to_string(),
+                },
+                needs_answer: true,
+            })
+            .unwrap(),
+            r#"{"event":"toolCall","data":{"id":4,"action":{"tool":"mcpTool","server":"browser","name":"browser_click","arguments":"{}"},"needsAnswer":true}}"#
+        );
+        assert_eq!(
+            serde_json::to_string(&ChatEvent::ToolResult {
+                id: 4,
+                outcome: crate::tools::ToolOutcome::Text {
+                    output: "ok".to_string(),
+                },
+            })
+            .unwrap(),
+            r#"{"event":"toolResult","data":{"id":4,"outcome":{"status":"text","output":"ok"}}}"#
+        );
     }
 }

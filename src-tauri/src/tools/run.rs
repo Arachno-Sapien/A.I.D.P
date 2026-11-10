@@ -152,7 +152,7 @@ pub fn parse(name: &str, input: &serde_json::Value) -> Result<ToolInput, String>
 /// variation selectors, tags, Hangul fillers, ...), the line and paragraph
 /// separators, the other format controls, and private use. Unassigned code
 /// points are left out: they render as visible boxes.
-fn is_hidden(c: char) -> bool {
+pub(crate) fn is_hidden(c: char) -> bool {
     (c.is_control() && !matches!(c, '\t' | '\n' | '\r'))
         || matches!(
             c,

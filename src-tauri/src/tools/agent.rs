@@ -1,16 +1,23 @@
 use super::approvals::{Answer, Approvals};
 use super::command;
 use super::run;
-use super::{agent_system, specs, ToolAction, ToolOutcome, MAX_STEPS};
+use super::{agent_system_for, head, show_arguments, specs, ToolAction, ToolOutcome, MAX_STEPS};
 use crate::gateway::{
     ChatEvent, ChatMessage, ChatRequest, ImageInput, ModelProvider, ProviderError, Role,
     ToolOutput, ToolRound, Usage,
 };
+use crate::mcp::hub::Hub;
+use crate::mcp::{split_name, McpError, ServerConfig, CALL_TIMEOUT};
 use crate::workspace::display_path;
 use std::path::PathBuf;
 use std::time::Duration;
 use tauri::ipc::Channel;
 use tokio_util::sync::CancellationToken;
+
+pub struct McpAccess<'a> {
+    pub hub: &'a Hub,
+    pub servers: Vec<ServerConfig>,
+}
 
 pub struct AgentRun<'a> {
     pub provider: &'a dyn ModelProvider,
@@ -23,6 +30,7 @@ pub struct AgentRun<'a> {
     pub command_timeout: Duration,
     pub local: crate::gateway::LocalOptions,
     pub text_limit: usize,
+    pub mcp: Option<McpAccess<'a>>,
 }
 
 pub async fn run(args: AgentRun<'_>) -> Result<Usage, ProviderError> {
@@ -34,9 +42,61 @@ pub async fn run_with_images(
     args: AgentRun<'_>,
     images: Vec<Vec<ImageInput>>,
 ) -> Result<Usage, ProviderError> {
+    let mut specs_list = specs();
+    let builtin_count = specs_list.len();
+    if let Some(mcp) = &args.mcp {
+        let mut enabled_ids = Vec::new();
+        for server in mcp.servers.iter().filter(|s| s.enabled) {
+            let id = args.approvals.next_id();
+            args.out
+                .send(ChatEvent::ToolCall {
+                    id,
+                    action: ToolAction::McpStart {
+                        server: server.name.clone(),
+                    },
+                    needs_answer: false,
+                })
+                .map_err(|_| ProviderError::Cancelled)?;
+
+            match mcp.hub.start(server, &args.cancel).await {
+                Ok(n) => {
+                    args.out
+                        .send(ChatEvent::ToolResult {
+                            id,
+                            outcome: ToolOutcome::Ok {
+                                summary: format!("{n} tools"),
+                            },
+                        })
+                        .map_err(|_| ProviderError::Cancelled)?;
+                    enabled_ids.push(server.id);
+                }
+                Err(McpError::Stopped) => {
+                    let _ = args.out.send(ChatEvent::ToolResult {
+                        id,
+                        outcome: ToolOutcome::Stopped,
+                    });
+                    return Err(ProviderError::Cancelled);
+                }
+                Err(e) => {
+                    args.out
+                        .send(ChatEvent::ToolResult {
+                            id,
+                            outcome: ToolOutcome::Error {
+                                message: e.to_string(),
+                            },
+                        })
+                        .map_err(|_| ProviderError::Cancelled)?;
+                }
+            }
+        }
+        if !enabled_ids.is_empty() {
+            specs_list.extend(mcp.hub.specs(&enabled_ids).await);
+        }
+    }
+
     let mut full_messages = vec![ChatMessage {
         role: Role::System,
-        content: agent_system(),
+        content: agent_system_for(specs_list.len() > builtin_count),
     }];
     full_messages.extend(args.messages);
     // The system message has no images, so the rest move down one.
@@ -45,7 +105,6 @@ pub async fn run_with_images(
 
     let mut total_usage = Usage::default();
     let mut rounds: Vec<ToolRound> = Vec::new();
-    let specs_list = specs();
 
     for step in 1..=MAX_STEPS {
         let req = ChatRequest {
@@ -80,6 +139,132 @@ pub async fn run_with_images(
         let mut results: Vec<ToolOutput> = Vec::new();
         for call in reply.tool_calls {
             let id = args.approvals.next_id();
+            if let Some(mcp) = &args.mcp
+                && let Some((server, tool)) = split_name(&call.name)
+            {
+                if !call.input.is_object() {
+                    let err = format!(
+                        "Invalid arguments for {}: they were not valid JSON.",
+                        call.name
+                    );
+                    args.out
+                        .send(ChatEvent::ToolCall {
+                            id,
+                            action: ToolAction::Invalid {
+                                name: call.name.clone(),
+                            },
+                            needs_answer: false,
+                        })
+                        .map_err(|_| ProviderError::Cancelled)?;
+                    args.out
+                        .send(ChatEvent::ToolResult {
+                            id,
+                            outcome: ToolOutcome::Error {
+                                message: err.clone(),
+                            },
+                        })
+                        .map_err(|_| ProviderError::Cancelled)?;
+                    results.push(ToolOutput {
+                        call_id: call.id,
+                        content: err,
+                        is_error: true,
+                    });
+                    continue;
+                }
+
+                let rx = args.approvals.register(id);
+                args.out
+                    .send(ChatEvent::ToolCall {
+                        id,
+                        action: ToolAction::McpTool {
+                            server: server.to_string(),
+                            name: tool.to_string(),
+                            arguments: show_arguments(&call.input),
+                        },
+                        needs_answer: true,
+                    })
+                    .map_err(|_| ProviderError::Cancelled)?;
+
+                match args.approvals.wait(id, rx, &args.cancel).await {
+                    Answer::Yes => {
+                        match mcp
+                            .hub
+                            .call(&call.name, call.input.clone(), CALL_TIMEOUT, &args.cancel)
+                            .await
+                        {
+                            Ok(res) => {
+                                let text = head(
+                                    &res.text,
+                                    crate::tools::OUTPUT_LIMIT.min(args.text_limit),
+                                );
+                                let outcome = if res.is_error {
+                                    ToolOutcome::Error {
+                                        message: text.clone(),
+                                    }
+                                } else {
+                                    ToolOutcome::Text {
+                                        output: text.clone(),
+                                    }
+                                };
+                                args.out
+                                    .send(ChatEvent::ToolResult { id, outcome })
+                                    .map_err(|_| ProviderError::Cancelled)?;
+                                results.push(ToolOutput {
+                                    call_id: call.id,
+                                    content: text,
+                                    is_error: res.is_error,
+                                });
+                            }
+                            Err(McpError::Stopped) => {
+                                let _ = args.out.send(ChatEvent::ToolResult {
+                                    id,
+                                    outcome: ToolOutcome::Stopped,
+                                });
+                                return Err(ProviderError::Cancelled);
+                            }
+                            Err(e) => {
+                                let msg = e.to_string();
+                                args.out
+                                    .send(ChatEvent::ToolResult {
+                                        id,
+                                        outcome: ToolOutcome::Error {
+                                            message: msg.clone(),
+                                        },
+                                    })
+                                    .map_err(|_| ProviderError::Cancelled)?;
+                                results.push(ToolOutput {
+                                    call_id: call.id,
+                                    content: msg,
+                                    is_error: true,
+                                });
+                            }
+                        }
+                    }
+                    Answer::No => {
+                        let tool_run = run::declined(true);
+                        args.out
+                            .send(ChatEvent::ToolResult {
+                                id,
+                                outcome: tool_run.outcome,
+                            })
+                            .map_err(|_| ProviderError::Cancelled)?;
+                        results.push(ToolOutput {
+                            call_id: call.id,
+                            content: tool_run.for_model,
+                            is_error: tool_run.is_error,
+                        });
+                    }
+                    Answer::Stopped => {
+                        let _ = args.out.send(ChatEvent::ToolResult {
+                            id,
+                            outcome: ToolOutcome::Stopped,
+                        });
+                        return Err(ProviderError::Cancelled);
+                    }
+                }
+                continue;
+            }
+
             let parsed = run::parse(&call.name, &call.input);
 
             let tool_input = match parsed {

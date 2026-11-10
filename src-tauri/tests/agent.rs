@@ -5,9 +5,11 @@ mod common;
 use aidp_lib::gateway::{
     openai_compat::OpenAiCompat, ChatEvent, ChatMessage, ProviderError, Role,
 };
-use aidp_lib::tools::agent::{run, AgentRun};
+use aidp_lib::mcp::hub::Hub;
+use aidp_lib::mcp::ServerConfig;
+use aidp_lib::tools::agent::{run, AgentRun, McpAccess};
 use aidp_lib::tools::approvals::Approvals;
-use aidp_lib::tools::{ToolAction, ToolOutcome};
+use aidp_lib::tools::{ToolAction, ToolOutcome, OUTSIDE_TOOLS_NOTE};
 use common::{capture, TempDir};
 use secrecy::SecretString;
 use serde_json::json;
@@ -140,6 +142,7 @@ async fn outside_path_is_refused_and_never_sent() {
         command_timeout: Duration::from_secs(5),
         local: Default::default(),
         text_limit: aidp_lib::tools::READ_LIMIT,
+        mcp: None,
     })
     .await;
 
@@ -228,6 +231,7 @@ async fn denied_command_never_runs() {
             command_timeout: Duration::from_secs(5),
         local: Default::default(),
         text_limit: aidp_lib::tools::READ_LIMIT,
+        mcp: None,
         })
         .await
     });
@@ -312,6 +316,7 @@ async fn approved_command_runs() {
             command_timeout: Duration::from_secs(5),
         local: Default::default(),
         text_limit: aidp_lib::tools::READ_LIMIT,
+        mcp: None,
         })
         .await
     });
@@ -389,6 +394,7 @@ async fn secret_file_is_never_sent() {
         command_timeout: Duration::from_secs(5),
         local: Default::default(),
         text_limit: aidp_lib::tools::READ_LIMIT,
+        mcp: None,
     })
     .await;
 
@@ -450,6 +456,7 @@ async fn instructions_in_files_never_skip_approval() {
             command_timeout: Duration::from_secs(5),
         local: Default::default(),
         text_limit: aidp_lib::tools::READ_LIMIT,
+        mcp: None,
         })
         .await
     });
@@ -526,6 +533,7 @@ async fn edit_waits_for_accept() {
             command_timeout: Duration::from_secs(5),
         local: Default::default(),
         text_limit: aidp_lib::tools::READ_LIMIT,
+        mcp: None,
         })
         .await
     });
@@ -603,6 +611,7 @@ async fn edit_waits_for_accept() {
             command_timeout: Duration::from_secs(5),
         local: Default::default(),
         text_limit: aidp_lib::tools::READ_LIMIT,
+        mcp: None,
         })
         .await
     });
@@ -680,6 +689,7 @@ async fn stop_while_waiting() {
             command_timeout: Duration::from_secs(5),
         local: Default::default(),
         text_limit: aidp_lib::tools::READ_LIMIT,
+        mcp: None,
         })
         .await
     });
@@ -754,6 +764,7 @@ async fn every_call_gets_one_result() {
         command_timeout: Duration::from_secs(5),
         local: Default::default(),
         text_limit: aidp_lib::tools::READ_LIMIT,
+        mcp: None,
     })
     .await;
 
@@ -825,6 +836,7 @@ async fn step_limit() {
         command_timeout: Duration::from_secs(5),
         local: Default::default(),
         text_limit: aidp_lib::tools::READ_LIMIT,
+        mcp: None,
     })
     .await;
 
@@ -886,6 +898,7 @@ async fn small_context_cuts_reads() {
         command_timeout: Duration::from_secs(5),
         local: Default::default(),
         text_limit: 1000,
+        mcp: None,
     })
     .await;
 
@@ -898,4 +911,674 @@ async fn small_context_cuts_reads() {
     let tool_msg = msgs.iter().find(|m| m["role"] == "tool").unwrap();
     let content = tool_msg["content"].as_str().unwrap();
     assert!(content.len() < 1200, "tool content was {} chars", content.len());
+}
+
+const MCP_FIXTURE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/fake-mcp.mjs");
+
+fn fake_config(mode: &str, enabled: bool) -> ServerConfig {
+    ServerConfig {
+        id: 1,
+        name: "fake".to_string(),
+        command: format!("node \"{MCP_FIXTURE}\" {mode}"),
+        enabled,
+    }
+}
+
+#[tokio::test]
+async fn mcp_call_waits_for_approval_and_returns_text() {
+    let server = MockServer::start().await;
+    let dir = TempDir::new();
+    let mcp_dir = TempDir::new();
+
+    let resp1 = sse_tool_calls(&[("call_1", "mcp__fake__echo", json!({"text": "hello"}))]);
+    let resp2 = sse_text("Done.");
+
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(QueueResponder::new(vec![resp1, resp2]))
+        .mount(&server)
+        .await;
+
+    let p = make_provider(&server);
+    let (channel, events) = capture();
+    let approvals = Arc::new(Approvals::new());
+    let approvals_clone = approvals.clone();
+    let cancel = CancellationToken::new();
+    let hub = Hub::new(mcp_dir.path().to_path_buf());
+    let hub_clone = hub.clone();
+    let root_buf = dir.path().to_path_buf();
+
+    let run_handle = tokio::spawn(async move {
+        run(AgentRun {
+            provider: &p,
+            model: "test-model".into(),
+            messages: vec![ChatMessage {
+                role: Role::User,
+                content: "Echo hello".into(),
+            }],
+            root: root_buf,
+            approvals: &approvals_clone,
+            out: channel,
+            cancel,
+            command_timeout: Duration::from_secs(5),
+            local: Default::default(),
+            text_limit: aidp_lib::tools::READ_LIMIT,
+            mcp: Some(McpAccess {
+                hub: &hub_clone,
+                servers: vec![fake_config("", true)],
+            }),
+        })
+        .await
+    });
+
+    let mut answered = false;
+    for _ in 0..100 {
+        tokio::time::sleep(Duration::from_millis(20)).await;
+        let list = events.lock().unwrap().clone();
+        for ev in list {
+            if let ChatEvent::ToolCall {
+                id,
+                action:
+                    ToolAction::McpTool {
+                        ref server,
+                        ref name,
+                        ref arguments,
+                    },
+                needs_answer,
+            } = ev
+            {
+                assert!(needs_answer);
+                assert_eq!(server, "fake");
+                assert_eq!(name, "echo");
+                let parsed: serde_json::Value = serde_json::from_str(arguments).unwrap();
+                assert_eq!(parsed, json!({"text": "hello"}));
+                approvals.answer(id, true);
+                answered = true;
+                break;
+            }
+        }
+        if answered {
+            break;
+        }
+    }
+    assert!(answered);
+
+    let res = run_handle.await.unwrap();
+    assert!(res.is_ok());
+
+    let evs = events.lock().unwrap().clone();
+    assert!(matches!(
+        &evs[0],
+        ChatEvent::ToolCall {
+            action: ToolAction::McpStart { server },
+            needs_answer: false,
+            ..
+        } if server == "fake"
+    ));
+    assert!(matches!(
+        &evs[1],
+        ChatEvent::ToolResult {
+            outcome: ToolOutcome::Ok { summary },
+            ..
+        } if summary == "3 tools"
+    ));
+    assert!(matches!(
+        &evs[2],
+        ChatEvent::ToolCall {
+            action: ToolAction::McpTool { server, name, .. },
+            needs_answer: true,
+            ..
+        } if server == "fake" && name == "echo"
+    ));
+    assert!(matches!(
+        &evs[3],
+        ChatEvent::ToolResult {
+            outcome: ToolOutcome::Text { output },
+            ..
+        } if output == "hello"
+    ));
+
+    let reqs = server.received_requests().await.unwrap();
+    assert_eq!(reqs.len(), 2);
+    let body2: serde_json::Value = reqs[1].body_json().unwrap();
+    let msgs = body2["messages"].as_array().unwrap();
+    assert!(msgs[0]["content"]
+        .as_str()
+        .unwrap()
+        .contains(OUTSIDE_TOOLS_NOTE));
+    assert!(msgs
+        .iter()
+        .any(|m| m["role"] == "tool" && m["content"] == "hello"));
+    let tools = body2["tools"].as_array().unwrap();
+    assert_eq!(tools.len(), 9);
+    assert!(tools
+        .iter()
+        .any(|t| t["function"]["name"] == "mcp__fake__echo"));
+
+    hub.stop_all().await;
+}
+
+#[tokio::test]
+async fn declined_mcp_call_is_not_sent() {
+    let server = MockServer::start().await;
+    let dir = TempDir::new();
+    let mcp_dir = TempDir::new();
+
+    let resp1 = sse_tool_calls(&[("call_1", "mcp__fake__die", json!({}))]);
+    let resp2 = sse_text("Okay, skipped.");
+
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(QueueResponder::new(vec![resp1, resp2]))
+        .mount(&server)
+        .await;
+
+    let p = make_provider(&server);
+    let (channel, events) = capture();
+    let approvals = Arc::new(Approvals::new());
+    let approvals_clone = approvals.clone();
+    let cancel = CancellationToken::new();
+    let hub = Hub::new(mcp_dir.path().to_path_buf());
+    let hub_clone = hub.clone();
+    let root_buf = dir.path().to_path_buf();
+
+    let run_handle = tokio::spawn(async move {
+        run(AgentRun {
+            provider: &p,
+            model: "test-model".into(),
+            messages: vec![ChatMessage {
+                role: Role::User,
+                content: "Die".into(),
+            }],
+            root: root_buf,
+            approvals: &approvals_clone,
+            out: channel,
+            cancel,
+            command_timeout: Duration::from_secs(5),
+            local: Default::default(),
+            text_limit: aidp_lib::tools::READ_LIMIT,
+            mcp: Some(McpAccess {
+                hub: &hub_clone,
+                servers: vec![fake_config("", true)],
+            }),
+        })
+        .await
+    });
+
+    let mut answered = false;
+    for _ in 0..100 {
+        tokio::time::sleep(Duration::from_millis(20)).await;
+        let list = events.lock().unwrap().clone();
+        for ev in list {
+            if let ChatEvent::ToolCall {
+                id,
+                needs_answer: true,
+                ..
+            } = ev
+            {
+                approvals.answer(id, false);
+                answered = true;
+                break;
+            }
+        }
+        if answered {
+            break;
+        }
+    }
+    assert!(answered);
+
+    let res = run_handle.await.unwrap();
+    assert!(res.is_ok());
+    assert!(hub.is_running(1).await);
+    assert!(events
+        .lock()
+        .unwrap()
+        .iter()
+        .any(|e| matches!(e, ChatEvent::ToolResult { outcome: ToolOutcome::Declined, .. })));
+
+    hub.stop_all().await;
+}
+
+#[tokio::test]
+async fn stop_during_mcp_call() {
+    let server = MockServer::start().await;
+    let dir = TempDir::new();
+    let mcp_dir = TempDir::new();
+
+    let resp1 = sse_tool_calls(&[("call_1", "mcp__fake__slow", json!({}))]);
+
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(QueueResponder::new(vec![resp1]))
+        .mount(&server)
+        .await;
+
+    let p = make_provider(&server);
+    let (channel, events) = capture();
+    let approvals = Arc::new(Approvals::new());
+    let approvals_clone = approvals.clone();
+    let cancel = CancellationToken::new();
+    let cancel_clone = cancel.clone();
+    let hub = Hub::new(mcp_dir.path().to_path_buf());
+    let hub_clone = hub.clone();
+    let root_buf = dir.path().to_path_buf();
+
+    let run_handle = tokio::spawn(async move {
+        run(AgentRun {
+            provider: &p,
+            model: "test-model".into(),
+            messages: vec![ChatMessage {
+                role: Role::User,
+                content: "Slow".into(),
+            }],
+            root: root_buf,
+            approvals: &approvals_clone,
+            out: channel,
+            cancel: cancel_clone,
+            command_timeout: Duration::from_secs(5),
+            local: Default::default(),
+            text_limit: aidp_lib::tools::READ_LIMIT,
+            mcp: Some(McpAccess {
+                hub: &hub_clone,
+                servers: vec![fake_config("", true)],
+            }),
+        })
+        .await
+    });
+
+    let mut answered = false;
+    for _ in 0..100 {
+        tokio::time::sleep(Duration::from_millis(20)).await;
+        let list = events.lock().unwrap().clone();
+        for ev in list {
+            if let ChatEvent::ToolCall {
+                id,
+                needs_answer: true,
+                ..
+            } = ev
+            {
+                approvals.answer(id, true);
+                answered = true;
+                break;
+            }
+        }
+        if answered {
+            break;
+        }
+    }
+    assert!(answered);
+
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    cancel.cancel();
+
+    let res = tokio::time::timeout(Duration::from_secs(5), run_handle)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(res, Err(ProviderError::Cancelled));
+    assert!(events
+        .lock()
+        .unwrap()
+        .iter()
+        .any(|e| matches!(e, ChatEvent::ToolResult { outcome: ToolOutcome::Stopped, .. })));
+
+    hub.stop_all().await;
+}
+
+#[tokio::test]
+async fn unknown_mcp_tool_is_an_error() {
+    let server = MockServer::start().await;
+    let dir = TempDir::new();
+    let mcp_dir = TempDir::new();
+
+    let resp1 = sse_tool_calls(&[("call_1", "mcp__fake__nope", json!({}))]);
+    let resp2 = sse_text("Not found.");
+
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(QueueResponder::new(vec![resp1, resp2]))
+        .mount(&server)
+        .await;
+
+    let p = make_provider(&server);
+    let (channel, events) = capture();
+    let approvals = Arc::new(Approvals::new());
+    let approvals_clone = approvals.clone();
+    let cancel = CancellationToken::new();
+    let hub = Hub::new(mcp_dir.path().to_path_buf());
+    let hub_clone = hub.clone();
+    let root_buf = dir.path().to_path_buf();
+
+    let run_handle = tokio::spawn(async move {
+        run(AgentRun {
+            provider: &p,
+            model: "test-model".into(),
+            messages: vec![ChatMessage {
+                role: Role::User,
+                content: "Nope".into(),
+            }],
+            root: root_buf,
+            approvals: &approvals_clone,
+            out: channel,
+            cancel,
+            command_timeout: Duration::from_secs(5),
+            local: Default::default(),
+            text_limit: aidp_lib::tools::READ_LIMIT,
+            mcp: Some(McpAccess {
+                hub: &hub_clone,
+                servers: vec![fake_config("", true)],
+            }),
+        })
+        .await
+    });
+
+    let mut answered = false;
+    for _ in 0..100 {
+        tokio::time::sleep(Duration::from_millis(20)).await;
+        let list = events.lock().unwrap().clone();
+        for ev in list {
+            if let ChatEvent::ToolCall {
+                id,
+                needs_answer: true,
+                ..
+            } = ev
+            {
+                approvals.answer(id, true);
+                answered = true;
+                break;
+            }
+        }
+        if answered {
+            break;
+        }
+    }
+    assert!(answered);
+
+    let res = run_handle.await.unwrap();
+    assert!(res.is_ok());
+
+    let err_ev = events
+        .lock()
+        .unwrap()
+        .iter()
+        .find_map(|e| match e {
+            ChatEvent::ToolResult {
+                outcome: ToolOutcome::Error { message },
+                ..
+            } => Some(message.clone()),
+            _ => None,
+        })
+        .unwrap();
+    assert!(
+        err_ev.starts_with("The server sent something unexpected"),
+        "got: {err_ev}"
+    );
+
+    hub.stop_all().await;
+}
+
+#[tokio::test]
+async fn mcp_names_without_access_are_unknown() {
+    let server = MockServer::start().await;
+    let dir = TempDir::new();
+
+    let resp1 = sse_tool_calls(&[("call_1", "mcp__fake__echo", json!({"text": "hi"}))]);
+    let resp2 = sse_text("Unknown.");
+
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(QueueResponder::new(vec![resp1, resp2]))
+        .mount(&server)
+        .await;
+
+    let p = make_provider(&server);
+    let (channel, events) = capture();
+    let approvals = Approvals::new();
+    let cancel = CancellationToken::new();
+
+    let res = run(AgentRun {
+        provider: &p,
+        model: "test-model".into(),
+        messages: vec![ChatMessage {
+            role: Role::User,
+            content: "Echo".into(),
+        }],
+        root: dir.path().to_path_buf(),
+        approvals: &approvals,
+        out: channel,
+        cancel,
+        command_timeout: Duration::from_secs(5),
+        local: Default::default(),
+        text_limit: aidp_lib::tools::READ_LIMIT,
+        mcp: None,
+    })
+    .await;
+    assert!(res.is_ok());
+
+    let evs = events.lock().unwrap().clone();
+    assert!(matches!(
+        &evs[0],
+        ChatEvent::ToolCall {
+            action: ToolAction::Invalid { name },
+            needs_answer: false,
+            ..
+        } if name == "mcp__fake__echo"
+    ));
+    assert!(matches!(
+        &evs[1],
+        ChatEvent::ToolResult {
+            outcome: ToolOutcome::Error { message },
+            ..
+        } if message == "There is no tool named mcp__fake__echo."
+    ));
+}
+
+#[tokio::test]
+async fn start_failure_shows_and_run_continues() {
+    let server = MockServer::start().await;
+    let dir = TempDir::new();
+    let mcp_dir = TempDir::new();
+
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(QueueResponder::new(vec![sse_text("Continued cleanly.")]))
+        .mount(&server)
+        .await;
+
+    let p = make_provider(&server);
+    let (channel, events) = capture();
+    let approvals = Approvals::new();
+    let cancel = CancellationToken::new();
+    let hub = Hub::new(mcp_dir.path().to_path_buf());
+
+    let bad = ServerConfig {
+        id: 1,
+        name: "bad".to_string(),
+        command: "node -e \"process.exit(1)\"".to_string(),
+        enabled: true,
+    };
+
+    let res = run(AgentRun {
+        provider: &p,
+        model: "test-model".into(),
+        messages: vec![ChatMessage {
+            role: Role::User,
+            content: "Hi".into(),
+        }],
+        root: dir.path().to_path_buf(),
+        approvals: &approvals,
+        out: channel,
+        cancel,
+        command_timeout: Duration::from_secs(5),
+        local: Default::default(),
+        text_limit: aidp_lib::tools::READ_LIMIT,
+        mcp: Some(McpAccess {
+            hub: &hub,
+            servers: vec![bad],
+        }),
+    })
+    .await;
+    assert!(res.is_ok());
+
+    let evs = events.lock().unwrap().clone();
+    assert!(matches!(
+        &evs[0],
+        ChatEvent::ToolCall {
+            action: ToolAction::McpStart { server },
+            needs_answer: false,
+            ..
+        } if server == "bad"
+    ));
+    assert!(matches!(
+        &evs[1],
+        ChatEvent::ToolResult {
+            outcome: ToolOutcome::Error { .. },
+            ..
+        }
+    ));
+
+    let reqs = server.received_requests().await.unwrap();
+    assert_eq!(reqs.len(), 1);
+    let body: serde_json::Value = reqs[0].body_json().unwrap();
+    assert_eq!(body["tools"].as_array().unwrap().len(), 6);
+    assert!(!body["messages"][0]["content"]
+        .as_str()
+        .unwrap()
+        .contains(OUTSIDE_TOOLS_NOTE));
+}
+
+#[tokio::test]
+async fn disabled_server_is_not_started() {
+    let server = MockServer::start().await;
+    let dir = TempDir::new();
+    let mcp_dir = TempDir::new();
+
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(QueueResponder::new(vec![sse_text("Done.")]))
+        .mount(&server)
+        .await;
+
+    let p = make_provider(&server);
+    let (channel, events) = capture();
+    let approvals = Approvals::new();
+    let cancel = CancellationToken::new();
+    let hub = Hub::new(mcp_dir.path().to_path_buf());
+
+    let res = run(AgentRun {
+        provider: &p,
+        model: "test-model".into(),
+        messages: vec![ChatMessage {
+            role: Role::User,
+            content: "Hi".into(),
+        }],
+        root: dir.path().to_path_buf(),
+        approvals: &approvals,
+        out: channel,
+        cancel,
+        command_timeout: Duration::from_secs(5),
+        local: Default::default(),
+        text_limit: aidp_lib::tools::READ_LIMIT,
+        mcp: Some(McpAccess {
+            hub: &hub,
+            servers: vec![fake_config("", false)],
+        }),
+    })
+    .await;
+    assert!(res.is_ok());
+    assert!(!hub.is_running(1).await);
+    assert!(!events
+        .lock()
+        .unwrap()
+        .iter()
+        .any(|e| matches!(e, ChatEvent::ToolCall { action: ToolAction::McpStart { .. }, .. })));
+
+    let reqs = server.received_requests().await.unwrap();
+    let body: serde_json::Value = reqs[0].body_json().unwrap();
+    assert_eq!(body["tools"].as_array().unwrap().len(), 6);
+}
+
+#[tokio::test]
+async fn mcp_result_is_cut() {
+    let server = MockServer::start().await;
+    let dir = TempDir::new();
+    let mcp_dir = TempDir::new();
+
+    let long_text = "x".repeat(200);
+    let resp1 = sse_tool_calls(&[("call_1", "mcp__fake__echo", json!({"text": long_text}))]);
+    let resp2 = sse_text("Cut cleanly.");
+
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(QueueResponder::new(vec![resp1, resp2]))
+        .mount(&server)
+        .await;
+
+    let p = make_provider(&server);
+    let (channel, events) = capture();
+    let approvals = Arc::new(Approvals::new());
+    let approvals_clone = approvals.clone();
+    let cancel = CancellationToken::new();
+    let hub = Hub::new(mcp_dir.path().to_path_buf());
+    let hub_clone = hub.clone();
+    let root_buf = dir.path().to_path_buf();
+
+    let run_handle = tokio::spawn(async move {
+        run(AgentRun {
+            provider: &p,
+            model: "test-model".into(),
+            messages: vec![ChatMessage {
+                role: Role::User,
+                content: "Echo 200".into(),
+            }],
+            root: root_buf,
+            approvals: &approvals_clone,
+            out: channel,
+            cancel,
+            command_timeout: Duration::from_secs(5),
+            local: Default::default(),
+            text_limit: 50,
+            mcp: Some(McpAccess {
+                hub: &hub_clone,
+                servers: vec![fake_config("", true)],
+            }),
+        })
+        .await
+    });
+
+    let mut answered = false;
+    for _ in 0..100 {
+        tokio::time::sleep(Duration::from_millis(20)).await;
+        let list = events.lock().unwrap().clone();
+        for ev in list {
+            if let ChatEvent::ToolCall {
+                id,
+                needs_answer: true,
+                ..
+            } = ev
+            {
+                approvals.answer(id, true);
+                answered = true;
+                break;
+            }
+        }
+        if answered {
+            break;
+        }
+    }
+    assert!(answered);
+
+    let res = run_handle.await.unwrap();
+    assert!(res.is_ok());
+
+    let expected = format!("{}\n[cut at 50 characters]", "x".repeat(50));
+    assert!(events.lock().unwrap().iter().any(|e| matches!(
+        e,
+        ChatEvent::ToolResult {
+            outcome: ToolOutcome::Text { output },
+            ..
+        } if output == &expected
+    )));
+
+    hub.stop_all().await;
 }

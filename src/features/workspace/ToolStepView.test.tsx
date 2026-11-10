@@ -99,4 +99,75 @@ describe("ToolStepView", () => {
     expect(screen.getByText("Exit code unknown")).toBeDefined();
     expect(screen.queryByText("Exit code 0")).toBeNull();
   });
+
+  it("an outside tool call shows the server, the tool and the arguments, and asks", () => {
+    const onAnswer = vi.fn();
+    const args = '{\n  "url": "http://localhost:5173"\n}';
+    const step: ToolStep = {
+      id: 10,
+      action: {
+        tool: "mcpTool",
+        server: "browser",
+        name: "browser_navigate",
+        arguments: args,
+      },
+      needsAnswer: true,
+    };
+
+    const { container } = render(
+      <ToolStepView step={step} onAnswer={onAnswer} />,
+    );
+
+    expect(screen.getByText("browser: browser_navigate")).toBeDefined();
+    expect(
+      screen.getByText("Outside tool. This is sent to browser:"),
+    ).toBeDefined();
+    const pre = container.querySelector("pre");
+    expect(pre?.textContent).toBe(args);
+
+    fireEvent.click(screen.getByRole("button", { name: "Run" }));
+    expect(onAnswer).toHaveBeenCalledWith(10, true);
+    fireEvent.click(screen.getByRole("button", { name: "Deny" }));
+    expect(onAnswer).toHaveBeenCalledWith(10, false);
+  });
+
+  it("the arguments stay after the answer", () => {
+    const args = '{\n  "url": "http://localhost:5173"\n}';
+    const step: ToolStep = {
+      id: 11,
+      action: {
+        tool: "mcpTool",
+        server: "browser",
+        name: "browser_navigate",
+        arguments: args,
+      },
+      needsAnswer: true,
+      answered: true,
+      outcome: { status: "text", output: "Page title: Home" },
+    };
+
+    const { container } = render(<ToolStepView step={step} />);
+
+    const pres = Array.from(container.querySelectorAll("pre")).map(
+      (p) => p.textContent,
+    );
+    expect(pres).toContain(args);
+    expect(pres).toContain("Page title: Home");
+    expect(screen.queryByRole("button", { name: "Run" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Deny" })).toBeNull();
+  });
+
+  it("starting outside tools is labelled", () => {
+    const step: ToolStep = {
+      id: 12,
+      action: { tool: "mcpStart", server: "browser" },
+      needsAnswer: false,
+      outcome: { status: "ok", summary: "24 tools" },
+    };
+
+    render(<ToolStepView step={step} />);
+
+    expect(screen.getByText("Start outside tools: browser")).toBeDefined();
+    expect(screen.getByText("24 tools")).toBeDefined();
+  });
 });

@@ -398,13 +398,13 @@ export type TerminalEvent = { event: "output"; data: string } | { event: "exit" 
 
 export type Theme = "dark" | "light" | "system" | "glass" | "soft" | "cyber" | "elegant";
 
-export type ToolAction = { tool: "listFiles"; path: string } | { tool: "readFile"; path: string } | { tool: "search"; query: string; path: string } | { tool: "editFile"; path: string; before: string; after: string } | { tool: "createFile"; path: string; text: string } | { tool: "runCommand"; command: string; folder: string } | { tool: "invalid"; name: string };
+export type ToolAction = { tool: "listFiles"; path: string } | { tool: "readFile"; path: string } | { tool: "search"; query: string; path: string } | { tool: "editFile"; path: string; before: string; after: string } | { tool: "createFile"; path: string; text: string } | { tool: "runCommand"; command: string; folder: string } | { tool: "mcpStart"; server: string } | { tool: "mcpTool"; server: string; name: string; arguments: string } | { tool: "invalid"; name: string };
 
 export type ToolOutcome = ToolOutcome_Serialize | ToolOutcome_Deserialize;
 
-export type ToolOutcome_Deserialize = { status: "ok"; summary: string } | { status: "command"; exitCode?: number | null; output: string; timedOut: boolean } | { status: "declined" } | { status: "error"; message: string } | { status: "stopped" };
+export type ToolOutcome_Deserialize = { status: "ok"; summary: string } | { status: "command"; exitCode?: number | null; output: string; timedOut: boolean } | { status: "text"; output: string } | { status: "declined" } | { status: "error"; message: string } | { status: "stopped" };
 
-export type ToolOutcome_Serialize = { status: "ok"; summary: string } | { status: "command"; exitCode: number | null; output: string; timedOut: boolean } | { status: "declined" } | { status: "error"; message: string } | { status: "stopped" };
+export type ToolOutcome_Serialize = { status: "ok"; summary: string } | { status: "command"; exitCode: number | null; output: string; timedOut: boolean } | { status: "text"; output: string } | { status: "declined" } | { status: "error"; message: string } | { status: "stopped" };
 
 export type UpdateEvent = 
 /**  Kilobytes so far and in all (0 when the server does not say). */
