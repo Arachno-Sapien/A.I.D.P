@@ -1240,7 +1240,7 @@ async fn stop_during_mcp_call() {
 }
 
 #[tokio::test]
-async fn unknown_mcp_tool_is_an_error() {
+async fn unknown_mcp_tool_is_never_put_to_the_user() {
     let server = MockServer::start().await;
     let dir = TempDir::new();
     let mcp_dir = TempDir::new();
@@ -1256,78 +1256,46 @@ async fn unknown_mcp_tool_is_an_error() {
 
     let p = make_provider(&server);
     let (channel, events) = capture();
-    let approvals = Arc::new(Approvals::new());
-    let approvals_clone = approvals.clone();
-    let cancel = CancellationToken::new();
+    let approvals = Approvals::new();
     let hub = Hub::new(mcp_dir.path().to_path_buf());
-    let hub_clone = hub.clone();
-    let root_buf = dir.path().to_path_buf();
 
-    let run_handle = tokio::spawn(async move {
-        run(AgentRun {
-            provider: &p,
-            model: "test-model".into(),
-            messages: vec![ChatMessage {
-                role: Role::User,
-                content: "Nope".into(),
-            }],
-            root: root_buf,
-            approvals: &approvals_clone,
-            out: channel,
-            cancel,
-            command_timeout: Duration::from_secs(5),
-            local: Default::default(),
-            text_limit: aidp_lib::tools::READ_LIMIT,
-            review_at_end: false,
-            mcp: Some(McpAccess {
-                hub: &hub_clone,
-                servers: vec![fake_config("", true)],
-            }),
-        })
-        .await
-    });
-
-    let mut answered = false;
-    for _ in 0..100 {
-        tokio::time::sleep(Duration::from_millis(20)).await;
-        let list = events.lock().unwrap().clone();
-        for ev in list {
-            if let ChatEvent::ToolCall {
-                id,
-                needs_answer: true,
-                ..
-            } = ev
-            {
-                approvals.answer(id, true);
-                answered = true;
-                break;
-            }
-        }
-        if answered {
-            break;
-        }
-    }
-    assert!(answered);
-
-    let res = run_handle.await.unwrap();
+    // The server runs, but offers no tool named "nope": no card asks about it.
+    let res = run(AgentRun {
+        provider: &p,
+        model: "test-model".into(),
+        messages: vec![ChatMessage {
+            role: Role::User,
+            content: "Nope".into(),
+        }],
+        root: dir.path().to_path_buf(),
+        approvals: &approvals,
+        out: channel,
+        cancel: CancellationToken::new(),
+        command_timeout: Duration::from_secs(5),
+        local: Default::default(),
+        text_limit: aidp_lib::tools::READ_LIMIT,
+        review_at_end: false,
+        mcp: Some(McpAccess {
+            hub: &hub,
+            servers: vec![fake_config("", true)],
+        }),
+    })
+    .await;
     assert!(res.is_ok());
 
-    let err_ev = events
-        .lock()
-        .unwrap()
+    let evs = events.lock().unwrap().clone();
+    assert!(!evs
         .iter()
-        .find_map(|e| match e {
-            ChatEvent::ToolResult {
-                outcome: ToolOutcome::Error { message },
-                ..
-            } => Some(message.clone()),
-            _ => None,
-        })
-        .unwrap();
-    assert!(
-        err_ev.starts_with("The server sent something unexpected"),
-        "got: {err_ev}"
-    );
+        .any(|e| matches!(e, ChatEvent::ToolCall { needs_answer: true, .. })));
+    assert!(evs.iter().any(|e| matches!(
+        e,
+        ChatEvent::ToolCall { action: ToolAction::Invalid { name }, .. } if name == "mcp__fake__nope"
+    )));
+    assert!(evs.iter().any(|e| matches!(
+        e,
+        ChatEvent::ToolResult { outcome: ToolOutcome::Error { message }, .. }
+            if message == "There is no tool named mcp__fake__nope."
+    )));
 
     hub.stop_all().await;
 }

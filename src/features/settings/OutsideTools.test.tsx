@@ -210,10 +210,17 @@ describe("OutsideTools", () => {
 
     expect(await screen.findByText("Starting…")).toBeDefined();
     expect(testBtn.disabled).toBe(true);
+    // Removing or turning it off mid-start is held until the start ends.
+    const onBox = screen.getByRole("checkbox", { name: "fake on" }) as HTMLInputElement;
+    const removeBtn = screen.getByRole("button", { name: "Remove fake" }) as HTMLButtonElement;
+    expect(onBox.disabled).toBe(true);
+    expect(removeBtn.disabled).toBe(true);
 
     resolveTest({ status: "ok", data: ["echo", "slow"] });
     expect(await screen.findByText("2 tools: echo, slow")).toBeDefined();
     expect(testBtn.disabled).toBe(false);
+    expect(onBox.disabled).toBe(false);
+    expect(removeBtn.disabled).toBe(false);
 
     vi.mocked(commands.testMcpServer).mockResolvedValueOnce({
       status: "error",

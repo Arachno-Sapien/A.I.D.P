@@ -251,3 +251,25 @@ async fn changed_command_restarts() {
     assert!(!hub.is_running(1).await);
 }
 
+
+/// Remove or turn off while a start is still in progress: the start must not
+/// add the server afterwards (it would run on, and answer for a newer server
+/// with the same name).
+#[tokio::test]
+async fn stop_during_start_wins() {
+    let dir = TempDir::new();
+    let hub = Hub::new(dir.path().to_path_buf());
+    let starting = {
+        let hub = hub.clone();
+        tokio::spawn(async move { hub.start(&fake("slowinit"), &CancellationToken::new()).await })
+    };
+    tokio::time::sleep(Duration::from_millis(250)).await;
+    hub.stop(1).await;
+
+    assert_eq!(starting.await.unwrap(), Err(McpError::Stopped));
+    assert!(!hub.is_running(1).await);
+
+    // A later start of the same server is not affected by the old stop.
+    assert_eq!(hub.start(&fake(""), &CancellationToken::new()).await, Ok(3));
+    hub.stop_all().await;
+}

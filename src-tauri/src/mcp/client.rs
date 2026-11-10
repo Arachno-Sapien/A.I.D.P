@@ -118,17 +118,17 @@ impl Client {
             "params": params,
         });
 
+        // Giving up mid-write may leave half a message in the stream, which would
+        // spoil the next one: the client is closed, so the hub starts the server again.
         let write_res = tokio::select! {
             biased;
             _ = cancel.cancelled() => {
-                let mut guard = self.pending.lock().unwrap_or_else(PoisonError::into_inner);
-                guard.remove(&id);
+                self.close_and_fail(McpError::Closed { stderr: String::new() });
                 return Err(McpError::Stopped);
             }
             res = self.write_value(&payload) => res,
             _ = tokio::time::sleep(timeout) => {
-                let mut guard = self.pending.lock().unwrap_or_else(PoisonError::into_inner);
-                guard.remove(&id);
+                self.close_and_fail(McpError::Closed { stderr: String::new() });
                 return Err(McpError::Timeout);
             }
         };
@@ -937,6 +937,8 @@ mod tests {
             .await
             .unwrap_err();
         assert!(matches!(err, McpError::Timeout));
+        // Half a message may be in the stream now: the client must not be reused.
+        assert!(client.is_closed());
 
         let (client_out2, _server_in2) = tokio::io::duplex(8);
         let (_server_out2, client_in2) = tokio::io::duplex(64);
@@ -952,6 +954,7 @@ mod tests {
             .await
             .unwrap_err();
         assert!(matches!(err2, McpError::Stopped));
+        assert!(client2.is_closed());
     }
 }
 

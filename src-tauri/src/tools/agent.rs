@@ -159,7 +159,8 @@ pub async fn run_with_images(
             let id = args.approvals.next_id();
             if let Some(mcp) = &args.mcp
                 && let Some((server, tool)) = split_name(&call.name)
-                && mcp.servers.iter().any(|s| s.name == server && s.enabled)
+                // Only a tool a started server offered this run; anything else is an unknown tool.
+                && specs_list[builtin_count..].iter().any(|s| s.name == call.name)
             {
                 if !call.input.is_object() {
                     let err = format!(

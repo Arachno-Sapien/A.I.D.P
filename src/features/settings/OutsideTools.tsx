@@ -178,10 +178,11 @@ export function OutsideTools() {
                         type="checkbox"
                         checked={server.enabled}
                         aria-label={`${server.name} on`}
+                        disabled={isTesting}
                         onChange={(e) =>
                           void handleToggle(server, e.target.checked)
                         }
-                        className="rounded bg-neutral-800 border-neutral-700 cursor-pointer focus-visible:ring-1 focus-visible:ring-neutral-400 focus-visible:outline-none"
+                        className="rounded bg-neutral-800 border-neutral-700 cursor-pointer disabled:cursor-default disabled:opacity-60 focus-visible:ring-1 focus-visible:ring-neutral-400 focus-visible:outline-none"
                       />
                       <span>On</span>
                     </label>
@@ -197,8 +198,9 @@ export function OutsideTools() {
                     <button
                       type="button"
                       aria-label={`Remove ${server.name}`}
+                      disabled={isTesting}
                       onClick={() => setRemoving(server)}
-                      className="px-2.5 py-1 rounded-lg border border-neutral-800 bg-neutral-900 text-xs text-neutral-300 hover:border-red-900/80 hover:text-red-300 transition-colors cursor-pointer focus-visible:ring-1 focus-visible:ring-neutral-400 focus-visible:outline-none"
+                      className="px-2.5 py-1 rounded-lg border border-neutral-800 bg-neutral-900 text-xs text-neutral-300 hover:border-red-900/80 hover:text-red-300 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-default focus-visible:ring-1 focus-visible:ring-neutral-400 focus-visible:outline-none"
                     >
                       Remove
                     </button>

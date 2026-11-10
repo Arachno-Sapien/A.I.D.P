@@ -1,4 +1,5 @@
-// A tiny MCP server for tests. argv[2] === "silent": never answers.
+// A tiny MCP server for tests. argv[2] === "silent": never answers;
+// "slowinit": answers initialize after 600 ms.
 import { createInterface } from "node:readline";
 const mode = process.argv[2];
 const send = (m) => process.stdout.write(JSON.stringify(m) + "\n");
@@ -9,6 +10,8 @@ createInterface({ input: process.stdin }).on("line", (line) => {
   try { m = JSON.parse(line); } catch { return; }
   if (mode === "silent" || m.id === undefined) return;
   const ok = (result) => send({ jsonrpc: "2.0", id: m.id, result });
+  if (m.method === "initialize" && mode === "slowinit")
+    return void setTimeout(() => ok({ protocolVersion: "2025-06-18", capabilities: { tools: {} }, serverInfo: { name: "fake", version: "1" } }), 600);
   if (m.method === "initialize")
     return ok({ protocolVersion: "2025-06-18", capabilities: { tools: {} }, serverInfo: { name: "fake", version: "1" } });
   if (m.method === "tools/list")

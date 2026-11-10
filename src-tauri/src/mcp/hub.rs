@@ -35,6 +35,9 @@ struct Running {
 pub struct Hub {
     base: PathBuf,
     running: Arc<AsyncMutex<HashMap<u32, Running>>>,
+    /// How many times each server was stopped. A start that began before a stop
+    /// (Remove or Off pressed while it starts) must not add the server afterwards.
+    stops: Arc<Mutex<HashMap<u32, u64>>>,
 }
 
 impl Hub {
@@ -43,7 +46,13 @@ impl Hub {
         Self {
             base,
             running: Arc::new(AsyncMutex::new(HashMap::new())),
+            stops: Arc::new(Mutex::new(HashMap::new())),
         }
+    }
+
+    fn stop_count(&self, id: u32) -> u64 {
+        let guard = self.stops.lock().unwrap_or_else(PoisonError::into_inner);
+        guard.get(&id).copied().unwrap_or(0)
     }
 
     /// Starts the server unless it already runs with the same command and an open stream
@@ -54,6 +63,7 @@ impl Hub {
         config: &ServerConfig,
         cancel: &CancellationToken,
     ) -> Result<usize, McpError> {
+        let stops_before = self.stop_count(config.id);
         let existing = {
             let mut guard = self.running.lock().await;
             if let Some(entry) = guard.get_mut(&config.id)
@@ -154,10 +164,15 @@ impl Hub {
                 let count = to_specs(&config.name, &tools).len();
                 entry.tools = tools;
                 entry.last_used = Instant::now();
-                let displaced = {
-                    let mut guard = self.running.lock().await;
-                    guard.insert(config.id, entry)
-                };
+                let mut guard = self.running.lock().await;
+                // Checked under the lock `stop` takes after counting, so one of the two sees the other.
+                if self.stop_count(config.id) != stops_before {
+                    drop(guard);
+                    kill_running(entry, false).await;
+                    return Err(McpError::Stopped);
+                }
+                let displaced = guard.insert(config.id, entry);
+                drop(guard);
                 if let Some(old) = displaced {
                     kill_running(old, false).await;
                 }
@@ -247,6 +262,10 @@ impl Hub {
     }
 
     pub async fn stop(&self, id: u32) {
+        {
+            let mut stops = self.stops.lock().unwrap_or_else(PoisonError::into_inner);
+            *stops.entry(id).or_insert(0) += 1;
+        }
         let entry = {
             let mut guard = self.running.lock().await;
             guard.remove(&id)
@@ -261,9 +280,8 @@ impl Hub {
             let mut guard = self.running.lock().await;
             guard.drain().map(|(_, r)| r).collect()
         };
-        for entry in entries {
-            kill_running(entry, false).await;
-        }
+        // Together, so quitting waits for the slowest server, not for each in turn.
+        futures_util::future::join_all(entries.into_iter().map(|e| kill_running(e, false))).await;
     }
 
     /// Stops servers not used for `older_than`.
