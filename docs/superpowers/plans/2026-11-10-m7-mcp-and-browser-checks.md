@@ -29,7 +29,7 @@
 
 Defaults are what this plan implements. A different answer changes the tasks named.
 
-**Answered 2026-11-10: the human approved every default ("Approve defaults").** Task 0 Step 1 is done. Per D1, the rest starts only after `0.1.0` ships and M6 closes.
+**Answered 2026-11-10:** The human first approved every default ("Approve defaults") for D1–D7, then amended **D1** on 2026-11-10 to **"Now, inside M6"** (`M6:` commit prefix, tracked in `docs/phases/M6.md`, no `docs/phases/M7.md` phase doc), keeping the approved D2–D7 defaults and local gitignored working ledgers.
 
 | | Question | Default | If changed |
 | --- | --- | --- | --- |

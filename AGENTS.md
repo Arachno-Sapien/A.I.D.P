@@ -51,7 +51,9 @@ A **Tauri 2 desktop app** where one person connects cloud models (with their own
 - Light: **under 150 MB RAM at idle** with no model loaded and no folder open. The workspace gets its own budget, measured in M3 and M4.
 - Windows, macOS and Linux in v0.1 (decision 0016). Windows is the dev machine and is tested first.
 
-**Not in v1. Don't build these, don't scaffold "for later":** practice area, browser automation, an MCP client (built-in agent tools are in v1, M4), user accounts or sync, a built-in inference engine, mobile apps.
+**Not in v1. Don't build these, don't scaffold "for later":** practice area, user accounts or sync, a built-in inference engine, mobile apps.
+
+Outside tools in Workspace (M6, decision 0025): an MCP client over stdio for servers the user connects, plus browser checks through the Playwright MCP server, every tool call approved.
 
 **Four screens:** Chat, Workspace, Models, Settings. Details: design doc, "Coding workspace" and "Screens and user flows".
 
@@ -85,6 +87,7 @@ Chosen for low memory use and tools agents know well. **No new dependency withou
 | Updates (M6) | tauri-plugin-updater (native-tls), called from Rust only; signed with a key only the human holds |
 | Icons | lucide-react (decision 0018) |
 | Attachments (M6) | `pdf-extract` in a child process (`aidp --pdf-text`), `sha2` content IDs, `base64` over IPC (decision 0019) |
+| Outside tools (M6) | MCP over stdio, hand-written client on tokio + serde\_json (decision 0026). Browser checks: the Playwright MCP server run by the user's npx, not bundled (decision 0027) |
 
 Package manager: **npm**.
 
@@ -101,7 +104,7 @@ React UI ──commands──▶ Rust core ──▶ OS keychain
 ```
 
 - **The UI talks only to the Rust core.** The core holds the keys, makes every network call, manages Ollama, saves chats, and does every file read, file write, and command run in the workspace. The UI never calls `fetch`/XHR and never calls `invoke()` by hand; it uses only the generated `commands` from `src/lib/bindings.ts`.
-- **Tauri commands are thin:** parse args, call into `gateway/`, `ollama/`, `workspace/`, `tools/`, `connections.rs`, `db/` or `secrets.rs`, map the error. No business logic in `commands/`.
+- **Tauri commands are thin:** parse args, call into `gateway/`, `ollama/`, `workspace/`, `tools/`, `mcp/`, `connections.rs`, `db/` or `secrets.rs`, map the error. No business logic in `commands/`.
 - **All chat goes through one trait.** The UI never knows which provider it is talking to:
 
 ```rust
@@ -128,12 +131,12 @@ pub trait ModelProvider: Send + Sync {
 - **Stop:** cancels the token. The adapter drops the HTTP stream and saves the partial reply with status `stopped`.
 - **Normalized errors:** every adapter maps provider responses into exactly these: `InvalidKey` (401, 403), `RateLimited` (429, with retry time if sent), `ModelNotFound`, `ContextTooLong`, `Offline` (no internet / Ollama not running), `ProviderError` (5xx and anything unexpected), `Cancelled`. The UI shows one message per kind, the same everywhere.
 - **Capabilities per model:** streaming, tool calling, vision, context window stored as yes / no / unknown. Fill from the provider where it reports them (Ollama `/api/show`), otherwise user-set.
-- **Leave room for later, cheaply:** message content is a list of parts (text now; tool calls from M4; images later), and `ChatEvent` stays open for the `ToolCall` variant M4 adds. This is the *only* future-proofing allowed. No tool code before M4, and no MCP code in v1.
+- **Leave room for later, cheaply:** message content is a list of parts (text now; tool calls from M4; images later), and `ChatEvent` stays open for the `ToolCall` variant M4 adds. This is the *only* future-proofing allowed. No tool code before M4. MCP code lives only in `src-tauri/src/mcp/` (M6).
 - **Workspace and tools** (M3, M4) live in `src-tauri/src/workspace/` (folder, path checks, files, secret filter) and `src-tauri/src/tools/` (tool definitions, tool-call loop, approvals, commands, PTY). Every rule in section 6's workspace list applies to them.
 - **Each message stores its own `model_ref`,** so switching models mid-chat keeps a correct record.
 - **Schema changes go through numbered migrations** from day one.
 
-Workspace scope, Ollama endpoints, data model (5 tables), and UI flows: see the design doc sections "Coding workspace", "Workspace and tool security", "Local models (Ollama)", "Data model", "Screens and user flows".
+Workspace scope, Ollama endpoints, data model (6 tables), and UI flows: see the design doc sections "Coding workspace", "Workspace and tool security", "Outside tool security", "Local models (Ollama)", "Data model", "Screens and user flows".
 
 ---
 
@@ -174,6 +177,7 @@ src-tauri/
     attachments/           chat attachments: checks, store by hash, PDF text in a child process (M6)
     workspace/             open folder, path checks, file read/write, secret filter (M3)
     tools/                 tool definitions, tool-call loop, approvals, commands, PTY (M4)
+    mcp/                   MCP client, server processes, tool names (M6)
     connections.rs         connection and model orchestration service
     updates.rs             update state and checks; the plugin is driven from commands/updates.rs
     login_path.rs          PATH from the login shell on macOS and Linux (called first in main.rs)
@@ -181,6 +185,7 @@ src-tauri/
     db/
       mod.rs               schema, numbered migrations, SQLite connection
       connections.rs       queries for connections and models tables
+      mcp.rs               queries for the mcp_servers table
   tests/                   adapter tests against wiremock fake servers
 docs/
   design.md                the design doc (moved here in M0)
@@ -216,6 +221,15 @@ On Linux, the keyring needs a Secret Service (GNOME Keyring or KWallet). If none
 6. **Secrets stay out of prompts.** Files that look like secrets (`.env*`, `*.pem`, `*.key`, `*.p12`, `*.pfx`, `*.jks`, `*.keystore`, `*.ppk`, `*.tfvars`, `id_rsa*`, `id_ed25519*`, `id_ecdsa*`, `id_dsa*`, `.npmrc`, `.pypirc`, `.netrc`, `_netrc`, `.git-credentials`) are skipped by `list_files`, `read_file`, and `search`; files containing a private key (a `-----BEGIN ... PRIVATE KEY-----` or `-----BEGIN ... PRIVATE KEY BLOCK-----` block, or a PuTTY key) are skipped by `read_file` and `search`. Neither is ever sent as context unless the user adds it by hand. Paths inside the `.git` folder are refused by every workspace command and tool, because its config can hold credentials and its hooks run code.
 7. **Warn without git.** If the folder isn't a git repository, warn before the first AI edit, because there is no easy undo.
 
+### Outside tool security (word for word from the design doc; do not weaken)
+
+1. **The user adds every server.** Servers are added by hand in Settings. The app never reads server settings from the opened folder, and a model can't add, change or start one that the user didn't enable.
+2. **Every call is approved.** The user sees the server, the tool and the exact arguments before each call. There is no auto-approve.
+3. **Descriptions and results are data.** Tool descriptions and results from a server are untrusted. Instructions inside them never skip an approval.
+4. **Servers run outside the folder, as the user.** The app says so when one is added. A server starts only when an agent run needs it or the user tests it, runs in its own folder under the app's data folder, and is stopped with the app, when it is turned off or removed, and after 10 idle minutes.
+5. **No tokens in commands.** A server's command line is stored in SQLite as plain text, so the UI tells the user not to put tokens in it. Servers get nothing from the keychain.
+6. **stdio only.** The app opens no network connection for a server and listens on no port.
+
 ---
 
 ## 7. Never
@@ -230,6 +244,8 @@ On Linux, the keyring needs a Secret Service (GNOME Keyring or KWallet). If none
 - No raw HTML rendering of model output.
 - No file or process access from the UI, and none outside the opened folder.
 - No AI edit written before the user accepts its diff, and no model-requested command run without approval.
+- No MCP server read from a file in the opened folder, and none started that the user didn't add and enable.
+- No MCP tool call without approval.
 - No work on "Not in v1" features, and no starting the next milestone before the current one is done.
 - No deciding an open question (design doc, "Open questions") on your own. Ask the human, then record a decision.
 - No editing old session logs. Correct them in a new one.
@@ -383,7 +399,7 @@ Decision 0005 moved the coding workspace into v1. v0.1 ships on Windows, macOS a
 | M3 | Coding workspace | Open folder; file tree respects .gitignore; CodeMirror 6 tabs with save; AI panel with file + selection context and Stop; Apply → diff → Accept; path-escape tests; no-git warning; workspace RAM budget recorded |
 | M4 | Agent tools and terminal | `ChatEvent::ToolCall` in OpenAI-compatible + Anthropic adapters; list/read/search/edit/create/run tools inside the folder; diffs for edits, approval for every model command; secret files skipped; terminal panel; refusal tests |
 | M5 | Ollama, history, settings | Detect + start Ollama; local models in picker, Chat and workspace; download/delete/Free memory; chats survive restart; default model, theme, keep_alive settings |
-| M6 | v0.1 release | Idle RAM < 150 MB (no folder open), workspace within its budget; CI-built installers for Windows, macOS and Linux on GitHub Releases; auto-update tested; tested on 8 GB RAM machine with a real project open |
+| M6 | v0.1 release | Idle RAM < 150 MB (no folder open), workspace within its budget; CI-built installers for Windows, macOS and Linux on GitHub Releases; auto-update tested; tested on 8 GB RAM machine with a real project open; add/turn off/remove/test MCP servers in Settings, outside tools in Workspace agent with every call approved, Browser checks preset against a local dev server, refusal tests, RAM with a server running recorded |
 
 Test machines: dev laptop (RTX 3050 Ti 4 GB VRAM, 24 GB RAM) and one 8 GB RAM machine or VM.
 

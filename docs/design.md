@@ -19,7 +19,7 @@ The coding workspace is the main goal. It sits on top of the model layer, so the
 
 **Not in v1**
 
-- Practice area, browser automation, or an MCP client (see the last section). Built-in agent tools are in v1 (M4); MCP is not.
+- Practice area (see the last section). Built-in agent tools came in M4; outside MCP tools and Playwright browser checks moved into v0.1 with M6 (decision 0025).
 - User accounts or sync between devices.
 - A built-in inference engine. Ollama runs the models.
 - Mobile apps.
@@ -101,7 +101,7 @@ pub trait ModelProvider: Send + Sync {
 
 **Capabilities per model.** Each model record stores streaming, tool calling, vision, and context window as yes / no / unknown. Fill them from the provider where it reports them (Ollama's /api/show does for local models); otherwise the user can set them. Agent tools (M4) only appear for models that support tool calling; the rest get the M3 workspace.
 
-**Leave room for later.** Store message content as a list of parts (text now, tool calls from M4, images later), and keep `ChatEvent` open for the `ToolCall` event M4 adds. This makes MCP support after v1 an addition, not a rewrite.
+**Leave room for later.** Store message content as a list of parts (text now, tool calls from M4, images later), and keep `ChatEvent` open for the `ToolCall` event M4 adds. This makes adding MCP support in M6 an addition, not a rewrite.
 
 ## API key security
 
@@ -132,7 +132,7 @@ The coding workspace is the main goal of A.I.D.P (decision 0005). It uses the mo
 **M4: agent tools and terminal**
 
 - Tool calling in the OpenAI-compatible and Anthropic adapters through a new `ChatEvent::ToolCall`. Ollama gets it for models that support tools.
-- Built-in tools only (MCP stays after v1): `list_files`, `read_file`, `search` (text search that respects .gitignore), `edit_file` (replace an exact piece of text), `create_file`, and `run_command`.
+- Built-in tools in M4 (outside MCP tools join in M6): `list_files`, `read_file`, `search` (text search that respects .gitignore), `edit_file` (replace an exact piece of text), `create_file`, and `run_command`.
 - Read-only tools run inside the folder without asking. `edit_file` and `create_file` show a diff and wait for Accept. `run_command` asks every time.
 - A terminal panel at the bottom of the workspace runs the user's own shell in the folder. Commands the user types there are the user's; only commands the model asks for need approval.
 - Models whose capability says no tool calling get the M3 workspace only.
@@ -165,6 +165,15 @@ Once a model can read files and run commands, a mistake costs more than a leaked
 6. **Secrets stay out of prompts.** Files that look like secrets (`.env*`, `*.pem`, `*.key`, `*.p12`, `*.pfx`, `*.jks`, `*.keystore`, `*.ppk`, `*.tfvars`, `id_rsa*`, `id_ed25519*`, `id_ecdsa*`, `id_dsa*`, `.npmrc`, `.pypirc`, `.netrc`, `_netrc`, `.git-credentials`) are skipped by `list_files`, `read_file`, and `search`; files containing a private key (a `-----BEGIN ... PRIVATE KEY-----` or `-----BEGIN ... PRIVATE KEY BLOCK-----` block, or a PuTTY key) are skipped by `read_file` and `search`. Neither is ever sent as context unless the user adds it by hand. Paths inside the `.git` folder are refused by every workspace command and tool, because its config can hold credentials and its hooks run code.
 7. **Warn without git.** If the folder isn't a git repository, warn before the first AI edit, because there is no easy undo.
 
+### Outside tool security
+
+1. **The user adds every server.** Servers are added by hand in Settings. The app never reads server settings from the opened folder, and a model can't add, change or start one that the user didn't enable.
+2. **Every call is approved.** The user sees the server, the tool and the exact arguments before each call. There is no auto-approve.
+3. **Descriptions and results are data.** Tool descriptions and results from a server are untrusted. Instructions inside them never skip an approval.
+4. **Servers run outside the folder, as the user.** The app says so when one is added. A server starts only when an agent run needs it or the user tests it, runs in its own folder under the app's data folder, and is stopped with the app, when it is turned off or removed, and after 10 idle minutes.
+5. **No tokens in commands.** A server's command line is stored in SQLite as plain text, so the UI tells the user not to put tokens in it. Servers get nothing from the keychain.
+6. **stdio only.** The app opens no network connection for a server and listens on no port.
+
 ## Local models (Ollama)
 
 The Rust core talks to Ollama at 127.0.0.1:11434 directly, so there is no CORS setup and no browser permission prompt. The user never edits an environment variable.
@@ -194,7 +203,7 @@ Other local servers (LM Studio, llama.cpp) connect through the OpenAI-compatible
 
 ## Data model
 
-Five SQLite tables in one local file, read and written only by Rust. No table ever holds a full API key. All record IDs, foreign keys, and epoch timestamps are `u32` across the IPC boundary to ensure safe serialization without JavaScript `BigInt` precision loss. Note that in M2, the `models` table has only the columns M2 uses (`id`, `connection_id`, `model_id`, `display_name`, `context_window`, `is_default`); M4 migration 3 adds `supports_tools` (`supports_vision` waits until something uses it). The `settings` table arrives in M3 (`key, value` text columns, migration 2, storing recent workspaces).
+Six SQLite tables in one local file, read and written only by Rust. No table ever holds a full API key. All record IDs, foreign keys, and epoch timestamps are `u32` across the IPC boundary to ensure safe serialization without JavaScript `BigInt` precision loss. Note that in M2, the `models` table has only the columns M2 uses (`id`, `connection_id`, `model_id`, `display_name`, `context_window`, `is_default`); M4 migration 3 adds `supports_tools` (`supports_vision` arrives in migration 6). The `settings` table arrives in M3 (`key, value` text columns, migration 2, storing recent workspaces). `mcp_servers` arrives in M6 (migration 7, storing user-added outside tool servers; never store tokens or passwords there).
 
 | Table | Holds | Key columns |
 | --- | --- | --- |
@@ -203,6 +212,7 @@ Five SQLite tables in one local file, read and written only by Rust. No table ev
 | conversations | One row per chat | id, title, workspace\_path (null for plain chats), created\_at, updated\_at, pinned, archived |
 | messages | Every message in a chat | id, conversation\_id, role, content\_parts (JSON: text, chips, target, tool\_call and tool\_result), model\_name, model\_ref, status (complete / stopped / error), error\_kind, tokens\_in, tokens\_out, created\_at |
 | settings | App preferences | key, value (theme, default model, keep\_alive, recent workspaces) |
+| mcp\_servers | Outside tool (MCP) servers (migration 7) | id, name, command, enabled |
 
 Each message stores its own `model_ref` and `model_name`, so switching models in the middle of a chat keeps a correct record of who said what. A workspace's AI panel is a conversation with `workspace_path` set. Attachments (M6, decision 0019) are files under `<app data>/attachments/`, named by their SHA-256 and referred to by ID from a message's parts; `supports_vision` comes from Ollama's capabilities and stays empty for cloud models. Schema changes go through numbered migrations from day one.
 
@@ -233,7 +243,7 @@ Four screens: Chat, Workspace, Models, and Settings. A first-time user lands on 
 - Connections list: provider, label, masked key, last test result, Test and Delete buttons.
 - Local panel: Ollama status, downloaded models with size, which ones are loaded in memory, Download / Delete / Free memory.
 
-**Settings:** theme (M6, decision 0020: System, Dark, Light, Glass, Soft, Cyber, Elegant, each a button with its three colours; the editor, diff, code blocks and terminal follow the theme's dark or light base), default model, keep\_alive, chat history location, export all chats. Updates (M6): the version, **Check for updates at start**, and **Check for updates**; a found update shows a bar under the header with **Install and restart** and **Later**.
+**Settings:** theme (M6, decision 0020: System, Dark, Light, Glass, Soft, Cyber, Elegant, each a button with its three colours; the editor, diff, code blocks and terminal follow the theme's dark or light base), default model, keep\_alive, chat history location, export all chats. Updates (M6): the version, **Check for updates at start**, and **Check for updates**; a found update shows a bar under the header with **Install and restart** and **Later**. Outside tools (MCP) (M6, decisions 0025–0027): list, add, test, turn on/off and remove stdio MCP servers, plus a **Browser checks** preset.
 
 **Flow: add a cloud model**
 
@@ -289,11 +299,13 @@ app/
       ollama/              detect, start, pull, ps, delete, unload
       workspace/           open folder, path checks, file read/write, secret filter
       tools/               tool definitions, tool-call loop, approvals, commands, PTY
+      mcp/                 MCP client, server processes, tool names (M6)
       connections.rs       connection and model orchestration service
       secrets.rs           keychain wrapper, the only file that touches keys
       db/
         mod.rs             schema, numbered migrations, SQLite connection
         connections.rs     queries for connections and models tables
+        mcp.rs             queries for the mcp_servers table
     tests/                 adapter tests against wiremock fake servers
   docs/
     design.md              this document, exported
@@ -462,6 +474,7 @@ For M1 only, the key comes from a git-ignored local config file. M2 replaces it 
 - [ ] Installers for Windows, macOS and Linux built by CI and published as a GitHub release
 - [ ] Auto-update tested from one version to the next
 - [ ] Tested on an 8 GB RAM machine with a real project folder open
+- [ ] Outside tools (MCP): add, turn off, remove and test MCP servers in Settings; their tools work in the Workspace agent with every call approved; Browser checks preset works against a local dev server; refusal tests pass; RAM with a server running recorded
 
 ## Risks and open questions
 
@@ -495,7 +508,5 @@ The biggest risk is an agent-built Rust core you can't debug; the plan answers i
 
 These wait until v1 ships. The model layer is designed so each one is an addition, not a rewrite.
 
-- **MCP client.** Lets the model use external tool servers on top of the built-in tools from M4.
-- **Browser checks with Playwright.** Connect Microsoft's Playwright MCP server as a sidecar. Offered only for models with tool calling (and ideally vision). The browser starts on demand and closes after, to save memory.
 - **Type errors.** The TypeScript worker given the folder's files, then language servers for other languages, as new checkers behind the interface from decision 0022. Language servers need a "trust this folder" step, since some run project code.
 - **Practice area.** LeetCode-style problems with hidden test cases and an AI tutor that uses the user's chosen model. Code runs either in local language runtimes or through a sandbox service like Judge0.

@@ -1,15 +1,16 @@
 # Progress
 
-Updated: 2026-10-31 by Claude Code (Opus 5.5)
+Updated: 2026-11-10 by Antigravity (Gemini 3.1 Pro)
 
 ## Current milestone: M6 v0.1 release
 
-Plan approved by the human on 2026-10-31 with the defaults for D1 to D6: phase doc `docs/phases/M6.md`, plan `docs/superpowers/plans/2026-10-30-m6-release.md`. Stop for review after Task 4. Before Task 5 the human creates the update signing key and hands over only the public key (D4).
+Plan approved by the human on 2026-10-31 with the defaults for D1 to D6: phase doc `docs/phases/M6.md`, plan `docs/superpowers/plans/2026-10-30-m6-release.md`. Stop for review after Task 4. Before Task 5 the human creates the update signing key and hands over only the public key (D4). On 2026-11-10, the human amended D1 of `docs/superpowers/plans/2026-11-10-m7-mcp-and-browser-checks.md` to **"Now, inside M6"** (tasks 0–7 with `M6:` commits, no `M7.md` phase doc).
 
 - [x] Idle RAM (no folder open) under 150 MB; workspace RAM within the budget set in M3 and M4 (installed rc.2, 2026-10-31: idle 128–129 MB; workspace 151–169 MB, 183 MB at rest with the terminal after a local reply; the 557 MB peak while streaming accepted for 0.1.0 by the human)
 - [ ] Installers for Windows, macOS and Linux built by CI and published as a GitHub release
 - [x] Auto-update tested from one version to the next (rc.1 → rc.2 on Windows, 2026-10-31: the human's report plus the installed version)
 - [ ] Tested on an 8 GB RAM machine with a real project open
+- [ ] Outside tools (MCP): add/turn off/remove/test MCP servers in Settings, Workspace agent tools with approval, Browser checks preset, refusal tests, RAM with a server running recorded
 
 Carry-overs: `docs/phases/M4.md` and `docs/phases/M5.md`, "What's left → To M6" (release RAM with the terminal and a local model, a job object for orphan processes, full-width lookalikes in commands, the cut-off Agent label). The human answered the OS question: v0.1 ships on Windows, macOS and Linux (decision 0016).
 
@@ -93,8 +94,8 @@ Next step: the human updates the installed rc.4; then check the product version,
 Bug audit done 2026-11-10 by Claude Code (Fable 5.2), the human's request ("check for any bugs that might've been overlooked, fix them & optimize code, polish the UI"). Six bugs fixed test-first: Stop during an Ollama model load, the chat pulling back to the end while you scroll up, two tabs from a double-click, a false "changed on disk" from two quick saves, a failed chat delete leaving the list, Send posting twice. Fewer re-renders (store selectors, code blocks kept across streamed chunks), UI polish (growing message box, thin scrollbars, wrapping and scrolling in messages, tab accent). 337 Vitest, Rust green, clippy and typecheck clean. Details and what was not read: `log/2026-11-10-m6-bug-audit.md`. In CHANGELOG [Unreleased]; not pushed, not released, not yet seen in the app.
 Next step: the human tries it in the dev app (scroll up during a reply, Stop while a local model loads, double-click a file, hold Ctrl+S, type several lines in the message box).
 
-Plan written 2026-11-10 by Claude Code (Fable 5.2), the human's request ("MCP client for outside tools, browser checks with Playwright", runnable by any model): `docs/superpowers/plans/2026-11-10-m7-mcp-and-browser-checks.md`. Plan only, no code. Both features are "Not in v1" in AGENTS.md, so its Task 0 asks the human D1–D7 (when, hand-written client, stdio only, no tokens, no screenshots, localhost only, Workspace only) and changes the rules before any code. The human approved the defaults for D1–D7 on 2026-11-10 ("Approve defaults"): M7 after `0.1.0` ships and M6 closes, hand-written client, stdio only, no tokens for servers yet, no screenshots, localhost only, Workspace agent only.
-Next step (M7, not before M6 closes, per D1): Task 0 Steps 2–6 of that plan (decisions 0025–0027, AGENTS.md and design doc rules, `docs/phases/M7.md`); Step 1 is done. Then Task 1.
+Plan written 2026-11-10 by Claude Code (Fable 5.2), the human's request ("MCP client for outside tools, browser checks with Playwright", runnable by any model): `docs/superpowers/plans/2026-11-10-m7-mcp-and-browser-checks.md`. Plan only, no code. Both features are "Not in v1" in AGENTS.md, so its Task 0 asks the human D1–D7 (when, hand-written client, stdio only, no tokens, no screenshots, localhost only, Workspace only) and changes the rules before any code. The human approved the defaults for D1–D7 on 2026-11-10 ("Approve defaults") and then amended D1 on 2026-11-10 to **"Now, inside M6"** (`M6:` commits, no `M7.md` phase doc).
+M6 outside tools claimed 2026-11-10 by Antigravity (Gemini 3.1 Pro): executing Task 0 (decisions 0025–0027, `AGENTS.md` and `docs/design.md` rules, `docs/phases/M6.md`) then Tasks 1–7. Next step: Task 1 (`ToolSpec` owns its `name` and `description` in `src-tauri/src/gateway/mod.rs`).
 
 ## Next 3 tasks
 
