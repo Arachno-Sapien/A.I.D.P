@@ -108,6 +108,7 @@ With no folder open, **Continue in &lt;folder&gt;** reopens the folder you used 
 
 ### Safety & Approval Gates
 - **Edits are proposals:** The model cannot write directly to your files. Changes appear as an interactive unified diff over the editor. Review the exact before-and-after diff and click **Accept** to write to disk or **Reject** to discard.
+- **Review at end:** For a task that changes many files, tick **Review at end** next to **Agent**. The agent then writes its edits as it goes (so it can run your tests or a browser check on them) and, when it finishes, a card lists every file it changed. Click a file to see its diff, then **Undo** it, **Undo all**, or **Keep all**. Commands and outside tools still ask every time. Undo leaves a file alone if it changed after the agent wrote it. The review is gone once you close the folder or the app, so in a folder without git (the app asks before turning it on there) decide before you leave.
 - **Non-git warning:** If you open a directory that is not a git repository, A.I.D.P warns you before applying AI edits, since changes cannot be undone with `git checkout`.
 
 ---
@@ -126,7 +127,7 @@ With Agent turned on, the model can iteratively explore your project:
 6. `run_command`: Request running commands in the project folder (e.g. tests or builds).
 
 ### Strict Security Rules
-- **No auto-approve:** File edits and command execution **always** pause for user review.
+- **No auto-approve:** Commands and outside tools **always** pause for your approval. File edits do too, unless you turn on **Review at end**.
 - **Command inspection:** Command cards display the exact command string and working directory. Commands with hidden characters, control characters, or unprintable unicode are refused before presentation.
 - **The `.git` folder is off limits:** Tools cannot read, modify, or create files inside `.git`.
 - **Hard timeouts & process cleanup:** Model commands run with a 120-second timeout. Clicking **Stop** kills the entire spawned process tree cleanly.

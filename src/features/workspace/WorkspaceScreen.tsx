@@ -53,7 +53,7 @@ export interface WorkspaceScreenProps {
 export function WorkspaceScreen({ active = true }: WorkspaceScreenProps) {
   // Not the whole store: it also holds the editor's selection, which changes
   // on every move of the cursor and would flatten the file tree again each time.
-  const { info, recent, children, expanded, error, proposal } = useWorkspaceStore(
+  const { info, recent, children, expanded, error, proposal, reviewDiff } = useWorkspaceStore(
     useShallow((s) => ({
       info: s.info,
       recent: s.recent,
@@ -61,6 +61,7 @@ export function WorkspaceScreen({ active = true }: WorkspaceScreenProps) {
       expanded: s.expanded,
       error: s.error,
       proposal: s.proposal,
+      reviewDiff: s.reviewDiff,
     })),
   );
   const {
@@ -392,7 +393,7 @@ export function WorkspaceScreen({ active = true }: WorkspaceScreenProps) {
           style={{ minWidth: EDITOR_MIN }}
         >
           <div className="flex-1 overflow-hidden flex flex-col min-h-0">
-            {proposal ? <DiffView /> : <EditorPane />}
+            {proposal || reviewDiff ? <DiffView /> : <EditorPane />}
           </div>
           {terminalOpen && (
             <Suspense fallback={<div className="h-60 bg-neutral-950" />}>

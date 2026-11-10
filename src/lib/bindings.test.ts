@@ -106,13 +106,14 @@ describe("generated IPC bindings", () => {
     });
   });
 
-  it("runAgent sends connectionId, modelId, messages, onEvent", async () => {
+  it("runAgent sends connectionId, modelId, messages, reviewAtEnd, onEvent", async () => {
     const channel = new Channel();
-    await commands.runAgent(1, "model-x", [], channel);
+    await commands.runAgent(1, "model-x", [], true, channel);
     expect(invoke).toHaveBeenCalledWith("run_agent", {
       connectionId: 1,
       modelId: "model-x",
       messages: [],
+      reviewAtEnd: true,
       onEvent: channel,
     });
   });

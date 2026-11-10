@@ -29,7 +29,7 @@ export const commands = {
 	renameEntry: (from: string, to: string) => typedError<string, WorkspaceError>(__TAURI_INVOKE("rename_entry", { from, to })),
 	/**  Delete from the tree: to the Recycle Bin or Trash, after the UI asked. */
 	deleteEntry: (path: string) => typedError<null, WorkspaceError>(__TAURI_INVOKE("delete_entry", { path })),
-	runAgent: (connectionId: number, modelId: string, messages: ChatInput_Deserialize[], onEvent: Channel<ChatEvent_Deserialize>) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("run_agent", { connectionId, modelId, messages, onEvent })),
+	runAgent: (connectionId: number, modelId: string, messages: ChatInput_Deserialize[], reviewAtEnd: boolean, onEvent: Channel<ChatEvent_Deserialize>) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("run_agent", { connectionId, modelId, messages, reviewAtEnd, onEvent })),
 	answerTool: (id: number, approve: boolean) => __TAURI_INVOKE<boolean>("answer_tool", { id, approve }),
 	terminalOpen: (cols: number, rows: number, onEvent: Channel<TerminalEvent>) => typedError<null, WorkspaceError>(__TAURI_INVOKE("terminal_open", { cols, rows, onEvent })),
 	terminalWrite: (data: string) => typedError<null, WorkspaceError>(__TAURI_INVOKE("terminal_write", { data })),

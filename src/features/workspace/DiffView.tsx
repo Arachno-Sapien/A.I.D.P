@@ -5,17 +5,28 @@ import { useSettingsStore } from "../settings/store";
 import { useWorkspaceStore } from "./store";
 
 export function DiffView() {
-  const { proposal, needsGitConfirm } = useWorkspaceStore(
-    useShallow((s) => ({ proposal: s.proposal, needsGitConfirm: s.needsGitConfirm })),
+  const { proposal, needsGitConfirm, reviewFile } = useWorkspaceStore(
+    useShallow((s) => ({
+      proposal: s.proposal,
+      needsGitConfirm: s.needsGitConfirm,
+      reviewFile: s.reviewDiff ? (s.review.find((f) => f.path === s.reviewDiff) ?? null) : null,
+    })),
   );
-  const { acceptProposal, rejectProposal, confirmGit } = useWorkspaceStore.getState();
+  const { acceptProposal, rejectProposal, confirmGit, showReviewDiff } =
+    useWorkspaceStore.getState();
+  // A change waiting for an answer comes first; otherwise a file the agent already wrote.
+  const diff = proposal
+    ? proposal
+    : reviewFile
+      ? { path: reviewFile.path, original: reviewFile.original ?? "", proposed: reviewFile.current }
+      : null;
   const resolved = useSettingsStore((s) => s.resolved);
   const editorRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!editorRef.current || !proposal) return;
+    if (!editorRef.current || !diff) return;
     const parent = editorRef.current;
-    const { path, original, proposed } = proposal;
+    const { path, original, proposed } = diff;
     let cancelled = false;
     let view: ReturnType<typeof mountDiff> | null = null;
     // The diff is coloured by the file's language, loaded before mounting.
@@ -26,9 +37,9 @@ export function DiffView() {
       cancelled = true;
       view?.destroy();
     };
-  }, [proposal?.path, proposal?.original, proposal?.proposed, resolved]);
+  }, [diff?.path, diff?.original, diff?.proposed, resolved]);
 
-  if (!proposal) return null;
+  if (!diff) return null;
 
   return (
     <div className="flex-1 flex flex-col h-full bg-neutral-950 text-neutral-100 overflow-hidden">
@@ -36,12 +47,22 @@ export function DiffView() {
       <div className="flex items-center justify-between px-4 py-2 border-b border-neutral-800 bg-neutral-900/60 select-none">
         <div className="flex items-center gap-2 truncate">
           <span className="text-xs font-medium text-neutral-400">
-            Proposed changes to:
+            {proposal ? "Proposed changes to:" : "The agent's changes to:"}
           </span>
           <span className="text-xs font-mono font-semibold text-neutral-200 truncate">
-            {proposal.path}
+            {diff.path}
           </span>
         </div>
+        {!proposal && (
+          <button
+            type="button"
+            onClick={() => showReviewDiff(null)}
+            className="px-3 py-1 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs font-semibold rounded transition-colors cursor-pointer"
+          >
+            Close
+          </button>
+        )}
+        {proposal && (
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -58,6 +79,7 @@ export function DiffView() {
             Reject
           </button>
         </div>
+        )}
       </div>
 
       {/* Git confirmation banner */}

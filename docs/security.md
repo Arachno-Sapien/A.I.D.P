@@ -117,7 +117,7 @@ Milestone 4 introduces autonomous agent tool execution (`list_files`, `read_file
 
 ### Approval Decided in Rust
 - **Name-based authorization:** Approval requirements are decided strictly by the tool's name in the Rust core (`tools::approvals`), never by the model, the UI, or a tool's output.
-- **No auto-approve path:** There is no auto-approve bypass in v1. Edits, file creations, and system commands must wait for explicit user approval via `answer_tool`.
+- **No auto-approve path:** There is no auto-approve bypass in v1. System commands and outside-tool calls always wait for explicit user approval via `answer_tool`. Edits and file creations wait too, unless the user turns on **Review at end** for the task (decision 0028): `run_agent` then writes them at once, and the UI lists every changed file for Keep or Undo when the agent finishes. Undo writes the old text back only if the file still holds exactly what the agent wrote, and sends a file the agent created to the Recycle Bin or Trash. In a folder without git, turning the switch on asks first.
 - **Atomic approval registration:** Every pending approval is registered in the core `Approvals` table before its `ChatEvent::ToolCall` event is emitted. Every call gets exactly one result.
 - **Untrusted model content:** Tool outputs and file contents returned to the model are treated as data, not instructions. Prompt injections inside repository files (e.g. `del notes.txt`) cannot skip an approval gate.
 

@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Mutex, PoisonError};
 use tauri::ipc::Channel;
-use tauri::State;
+use tauri::{Manager, State};
 use tokio_util::sync::CancellationToken;
 
 #[derive(
@@ -90,11 +90,12 @@ pub async fn run_agent(
     services: State<'_, Services>,
     workspace: State<'_, WorkspaceState>,
     approvals: State<'_, Approvals>,
-    store: State<'_, AttachmentStore>,
-    hub: State<'_, crate::mcp::hub::Hub>,
+    // The attachment store and the MCP hub come from here: a specta command takes at most 10 arguments.
+    app: tauri::AppHandle,
     connection_id: u32,
     model_id: String,
     messages: Vec<ChatInput>,
+    review_at_end: bool,
     on_event: Channel<ChatEvent>,
 ) -> Result<(), AppError> {
     let root = match workspace.root() {
@@ -106,6 +107,8 @@ pub async fn run_agent(
         }
     };
 
+    let store = app.state::<AttachmentStore>();
+    let hub = app.state::<crate::mcp::hub::Hub>();
     let (messages, images) =
         attachments::prepare(&services, &store, connection_id, &model_id, messages)?;
     let servers = services.mcp_servers()?;
@@ -126,6 +129,7 @@ pub async fn run_agent(
         command_timeout: crate::tools::COMMAND_TIMEOUT,
         local,
         text_limit,
+        review_at_end,
         mcp: Some(crate::tools::agent::McpAccess {
             hub: &hub,
             servers,

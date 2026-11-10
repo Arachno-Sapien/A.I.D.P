@@ -34,6 +34,15 @@ export interface Proposal {
   toolId?: number;
 }
 
+/** A file the agent wrote without asking, kept for the review at the end (decision 0028). */
+export interface ReviewFile {
+  path: string;
+  /** The text before the agent's first write; null for a file it created. */
+  original: string | null;
+  /** The text after its last write. */
+  current: string;
+}
+
 export type DirtyPromptAction =
   | "open"
   | "close"
@@ -58,6 +67,12 @@ export interface WorkspaceStore {
   selection: { path: string; info: SelectionInfo } | null;
   /** Bumped when the store replaces a buffer (reload, Accept), so the open editor shows it. */
   revision: number;
+  /** The agent writes edits without asking; they are reviewed when it finishes. */
+  reviewAtEnd: boolean;
+  /** What the agent wrote without asking, one entry per file. */
+  review: ReviewFile[];
+  /** The review file whose diff is shown in place of the editor. */
+  reviewDiff: string | null;
 
   loadRecent(): Promise<void>;
   openFolder(): Promise<void>;
@@ -97,6 +112,16 @@ export interface WorkspaceStore {
   acceptProposal(): Promise<void>;
   confirmGit(): Promise<void>;
   rejectProposal(): void;
+
+  setReviewAtEnd(on: boolean): void;
+  /** Adds a write the agent made without asking to the review. */
+  noteAgentWrite(path: string, before: string | null, after: string): void;
+  showReviewDiff(path: string | null): void;
+  /** Puts one file back as it was before the agent: the message to show, or null once done. */
+  undoReview(path: string): Promise<string | null>;
+  /** Undoes every file it can: the messages for the rest, or null. */
+  undoAll(): Promise<string | null>;
+  keepReview(): void;
 
   /** Saves every dirty tab; true only when nothing is left unsaved. */
   saveAll(): Promise<boolean>;
@@ -151,6 +176,9 @@ async function editorState(path: string, text: string, filename: string) {
   });
 }
 
+/** Text with CRLF read as LF: the agent's text and a file read back differ only there. */
+const lf = (text: string) => text.replace(/\r\n/g, "\n");
+
 // Saves of one file run one after another: each needs the version the one
 // before it wrote, or it looks like a change on disk.
 const saves = new Map<string, Promise<void>>();
@@ -167,6 +195,10 @@ const folderReset = {
   conflict: null,
   dirtyPrompt: null,
   selection: null,
+  // A new folder may have no git, and its warning comes before the switch is on.
+  reviewAtEnd: false,
+  review: [],
+  reviewDiff: null,
 };
 
 export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
@@ -185,6 +217,9 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   dirtyPrompt: null,
   selection: null,
   revision: 0,
+  reviewAtEnd: false,
+  review: [],
+  reviewDiff: null,
 
   loadRecent: async () => {
     const res = await commands.recentFolders();
@@ -636,6 +671,65 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
     }
     set({ proposal: null, needsGitConfirm: false });
   },
+
+  setReviewAtEnd: (on) => set({ reviewAtEnd: on }),
+
+  noteAgentWrite: (path, before, after) => {
+    const review = get().review;
+    const known = review.find((f) => f.path === path);
+    set({
+      review: known
+        ? review.map((f) => (f.path === path ? { ...f, current: after } : f))
+        : [...review, { path, original: before, current: after }],
+    });
+  },
+
+  showReviewDiff: (path) => set({ reviewDiff: path }),
+
+  undoReview: async (path) => {
+    const file = get().review.find((f) => f.path === path);
+    if (!file) return null;
+    const blocked = blockedBy(get().tabs, get().proposal, path);
+    if (blocked) return blocked;
+
+    const res = await commands.readFile(path);
+    if (res.status === "error") return workspaceErrorText(res.error);
+    // Only the agent's own text is put back: anything since then is someone's work.
+    if (lf(res.data.text) !== lf(file.current)) {
+      return `${path} changed after the agent wrote it, so it was left as it is.`;
+    }
+
+    if (file.original === null) {
+      const message = await get().remove(path);
+      if (message) return message;
+    } else {
+      const written = await commands.writeFile({
+        path,
+        text: file.original,
+        lineEnding: res.data.lineEnding,
+        hasBom: res.data.hasBom,
+        expectedVersion: res.data.version,
+      });
+      if (written.status === "error") return workspaceErrorText(written.error);
+      await get().reloadIfClean(path);
+    }
+    set((s) => ({
+      review: s.review.filter((f) => f.path !== path),
+      reviewDiff: s.reviewDiff === path ? null : s.reviewDiff,
+    }));
+    return null;
+  },
+
+  undoAll: async () => {
+    const messages: string[] = [];
+    for (const { path } of get().review) {
+      const message = await get().undoReview(path);
+      if (message) messages.push(message);
+    }
+    return messages.length > 0 ? messages.join("\n") : null;
+  },
+
+  keepReview: () => set({ review: [], reviewDiff: null }),
 
   saveAll: async () => {
     for (const tab of get().tabs) {

@@ -28,6 +28,14 @@ export const agentHooks: ChatHooks = {
     }
 
     if (step.outcome?.status === "ok") {
+      // Written without asking (review at the end): kept for the review.
+      if (!step.needsAnswer) {
+        if (step.action.tool === "editFile") {
+          store.noteAgentWrite(step.action.path, step.action.before, step.action.after);
+        } else if (step.action.tool === "createFile") {
+          store.noteAgentWrite(step.action.path, null, step.action.text);
+        }
+      }
       if (
         step.action.tool === "editFile" ||
         step.action.tool === "createFile"

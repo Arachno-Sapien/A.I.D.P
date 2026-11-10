@@ -9,7 +9,7 @@ use aidp_lib::mcp::hub::Hub;
 use aidp_lib::mcp::ServerConfig;
 use aidp_lib::tools::agent::{run, AgentRun, McpAccess};
 use aidp_lib::tools::approvals::Approvals;
-use aidp_lib::tools::{ToolAction, ToolOutcome, OUTSIDE_TOOLS_NOTE};
+use aidp_lib::tools::{ToolAction, ToolOutcome, EDITS_AT_END, OUTSIDE_TOOLS_NOTE};
 use common::{capture, TempDir};
 use secrecy::SecretString;
 use serde_json::json;
@@ -142,6 +142,7 @@ async fn outside_path_is_refused_and_never_sent() {
         command_timeout: Duration::from_secs(5),
         local: Default::default(),
         text_limit: aidp_lib::tools::READ_LIMIT,
+        review_at_end: false,
         mcp: None,
     })
     .await;
@@ -231,6 +232,7 @@ async fn denied_command_never_runs() {
             command_timeout: Duration::from_secs(5),
         local: Default::default(),
         text_limit: aidp_lib::tools::READ_LIMIT,
+        review_at_end: false,
         mcp: None,
         })
         .await
@@ -316,6 +318,7 @@ async fn approved_command_runs() {
             command_timeout: Duration::from_secs(5),
         local: Default::default(),
         text_limit: aidp_lib::tools::READ_LIMIT,
+        review_at_end: false,
         mcp: None,
         })
         .await
@@ -394,6 +397,7 @@ async fn secret_file_is_never_sent() {
         command_timeout: Duration::from_secs(5),
         local: Default::default(),
         text_limit: aidp_lib::tools::READ_LIMIT,
+        review_at_end: false,
         mcp: None,
     })
     .await;
@@ -456,6 +460,7 @@ async fn instructions_in_files_never_skip_approval() {
             command_timeout: Duration::from_secs(5),
         local: Default::default(),
         text_limit: aidp_lib::tools::READ_LIMIT,
+        review_at_end: false,
         mcp: None,
         })
         .await
@@ -533,6 +538,7 @@ async fn edit_waits_for_accept() {
             command_timeout: Duration::from_secs(5),
         local: Default::default(),
         text_limit: aidp_lib::tools::READ_LIMIT,
+        review_at_end: false,
         mcp: None,
         })
         .await
@@ -611,6 +617,7 @@ async fn edit_waits_for_accept() {
             command_timeout: Duration::from_secs(5),
         local: Default::default(),
         text_limit: aidp_lib::tools::READ_LIMIT,
+        review_at_end: false,
         mcp: None,
         })
         .await
@@ -689,6 +696,7 @@ async fn stop_while_waiting() {
             command_timeout: Duration::from_secs(5),
         local: Default::default(),
         text_limit: aidp_lib::tools::READ_LIMIT,
+        review_at_end: false,
         mcp: None,
         })
         .await
@@ -764,6 +772,7 @@ async fn every_call_gets_one_result() {
         command_timeout: Duration::from_secs(5),
         local: Default::default(),
         text_limit: aidp_lib::tools::READ_LIMIT,
+        review_at_end: false,
         mcp: None,
     })
     .await;
@@ -836,6 +845,7 @@ async fn step_limit() {
         command_timeout: Duration::from_secs(5),
         local: Default::default(),
         text_limit: aidp_lib::tools::READ_LIMIT,
+        review_at_end: false,
         mcp: None,
     })
     .await;
@@ -898,6 +908,7 @@ async fn small_context_cuts_reads() {
         command_timeout: Duration::from_secs(5),
         local: Default::default(),
         text_limit: 1000,
+        review_at_end: false,
         mcp: None,
     })
     .await;
@@ -963,6 +974,7 @@ async fn mcp_call_waits_for_approval_and_returns_text() {
             command_timeout: Duration::from_secs(5),
             local: Default::default(),
             text_limit: aidp_lib::tools::READ_LIMIT,
+            review_at_end: false,
             mcp: Some(McpAccess {
                 hub: &hub_clone,
                 servers: vec![fake_config("", true)],
@@ -1097,6 +1109,7 @@ async fn declined_mcp_call_is_not_sent() {
             command_timeout: Duration::from_secs(5),
             local: Default::default(),
             text_limit: aidp_lib::tools::READ_LIMIT,
+            review_at_end: false,
             mcp: Some(McpAccess {
                 hub: &hub_clone,
                 servers: vec![fake_config("", true)],
@@ -1178,6 +1191,7 @@ async fn stop_during_mcp_call() {
             command_timeout: Duration::from_secs(5),
             local: Default::default(),
             text_limit: aidp_lib::tools::READ_LIMIT,
+            review_at_end: false,
             mcp: Some(McpAccess {
                 hub: &hub_clone,
                 servers: vec![fake_config("", true)],
@@ -1264,6 +1278,7 @@ async fn unknown_mcp_tool_is_an_error() {
             command_timeout: Duration::from_secs(5),
             local: Default::default(),
             text_limit: aidp_lib::tools::READ_LIMIT,
+            review_at_end: false,
             mcp: Some(McpAccess {
                 hub: &hub_clone,
                 servers: vec![fake_config("", true)],
@@ -1350,6 +1365,7 @@ async fn mcp_names_without_access_are_unknown() {
         command_timeout: Duration::from_secs(5),
         local: Default::default(),
         text_limit: aidp_lib::tools::READ_LIMIT,
+        review_at_end: false,
         mcp: None,
     })
     .await;
@@ -1412,6 +1428,7 @@ async fn start_failure_shows_and_run_continues() {
         command_timeout: Duration::from_secs(5),
         local: Default::default(),
         text_limit: aidp_lib::tools::READ_LIMIT,
+        review_at_end: false,
         mcp: Some(McpAccess {
             hub: &hub,
             servers: vec![bad],
@@ -1479,6 +1496,7 @@ async fn disabled_server_is_not_started() {
         command_timeout: Duration::from_secs(5),
         local: Default::default(),
         text_limit: aidp_lib::tools::READ_LIMIT,
+        review_at_end: false,
         mcp: Some(McpAccess {
             hub: &hub,
             servers: vec![fake_config("", false)],
@@ -1538,6 +1556,7 @@ async fn mcp_result_is_cut() {
             command_timeout: Duration::from_secs(5),
             local: Default::default(),
             text_limit: 50,
+            review_at_end: false,
             mcp: Some(McpAccess {
                 hub: &hub_clone,
                 servers: vec![fake_config("", true)],
@@ -1581,4 +1600,135 @@ async fn mcp_result_is_cut() {
     )));
 
     hub.stop_all().await;
+}
+
+#[tokio::test]
+async fn review_at_end_writes_edits_without_asking() {
+    let server = MockServer::start().await;
+    let temp_dir = TempDir::new();
+    let root = temp_dir.path();
+    fs::write(root.join("file.txt"), "hello world\n").unwrap();
+
+    let resp1 = sse_tool_calls(&[
+        (
+            "call_1",
+            "edit_file",
+            json!({"path": "file.txt", "old_text": "hello", "new_text": "goodbye"}),
+        ),
+        ("call_2", "create_file", json!({"path": "new.txt", "text": "new\n"})),
+    ]);
+    let resp2 = sse_text("Done.");
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(QueueResponder::new(vec![resp1, resp2]))
+        .mount(&server)
+        .await;
+
+    let p = make_provider(&server);
+    let (channel, events) = capture();
+    let approvals = Approvals::new();
+    let res = run(AgentRun {
+        provider: &p,
+        model: "test-model".into(),
+        messages: vec![ChatMessage {
+            role: Role::User,
+            content: "Change and add a file".into(),
+        }],
+        root: root.to_path_buf(),
+        approvals: &approvals,
+        out: channel,
+        cancel: CancellationToken::new(),
+        command_timeout: Duration::from_secs(5),
+        local: Default::default(),
+        text_limit: aidp_lib::tools::READ_LIMIT,
+        review_at_end: true,
+        mcp: None,
+    })
+    .await;
+
+    assert!(res.is_ok());
+    assert_eq!(fs::read_to_string(root.join("file.txt")).unwrap(), "goodbye world\n");
+    assert_eq!(fs::read_to_string(root.join("new.txt")).unwrap(), "new\n");
+
+    let evs = events.lock().unwrap().clone();
+    assert!(!evs
+        .iter()
+        .any(|e| matches!(e, ChatEvent::ToolCall { needs_answer: true, .. })));
+    assert!(evs.iter().any(|e| matches!(
+        e,
+        ChatEvent::ToolCall { action: ToolAction::EditFile { before, after, .. }, needs_answer: false, .. }
+            if before == "hello world\n" && after == "goodbye world\n"
+    )));
+    let oks = evs
+        .iter()
+        .filter(|e| matches!(e, ChatEvent::ToolResult { outcome: ToolOutcome::Ok { .. }, .. }))
+        .count();
+    assert_eq!(oks, 2);
+
+    let reqs = server.received_requests().await.unwrap();
+    let first: serde_json::Value = reqs[0].body_json().unwrap();
+    let system = first["messages"][0]["content"].as_str().unwrap();
+    assert!(system.contains(EDITS_AT_END));
+}
+
+#[tokio::test]
+async fn review_at_end_still_asks_for_commands() {
+    let server = MockServer::start().await;
+    let temp_dir = TempDir::new();
+    let root = temp_dir.path();
+    let cmd_str = if cfg!(windows) {
+        "echo late > marker.txt"
+    } else {
+        "touch marker.txt"
+    };
+    let resp1 = sse_tool_calls(&[("call_1", "run_command", json!({"command": cmd_str}))]);
+    let resp2 = sse_text("Command denied.");
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(QueueResponder::new(vec![resp1, resp2]))
+        .mount(&server)
+        .await;
+
+    let p = make_provider(&server);
+    let (channel, events) = capture();
+    let approvals = Arc::new(Approvals::new());
+    let approvals_clone = approvals.clone();
+    let root_buf = root.to_path_buf();
+    let run_handle = tokio::spawn(async move {
+        run(AgentRun {
+            provider: &p,
+            model: "test-model".into(),
+            messages: vec![ChatMessage {
+                role: Role::User,
+                content: "Run marker command".into(),
+            }],
+            root: root_buf,
+            approvals: &approvals_clone,
+            out: channel,
+            cancel: CancellationToken::new(),
+            command_timeout: Duration::from_secs(5),
+            local: Default::default(),
+            text_limit: aidp_lib::tools::READ_LIMIT,
+            review_at_end: true,
+            mcp: None,
+        })
+        .await
+    });
+
+    let mut answered = false;
+    for _ in 0..50 {
+        tokio::time::sleep(Duration::from_millis(20)).await;
+        let list = events.lock().unwrap().clone();
+        if let Some(id) = list.iter().find_map(|e| match e {
+            ChatEvent::ToolCall { id, needs_answer: true, .. } => Some(*id),
+            _ => None,
+        }) {
+            approvals.answer(id, false);
+            answered = true;
+            break;
+        }
+    }
+    assert!(answered, "the command was not put to the user");
+    assert!(run_handle.await.unwrap().is_ok());
+    assert!(!root.join("marker.txt").exists());
 }

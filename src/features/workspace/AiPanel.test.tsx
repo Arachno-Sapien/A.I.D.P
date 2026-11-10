@@ -446,3 +446,74 @@ describe("AiPanel while a reply streams", () => {
     expect(vi.mocked(Markdown).mock.calls[0][0].text).toBe("hi");
   });
 });
+
+describe("AiPanel review at the end", () => {
+  const toolModel = () =>
+    vi.mocked(useModelsStore).mockReturnValue({
+      chatModels: [
+        {
+          connectionId: 1,
+          modelId: "tool-model",
+          displayName: "Tool Model",
+          connectionLabel: "Provider",
+          supportsTools: true,
+        },
+      ],
+      selected: { connectionId: 1, modelId: "tool-model" },
+      loaded: true,
+      select: vi.fn(),
+      load: vi.fn(),
+    } as any);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    toolModel();
+    useWorkspaceChatStore.setState({ messages: [], streaming: false });
+    useWorkspaceStore.setState({
+      info: { name: "p", path: "/p", isGit: true },
+      gitWarned: false,
+      reviewAtEnd: false,
+      review: [],
+      tabs: [],
+      active: null,
+    });
+  });
+
+  it("is off by default and is sent with the agent run once on", async () => {
+    render(<AiPanel />);
+    const box = screen.getByRole("checkbox", { name: "Review at end" }) as HTMLInputElement;
+    expect(box.checked).toBe(false);
+
+    fireEvent.click(box);
+    expect(useWorkspaceStore.getState().reviewAtEnd).toBe(true);
+
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "Build it" } });
+    fireEvent.click(screen.getByRole("button", { name: /send/i }));
+    await vi.waitFor(() => expect(commands.runAgent).toHaveBeenCalled());
+    expect(vi.mocked(commands.runAgent).mock.calls[0][3]).toBe(true);
+  });
+
+  it("asks first in a folder without git", () => {
+    useWorkspaceStore.setState({ info: { name: "p", path: "/p", isGit: false } });
+    render(<AiPanel />);
+    fireEvent.click(screen.getByRole("checkbox", { name: "Review at end" }));
+
+    expect(screen.getByRole("alert").textContent).toMatch(/No git here/);
+    expect(useWorkspaceStore.getState().reviewAtEnd).toBe(false);
+
+    fireEvent.click(screen.getByRole("button", { name: "Turn on" }));
+    expect(useWorkspaceStore.getState().reviewAtEnd).toBe(true);
+    expect(useWorkspaceStore.getState().gitWarned).toBe(true);
+  });
+
+  it("shows the review only once the reply has ended", () => {
+    useWorkspaceStore.setState({ review: [{ path: "a.ts", original: "1\n", current: "2\n" }] });
+    useWorkspaceChatStore.setState({ streaming: true });
+    const { rerender } = render(<AiPanel />);
+    expect(screen.queryByText("The agent changed 1 file")).toBeNull();
+
+    act(() => useWorkspaceChatStore.setState({ streaming: false }));
+    rerender(<AiPanel />);
+    expect(screen.getByText("The agent changed 1 file")).toBeTruthy();
+  });
+});

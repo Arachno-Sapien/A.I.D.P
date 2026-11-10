@@ -30,7 +30,25 @@ pub struct AgentRun<'a> {
     pub command_timeout: Duration,
     pub local: crate::gateway::LocalOptions,
     pub text_limit: usize,
+    /// Edits and new files are written without asking; the UI shows them all for
+    /// review when the run ends (decision 0028). Commands and outside tools still ask.
+    pub review_at_end: bool,
     pub mcp: Option<McpAccess<'a>>,
+}
+
+/// The user's answer to an edit or new file; with no receiver (review at the end)
+/// it is written unless the user already pressed Stop.
+async fn edit_answer(
+    approvals: &Approvals,
+    id: u32,
+    rx: Option<tokio::sync::oneshot::Receiver<bool>>,
+    cancel: &CancellationToken,
+) -> Answer {
+    match rx {
+        Some(rx) => approvals.wait(id, rx, cancel).await,
+        None if cancel.is_cancelled() => Answer::Stopped,
+        None => Answer::Yes,
+    }
 }
 
 pub async fn run(args: AgentRun<'_>) -> Result<Usage, ProviderError> {
@@ -96,7 +114,7 @@ pub async fn run_with_images(
 
     let mut full_messages = vec![ChatMessage {
         role: Role::System,
-        content: agent_system_for(specs_list.len() > builtin_count),
+        content: agent_system_for(specs_list.len() > builtin_count, args.review_at_end),
     }];
     full_messages.extend(args.messages);
     // The system message has no images, so the rest move down one.
@@ -444,7 +462,7 @@ pub async fn run_with_images(
                             });
                         }
                         Ok(edit) => {
-                            let rx = args.approvals.register(id);
+                            let rx = (!args.review_at_end).then(|| args.approvals.register(id));
                             args.out
                                 .send(ChatEvent::ToolCall {
                                     id,
@@ -453,11 +471,11 @@ pub async fn run_with_images(
                                         before: edit.before.clone(),
                                         after: edit.after.clone(),
                                     },
-                                    needs_answer: true,
+                                    needs_answer: rx.is_some(),
                                 })
                                 .map_err(|_| ProviderError::Cancelled)?;
 
-                            let ans = args.approvals.wait(id, rx, &args.cancel).await;
+                            let ans = edit_answer(args.approvals, id, rx, &args.cancel).await;
                             match ans {
                                 Answer::Yes => {
                                     let root = args.root.clone();
@@ -544,7 +562,7 @@ pub async fn run_with_images(
                             });
                         }
                         Ok(new_file) => {
-                            let rx = args.approvals.register(id);
+                            let rx = (!args.review_at_end).then(|| args.approvals.register(id));
                             args.out
                                 .send(ChatEvent::ToolCall {
                                     id,
@@ -552,11 +570,11 @@ pub async fn run_with_images(
                                         path: new_file.path.clone(),
                                         text: new_file.text.clone(),
                                     },
-                                    needs_answer: true,
+                                    needs_answer: rx.is_some(),
                                 })
                                 .map_err(|_| ProviderError::Cancelled)?;
 
-                            let ans = args.approvals.wait(id, rx, &args.cancel).await;
+                            let ans = edit_answer(args.approvals, id, rx, &args.cancel).await;
                             match ans {
                                 Answer::Yes => {
                                     let root = args.root.clone();

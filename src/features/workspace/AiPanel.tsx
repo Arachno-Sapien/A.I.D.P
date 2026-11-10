@@ -15,6 +15,7 @@ import {
   type FileContext,
   type SelectionContext,
 } from "./context";
+import { ReviewCard } from "./ReviewCard";
 import { useWorkspaceStore } from "./store";
 import { ToolStepView } from "./ToolStepView";
 
@@ -30,10 +31,18 @@ export function textBudget(contextTokens?: number | null): number {
 }
 
 export function AiPanel({ onApply }: AiPanelProps) {
-  const { tabs, active, selection } = useWorkspaceStore(
-    useShallow((s) => ({ tabs: s.tabs, active: s.active, selection: s.selection })),
+  const { tabs, active, selection, reviewAtEnd, noGit } = useWorkspaceStore(
+    useShallow((s) => ({
+      tabs: s.tabs,
+      active: s.active,
+      selection: s.selection,
+      reviewAtEnd: s.reviewAtEnd,
+      // Asked once per folder, like the first accepted edit (workspace rule 7).
+      noGit: Boolean(s.info && !s.info.isGit && !s.gitWarned),
+    })),
   );
-  const { propose } = useWorkspaceStore.getState();
+  const { propose, setReviewAtEnd } = useWorkspaceStore.getState();
+  const [confirmNoGit, setConfirmNoGit] = useState(false);
   const {
     messages,
     streaming,
@@ -178,6 +187,7 @@ export function AiPanel({ onApply }: AiPanelProps) {
       chips: chipLabels.length > 0 ? chipLabels : undefined,
       target,
       agent: isAgent ? true : undefined,
+      reviewAtEnd: isAgent && reviewAtEnd ? true : undefined,
     };
 
     await send(question, selected, extra);
@@ -225,6 +235,50 @@ export function AiPanel({ onApply }: AiPanelProps) {
             />
             <span className="font-medium">Agent</span>
           </label>
+
+          {isAgent && !confirmNoGit && (
+            <label
+              className="flex items-center gap-1.5 text-xs select-none shrink-0 whitespace-nowrap text-neutral-300 cursor-pointer"
+              title="The agent writes its edits as it goes; you keep or undo them when it finishes. Commands still ask."
+            >
+              <input
+                type="checkbox"
+                aria-label="Review at end"
+                checked={reviewAtEnd}
+                disabled={streaming}
+                onChange={(e) => {
+                  if (e.target.checked && noGit) setConfirmNoGit(true);
+                  else setReviewAtEnd(e.target.checked);
+                }}
+                className="rounded bg-neutral-800 border-neutral-700 text-neutral-100 focus:ring-0 focus:ring-offset-0 cursor-pointer disabled:cursor-not-allowed"
+              />
+              <span className="font-medium">Review at end</span>
+            </label>
+          )}
+
+          {confirmNoGit && (
+            <span role="alert" className="flex items-center gap-1.5 text-xs text-amber-200">
+              <span>No git here: edits can be undone only from the review.</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmNoGit(false);
+                  useWorkspaceStore.setState({ gitWarned: true });
+                  setReviewAtEnd(true);
+                }}
+                className="px-1.5 py-0.5 bg-amber-600 hover:bg-amber-500 text-neutral-950 rounded text-[11px] font-semibold cursor-pointer"
+              >
+                Turn on
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmNoGit(false)}
+                className="px-1.5 py-0.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded text-[11px] cursor-pointer"
+              >
+                Cancel
+              </button>
+            </span>
+          )}
 
           {messages.length > 0 &&
             !streaming &&
@@ -347,6 +401,8 @@ export function AiPanel({ onApply }: AiPanelProps) {
         onApply={handleApply}
         renderStep={renderStep}
       />
+
+      {!streaming && <ReviewCard />}
 
       {/* Composer */}
       <Composer
