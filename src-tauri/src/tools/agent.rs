@@ -42,12 +42,17 @@ pub struct AgentRun<'a> {
 }
 
 /// Whether a command the model asked for waits for the user's answer.
+/// `args.messages` is moved before the loop, so it takes the fields it reads.
 fn command_asks(
     run_commands: bool,
+    review_at_end: bool,
     allowed: &(dyn Fn(&str) -> bool + Send + Sync),
     command: &str,
 ) -> bool {
-    !(run_commands || allowed(command))
+    // With Review at end the agent may already have changed what a remembered
+    // command runs (a package.json script) without the user seeing a diff.
+    let remembered = !review_at_end && allowed(command);
+    !(run_commands || remembered)
 }
 
 /// The user's answer to a step; with no receiver (review at the end, a server or
@@ -650,7 +655,7 @@ pub async fn run_with_images(
                     }
                 }
                 run::ToolInput::RunCommand { command } => {
-                    let rx = command_asks(args.run_commands, args.command_allowed, &command).then(|| args.approvals.register(id));
+                    let rx = command_asks(args.run_commands, args.review_at_end, args.command_allowed, &command).then(|| args.approvals.register(id));
                     let folder = display_path(&args.root);
                     args.out
                         .send(ChatEvent::ToolCall {

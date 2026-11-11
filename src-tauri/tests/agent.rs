@@ -499,6 +499,61 @@ async fn allowed_command_skips_the_card() {
 }
 
 #[tokio::test]
+async fn allowed_command_asks_with_review_at_end() {
+    // The agent may have changed package.json unseen, so "npm test" is no longer what was allowed.
+    let server = MockServer::start().await;
+    let temp_dir = TempDir::new();
+    let resp1 = sse_tool_calls(&[("call_1", "run_command", json!({"command": "echo hi"}))]);
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(QueueResponder::new(vec![resp1, sse_text("done")]))
+        .mount(&server)
+        .await;
+
+    let p = make_provider(&server);
+    let (channel, events) = capture();
+    let approvals = Arc::new(Approvals::new());
+    let approvals_clone = approvals.clone();
+    let root_buf = temp_dir.path().to_path_buf();
+    let run_handle = tokio::spawn(async move {
+        run(AgentRun {
+            provider: &p,
+            model: "test-model".into(),
+            messages: vec![ChatMessage { role: Role::User, content: "Run it".into() }],
+            root: root_buf,
+            approvals: &approvals_clone,
+            out: channel,
+            cancel: CancellationToken::new(),
+            command_timeout: Duration::from_secs(5),
+            local: Default::default(),
+            text_limit: aidp_lib::tools::READ_LIMIT,
+            review_at_end: true,
+            run_commands: false,
+            command_allowed: &|_| true,
+            mcp: None,
+        })
+        .await
+    });
+
+    let mut asked = false;
+    for _ in 0..250 {
+        tokio::time::sleep(Duration::from_millis(20)).await;
+        let found = events.lock().unwrap().iter().find_map(|e| match e {
+            ChatEvent::ToolCall { id, needs_answer: true, .. } => Some(*id),
+            _ => None,
+        });
+        if let Some(id) = found {
+            approvals.answer(id, false);
+            asked = true;
+            break;
+        }
+    }
+    assert!(asked, "an allowed command ran unasked with Review at end on");
+    let res = tokio::time::timeout(Duration::from_secs(30), run_handle).await.unwrap().unwrap();
+    assert!(res.is_ok());
+}
+
+#[tokio::test]
 async fn secret_file_is_never_sent() {
     let server = MockServer::start().await;
     let temp_dir = TempDir::new();
