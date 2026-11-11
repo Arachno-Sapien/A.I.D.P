@@ -39,6 +39,12 @@ export const commands = {
 	terminalWrite: (data: string) => typedError<null, WorkspaceError>(__TAURI_INVOKE("terminal_write", { data })),
 	terminalResize: (cols: number, rows: number) => typedError<null, WorkspaceError>(__TAURI_INVOKE("terminal_resize", { cols, rows })),
 	terminalClose: () => typedError<null, WorkspaceError>(__TAURI_INVOKE("terminal_close")),
+	/**  The servers the agent started (decision 0030), for the terminal tabs. */
+	serverList: () => __TAURI_INVOKE<ServerInfo[]>("server_list"),
+	/**  Shows a server in a tab: its kept output, then what it prints next. */
+	serverAttach: (id: number, onEvent: Channel<TerminalEvent>) => __TAURI_INVOKE<boolean>("server_attach", { id, onEvent }),
+	/**  Stops a server and closes its tab. */
+	serverStop: (id: number) => __TAURI_INVOKE<boolean>("server_stop", { id }),
 	listConversations: (workspacePath: string | null) => typedError<Conversation_Serialize[], AppError_Serialize>(__TAURI_INVOKE("list_conversations", { workspacePath })),
 	createConversation: (firstText: string, workspacePath: string | null) => typedError<Conversation_Serialize, AppError_Serialize>(__TAURI_INVOKE("create_conversation", { firstText, workspacePath })),
 	deleteConversation: (id: number) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("delete_conversation", { id })),
@@ -399,6 +405,12 @@ export type ServerConfig = {
 	autoApprove: boolean,
 };
 
+export type ServerInfo = {
+	id: number,
+	command: string,
+	running: boolean,
+};
+
 export type StoredMessage = StoredMessage_Serialize | StoredMessage_Deserialize;
 
 export type StoredMessage_Deserialize = {
@@ -431,13 +443,17 @@ export type TerminalEvent = { event: "output"; data: string } | { event: "exit" 
 
 export type Theme = "dark" | "light" | "system" | "glass" | "soft" | "cyber" | "elegant";
 
-export type ToolAction = { tool: "listFiles"; path: string } | { tool: "readFile"; path: string } | { tool: "search"; query: string; path: string } | { tool: "editFile"; path: string; before: string; after: string } | { tool: "createFile"; path: string; text: string } | { tool: "runCommand"; command: string; folder: string } | { tool: "mcpStart"; server: string } | { tool: "mcpTool"; server: string; name: string; arguments: string } | { tool: "invalid"; name: string };
+export type ToolAction = { tool: "listFiles"; path: string } | { tool: "readFile"; path: string } | { tool: "search"; query: string; path: string } | { tool: "editFile"; path: string; before: string; after: string } | { tool: "createFile"; path: string; text: string } | { tool: "runCommand"; command: string; folder: string } | { tool: "startServer"; command: string; folder: string } | { tool: "serverOutput"; server: number } | { tool: "stopServer"; server: number } | { tool: "mcpStart"; server: string } | { tool: "mcpTool"; server: string; name: string; arguments: string } | { tool: "invalid"; name: string };
 
 export type ToolOutcome = ToolOutcome_Serialize | ToolOutcome_Deserialize;
 
-export type ToolOutcome_Deserialize = { status: "ok"; summary: string } | { status: "command"; exitCode?: number | null; output: string; timedOut: boolean } | { status: "text"; output: string } | { status: "declined" } | { status: "error"; message: string } | { status: "stopped" };
+export type ToolOutcome_Deserialize = { status: "ok"; summary: string } | { status: "command"; exitCode?: number | null; output: string; timedOut: boolean } | { status: "text"; output: string } | 
+/**  A server the agent started that keeps running in a terminal tab. */
+{ status: "server"; server: number; output: string } | { status: "declined" } | { status: "error"; message: string } | { status: "stopped" };
 
-export type ToolOutcome_Serialize = { status: "ok"; summary: string } | { status: "command"; exitCode: number | null; output: string; timedOut: boolean } | { status: "text"; output: string } | { status: "declined" } | { status: "error"; message: string } | { status: "stopped" };
+export type ToolOutcome_Serialize = { status: "ok"; summary: string } | { status: "command"; exitCode: number | null; output: string; timedOut: boolean } | { status: "text"; output: string } | 
+/**  A server the agent started that keeps running in a terminal tab. */
+{ status: "server"; server: number; output: string } | { status: "declined" } | { status: "error"; message: string } | { status: "stopped" };
 
 export type UpdateEvent = 
 /**  Kilobytes so far and in all (0 when the server does not say). */

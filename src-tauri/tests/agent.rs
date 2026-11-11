@@ -9,6 +9,7 @@ use aidp_lib::mcp::hub::Hub;
 use aidp_lib::mcp::ServerConfig;
 use aidp_lib::tools::agent::{run, AgentRun, McpAccess};
 use aidp_lib::tools::approvals::Approvals;
+use aidp_lib::tools::servers::Servers;
 use aidp_lib::tools::{ToolAction, ToolOutcome, EDITS_AT_END, OUTSIDE_TOOLS_NOTE};
 use common::{capture, TempDir};
 use secrecy::SecretString;
@@ -145,6 +146,7 @@ async fn outside_path_is_refused_and_never_sent() {
         review_at_end: false,
         run_commands: false,
         command_allowed: &|_| false,
+        servers: None,
         mcp: None,
     })
     .await;
@@ -237,6 +239,7 @@ async fn denied_command_never_runs() {
         review_at_end: false,
         run_commands: false,
         command_allowed: &|_| false,
+        servers: None,
         mcp: None,
         })
         .await
@@ -325,6 +328,7 @@ async fn approved_command_runs() {
         review_at_end: false,
         run_commands: false,
         command_allowed: &|_| false,
+        servers: None,
         mcp: None,
         })
         .await
@@ -402,6 +406,7 @@ async fn run_commands_without_asking_skips_the_card() {
             review_at_end: false,
             run_commands: true,
             command_allowed: &|_| false,
+            servers: None,
             mcp: None,
         }),
     )
@@ -461,6 +466,7 @@ async fn allowed_command_skips_the_card() {
             review_at_end: false,
             run_commands: false,
             command_allowed: &|c| c == "echo hi",
+            servers: None,
             mcp: None,
         })
         .await
@@ -530,6 +536,7 @@ async fn allowed_command_asks_with_review_at_end() {
             review_at_end: true,
             run_commands: false,
             command_allowed: &|_| true,
+            servers: None,
             mcp: None,
         })
         .await
@@ -551,6 +558,70 @@ async fn allowed_command_asks_with_review_at_end() {
     assert!(asked, "an allowed command ran unasked with Review at end on");
     let res = tokio::time::timeout(Duration::from_secs(30), run_handle).await.unwrap().unwrap();
     assert!(res.is_ok());
+}
+
+#[tokio::test]
+async fn start_server_returns_its_number() {
+    #[cfg(windows)]
+    let cmd = "echo http://localhost:5173 && ping -n 60 127.0.0.1 >nul";
+    #[cfg(not(windows))]
+    let cmd = "echo http://localhost:5173; sleep 60";
+    let server = MockServer::start().await;
+    let temp_dir = TempDir::new();
+    let resp1 = sse_tool_calls(&[("call_1", "start_server", json!({"command": cmd}))]);
+    let resp2 = sse_tool_calls(&[("call_2", "stop_server", json!({"server": 1}))]);
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(QueueResponder::new(vec![resp1, resp2, sse_text("done")]))
+        .mount(&server)
+        .await;
+
+    let p = make_provider(&server);
+    let (channel, events) = capture();
+    let approvals = Approvals::new();
+    let servers = Servers::default();
+    let started = std::time::Instant::now();
+    let res = tokio::time::timeout(
+        Duration::from_secs(30),
+        run(AgentRun {
+            provider: &p,
+            model: "test-model".into(),
+            messages: vec![ChatMessage { role: Role::User, content: "Serve it".into() }],
+            root: temp_dir.path().to_path_buf(),
+            approvals: &approvals,
+            out: channel,
+            cancel: CancellationToken::new(),
+            command_timeout: Duration::from_secs(5),
+            local: Default::default(),
+            text_limit: aidp_lib::tools::READ_LIMIT,
+            review_at_end: false,
+            run_commands: true,
+            command_allowed: &|_| false,
+            servers: Some(&servers),
+            mcp: None,
+        }),
+    )
+    .await
+    .expect("the run waited for an answer");
+    assert!(res.is_ok());
+    // It returned once the address appeared, not after the full 10 seconds.
+    assert!(started.elapsed() < Duration::from_secs(9));
+
+    let evs = events.lock().unwrap().clone();
+    assert!(evs.iter().any(|e| matches!(
+        e,
+        ChatEvent::ToolCall { action: ToolAction::StartServer { .. }, needs_answer: false, .. }
+    )));
+    assert!(evs.iter().any(|e| matches!(
+        e,
+        ChatEvent::ToolResult { outcome: ToolOutcome::Server { server: 1, output }, .. }
+            if output.contains("http://localhost:5173")
+    )));
+    assert!(evs.iter().any(|e| matches!(
+        e,
+        ChatEvent::ToolCall { action: ToolAction::StopServer { server: 1 }, needs_answer: false, .. }
+    )));
+    assert!(servers.list().is_empty());
 }
 
 #[tokio::test]
@@ -594,6 +665,7 @@ async fn secret_file_is_never_sent() {
         review_at_end: false,
         run_commands: false,
         command_allowed: &|_| false,
+        servers: None,
         mcp: None,
     })
     .await;
@@ -659,6 +731,7 @@ async fn instructions_in_files_never_skip_approval() {
         review_at_end: false,
         run_commands: false,
         command_allowed: &|_| false,
+        servers: None,
         mcp: None,
         })
         .await
@@ -739,6 +812,7 @@ async fn edit_waits_for_accept() {
         review_at_end: false,
         run_commands: false,
         command_allowed: &|_| false,
+        servers: None,
         mcp: None,
         })
         .await
@@ -820,6 +894,7 @@ async fn edit_waits_for_accept() {
         review_at_end: false,
         run_commands: false,
         command_allowed: &|_| false,
+        servers: None,
         mcp: None,
         })
         .await
@@ -901,6 +976,7 @@ async fn stop_while_waiting() {
         review_at_end: false,
         run_commands: false,
         command_allowed: &|_| false,
+        servers: None,
         mcp: None,
         })
         .await
@@ -979,6 +1055,7 @@ async fn every_call_gets_one_result() {
         review_at_end: false,
         run_commands: false,
         command_allowed: &|_| false,
+        servers: None,
         mcp: None,
     })
     .await;
@@ -1054,6 +1131,7 @@ async fn step_limit() {
         review_at_end: false,
         run_commands: false,
         command_allowed: &|_| false,
+        servers: None,
         mcp: None,
     })
     .await;
@@ -1119,6 +1197,7 @@ async fn small_context_cuts_reads() {
         review_at_end: false,
         run_commands: false,
         command_allowed: &|_| false,
+        servers: None,
         mcp: None,
     })
     .await;
@@ -1188,6 +1267,7 @@ async fn mcp_call_waits_for_approval_and_returns_text() {
             review_at_end: false,
         run_commands: false,
         command_allowed: &|_| false,
+        servers: None,
             mcp: Some(McpAccess {
                 hub: &hub_clone,
                 servers: vec![fake_config("", true)],
@@ -1322,6 +1402,7 @@ async fn run_without_asking_server_skips_the_card() {
             review_at_end: false,
         run_commands: false,
         command_allowed: &|_| false,
+        servers: None,
             mcp: Some(McpAccess {
                 hub: &hub,
                 servers: vec![ServerConfig {
@@ -1398,6 +1479,7 @@ async fn declined_mcp_call_is_not_sent() {
             review_at_end: false,
         run_commands: false,
         command_allowed: &|_| false,
+        servers: None,
             mcp: Some(McpAccess {
                 hub: &hub_clone,
                 servers: vec![fake_config("", true)],
@@ -1482,6 +1564,7 @@ async fn stop_during_mcp_call() {
             review_at_end: false,
         run_commands: false,
         command_allowed: &|_| false,
+        servers: None,
             mcp: Some(McpAccess {
                 hub: &hub_clone,
                 servers: vec![fake_config("", true)],
@@ -1567,6 +1650,7 @@ async fn unknown_mcp_tool_is_never_put_to_the_user() {
         review_at_end: false,
         run_commands: false,
         command_allowed: &|_| false,
+        servers: None,
         mcp: Some(McpAccess {
             hub: &hub,
             servers: vec![fake_config("", true)],
@@ -1628,6 +1712,7 @@ async fn mcp_names_without_access_are_unknown() {
         review_at_end: false,
         run_commands: false,
         command_allowed: &|_| false,
+        servers: None,
         mcp: None,
     })
     .await;
@@ -1694,6 +1779,7 @@ async fn start_failure_shows_and_run_continues() {
         review_at_end: false,
         run_commands: false,
         command_allowed: &|_| false,
+        servers: None,
         mcp: Some(McpAccess {
             hub: &hub,
             servers: vec![bad],
@@ -1764,6 +1850,7 @@ async fn disabled_server_is_not_started() {
         review_at_end: false,
         run_commands: false,
         command_allowed: &|_| false,
+        servers: None,
         mcp: Some(McpAccess {
             hub: &hub,
             servers: vec![fake_config("", false)],
@@ -1826,6 +1913,7 @@ async fn mcp_result_is_cut() {
             review_at_end: false,
         run_commands: false,
         command_allowed: &|_| false,
+        servers: None,
             mcp: Some(McpAccess {
                 hub: &hub_clone,
                 servers: vec![fake_config("", true)],
@@ -1913,6 +2001,7 @@ async fn review_at_end_writes_edits_without_asking() {
         review_at_end: true,
         run_commands: false,
         command_allowed: &|_| false,
+        servers: None,
         mcp: None,
     })
     .await;
@@ -1983,6 +2072,7 @@ async fn review_at_end_still_asks_for_commands() {
             review_at_end: true,
             run_commands: false,
             command_allowed: &|_| false,
+            servers: None,
             mcp: None,
         })
         .await

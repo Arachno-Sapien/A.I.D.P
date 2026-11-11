@@ -78,3 +78,30 @@ pub async fn terminal_close(
     Ok(())
 }
 
+
+/// The servers the agent started (decision 0030), for the terminal tabs.
+#[tauri::command]
+#[specta::specta]
+pub fn server_list(
+    servers: State<'_, crate::tools::servers::Servers>,
+) -> Vec<crate::tools::servers::ServerInfo> {
+    servers.list()
+}
+
+/// Shows a server in a tab: its kept output, then what it prints next.
+#[tauri::command]
+#[specta::specta]
+pub fn server_attach(
+    servers: State<'_, crate::tools::servers::Servers>,
+    id: u32,
+    on_event: Channel<TerminalEvent>,
+) -> bool {
+    servers.attach(id, on_event)
+}
+
+/// Stops a server and closes its tab.
+#[tauri::command]
+#[specta::specta]
+pub fn server_stop(servers: State<'_, crate::tools::servers::Servers>, id: u32) -> bool {
+    servers.stop(id)
+}

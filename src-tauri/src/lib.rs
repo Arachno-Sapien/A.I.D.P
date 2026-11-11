@@ -70,6 +70,9 @@ fn specta_builder() -> Builder<tauri::Wry> {
         commands::terminal::terminal_write,
         commands::terminal::terminal_resize,
         commands::terminal::terminal_close,
+        commands::terminal::server_list,
+        commands::terminal::server_attach,
+        commands::terminal::server_stop,
         commands::history::list_conversations,
         commands::history::create_conversation,
         commands::history::delete_conversation,
@@ -152,6 +155,7 @@ pub fn run() -> tauri::Result<()> {
         .manage(workspace::WorkspaceState::default())
         .manage(tools::approvals::Approvals::default())
         .manage(tools::pty::TerminalState::default())
+        .manage(tools::servers::Servers::default())
         .manage(commands::ollama::OllamaState::default())
         .manage(close_guard::CloseGuard::default())
         .manage(updates::UpdateState::default())
@@ -180,6 +184,7 @@ pub fn run() -> tauri::Result<()> {
     app.run(|handle, event| {
         if matches!(event, tauri::RunEvent::Exit) {
             tauri::async_runtime::block_on(handle.state::<mcp::hub::Hub>().stop_all());
+            handle.state::<tools::servers::Servers>().stop_all();
         }
     });
     Ok(())

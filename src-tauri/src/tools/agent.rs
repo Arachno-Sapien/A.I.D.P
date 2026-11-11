@@ -1,7 +1,11 @@
 use super::approvals::{Answer, Approvals};
 use super::command;
 use super::run;
-use super::{agent_system_for, head, show_arguments, specs, ToolAction, ToolOutcome, MAX_STEPS};
+use super::servers::Servers;
+use super::{
+    agent_system_for, head, server_specs, show_arguments, specs, ToolAction, ToolOutcome, MAX_STEPS,
+    SERVER_WAIT,
+};
 use crate::gateway::{
     ChatEvent, ChatMessage, ChatRequest, ImageInput, ModelProvider, ProviderError, Role,
     ToolOutput, ToolRound, Usage,
@@ -38,6 +42,8 @@ pub struct AgentRun<'a> {
     /// Whether the user chose to always allow this exact command in this folder
     /// (decision 0030). Asked per call, so it applies within the same task.
     pub command_allowed: &'a (dyn Fn(&str) -> bool + Send + Sync),
+    /// Where start_server keeps its servers; `None` leaves the server tools out.
+    pub servers: Option<&'a Servers>,
     pub mcp: Option<McpAccess<'a>>,
 }
 
@@ -70,6 +76,59 @@ async fn edit_answer(
     }
 }
 
+/// A server's output once it prints an address, ends, or `SERVER_WAIT` passes.
+async fn first_output(
+    servers: &Servers,
+    server: u32,
+    cancel: &CancellationToken,
+) -> super::servers::ServerStatus {
+    let started = std::time::Instant::now();
+    loop {
+        let status = servers.output(server).unwrap_or(super::servers::ServerStatus {
+            output: String::new(),
+            exit_code: None,
+            running: false,
+        });
+        let address = status.output.contains("http://") || status.output.contains("https://");
+        if address || !status.running || started.elapsed() >= SERVER_WAIT || cancel.is_cancelled() {
+            return status;
+        }
+        tokio::time::sleep(Duration::from_millis(200)).await;
+    }
+}
+
+/// A server tool called when this surface has none: the same as any unknown tool.
+fn unknown_tool(
+    out: &Channel<ChatEvent>,
+    id: u32,
+    name: &str,
+    call_id: String,
+    results: &mut Vec<ToolOutput>,
+) -> Result<(), ProviderError> {
+    let err = format!("There is no tool named {name}.");
+    out.send(ChatEvent::ToolCall {
+        id,
+        action: ToolAction::Invalid {
+            name: name.to_string(),
+        },
+        needs_answer: false,
+    })
+    .map_err(|_| ProviderError::Cancelled)?;
+    out.send(ChatEvent::ToolResult {
+        id,
+        outcome: ToolOutcome::Error {
+            message: err.clone(),
+        },
+    })
+    .map_err(|_| ProviderError::Cancelled)?;
+    results.push(ToolOutput {
+        call_id,
+        content: err,
+        is_error: true,
+    });
+    Ok(())
+}
+
 pub async fn run(args: AgentRun<'_>) -> Result<Usage, ProviderError> {
     run_with_images(args, Vec::new()).await
 }
@@ -80,6 +139,9 @@ pub async fn run_with_images(
     images: Vec<Vec<ImageInput>>,
 ) -> Result<Usage, ProviderError> {
     let mut specs_list = specs();
+    if args.servers.is_some() {
+        specs_list.extend(server_specs());
+    }
     let builtin_count = specs_list.len();
     if let Some(mcp) = &args.mcp {
         let mut enabled_ids = Vec::new();
@@ -758,6 +820,145 @@ pub async fn run_with_images(
                             return Err(ProviderError::Cancelled);
                         }
                     }
+                }
+                run::ToolInput::StartServer { command } => {
+                    let Some(servers) = args.servers else {
+                        unknown_tool(&args.out, id, &call.name, call.id, &mut results)?;
+                        continue;
+                    };
+                    let rx = command_asks(
+                        args.run_commands,
+                        args.review_at_end,
+                        args.command_allowed,
+                        &command,
+                    )
+                    .then(|| args.approvals.register(id));
+                    args.out
+                        .send(ChatEvent::ToolCall {
+                            id,
+                            action: ToolAction::StartServer {
+                                command: command.clone(),
+                                folder: display_path(&args.root),
+                            },
+                            needs_answer: rx.is_some(),
+                        })
+                        .map_err(|_| ProviderError::Cancelled)?;
+
+                    match edit_answer(args.approvals, id, rx, &args.cancel).await {
+                        Answer::Yes => match servers.start(&args.root, &command).await {
+                            Ok(server) => {
+                                let limit = crate::tools::OUTPUT_LIMIT.min(args.text_limit);
+                                let status = first_output(servers, server, &args.cancel).await;
+                                let output = command::tail(&status.output, limit);
+                                let for_model = if status.running {
+                                    format!("Server {server} is running in a terminal tab the user can see.\n{output}")
+                                } else {
+                                    let code = status
+                                        .exit_code
+                                        .map(|c| c.to_string())
+                                        .unwrap_or_else(|| "none".to_string());
+                                    format!("Server {server} exited with code {code}.\n{output}")
+                                };
+                                args.out
+                                    .send(ChatEvent::ToolResult {
+                                        id,
+                                        outcome: ToolOutcome::Server { server, output },
+                                    })
+                                    .map_err(|_| ProviderError::Cancelled)?;
+                                results.push(ToolOutput {
+                                    call_id: call.id,
+                                    content: for_model,
+                                    is_error: !status.running,
+                                });
+                            }
+                            Err(err) => {
+                                let err_run = run::refused(&err, "");
+                                args.out
+                                    .send(ChatEvent::ToolResult {
+                                        id,
+                                        outcome: err_run.outcome,
+                                    })
+                                    .map_err(|_| ProviderError::Cancelled)?;
+                                results.push(ToolOutput {
+                                    call_id: call.id,
+                                    content: err_run.for_model,
+                                    is_error: true,
+                                });
+                            }
+                        },
+                        Answer::No => {
+                            let tool_run = run::declined(true);
+                            args.out
+                                .send(ChatEvent::ToolResult {
+                                    id,
+                                    outcome: tool_run.outcome,
+                                })
+                                .map_err(|_| ProviderError::Cancelled)?;
+                            results.push(ToolOutput {
+                                call_id: call.id,
+                                content: tool_run.for_model,
+                                is_error: tool_run.is_error,
+                            });
+                        }
+                        Answer::Stopped => {
+                            let _ = args.out.send(ChatEvent::ToolResult {
+                                id,
+                                outcome: ToolOutcome::Stopped,
+                            });
+                            return Err(ProviderError::Cancelled);
+                        }
+                    }
+                }
+                run::ToolInput::ServerOutput { server } | run::ToolInput::StopServer { server } => {
+                    let Some(servers) = args.servers else {
+                        unknown_tool(&args.out, id, &call.name, call.id, &mut results)?;
+                        continue;
+                    };
+                    let stop = call.name == "stop_server";
+                    let action = if stop {
+                        ToolAction::StopServer { server }
+                    } else {
+                        ToolAction::ServerOutput { server }
+                    };
+                    args.out
+                        .send(ChatEvent::ToolCall {
+                            id,
+                            action,
+                            needs_answer: false,
+                        })
+                        .map_err(|_| ProviderError::Cancelled)?;
+                    let limit = crate::tools::OUTPUT_LIMIT.min(args.text_limit);
+                    let found = if stop {
+                        servers.stop(server).then(|| "Stopped.".to_string())
+                    } else {
+                        servers.output(server).map(|st| {
+                            let state = if st.running {
+                                "Running.".to_string()
+                            } else {
+                                format!(
+                                    "Exited with code {}.",
+                                    st.exit_code.map(|c| c.to_string()).unwrap_or_else(|| "none".to_string())
+                                )
+                            };
+                            format!("{state}\n{}", command::tail(&st.output, limit))
+                        })
+                    };
+                    let (outcome, content, is_error) = match found {
+                        Some(text) if stop => (ToolOutcome::Ok { summary: text.clone() }, text, false),
+                        Some(text) => (ToolOutcome::Text { output: text.clone() }, text, false),
+                        None => {
+                            let message = format!("There is no server {server}. Start one with start_server.");
+                            (ToolOutcome::Error { message: message.clone() }, message, true)
+                        }
+                    };
+                    args.out
+                        .send(ChatEvent::ToolResult { id, outcome })
+                        .map_err(|_| ProviderError::Cancelled)?;
+                    results.push(ToolOutput {
+                        call_id: call.id,
+                        content,
+                        is_error,
+                    });
                 }
             }
         }

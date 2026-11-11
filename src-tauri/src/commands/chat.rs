@@ -136,6 +136,7 @@ pub async fn run_agent(
         review_at_end: options.review_at_end,
         run_commands: options.run_commands,
         command_allowed: &command_allowed,
+        servers: Some(&app.state::<crate::tools::servers::Servers>()),
         mcp: Some(crate::tools::agent::McpAccess {
             hub: &hub,
             servers,

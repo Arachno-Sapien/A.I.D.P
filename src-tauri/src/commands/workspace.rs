@@ -1,4 +1,5 @@
 use crate::connections::{AppError, Services};
+use crate::tools::servers::Servers;
 use crate::workspace::files::{DirEntry, FileContent, WriteFile};
 use crate::workspace::recent;
 use crate::workspace::{WorkspaceError, WorkspaceInfo, WorkspaceState};
@@ -42,6 +43,7 @@ pub async fn open_folder(
     app: AppHandle,
     state: State<'_, WorkspaceState>,
     services: State<'_, Services>,
+    servers: State<'_, Servers>,
 ) -> Result<Option<WorkspaceInfo>, WorkspaceError> {
     let opened = tauri::async_runtime::spawn_blocking(move || {
         let Some(picked) = app.dialog().file().blocking_pick_folder() else {
@@ -56,6 +58,8 @@ pub async fn open_folder(
     let Some((canonical, info)) = opened else {
         return Ok(None);
     };
+    // The agent's servers belong to the folder they started in.
+    servers.stop_all();
     state.set(canonical);
     if let Ok(list) = load_recent(&services) {
         save_recent(&services, &recent::push(list, info.path.clone()));
@@ -75,6 +79,7 @@ pub async fn open_recent(
     path: String,
     state: State<'_, WorkspaceState>,
     services: State<'_, Services>,
+    servers: State<'_, Servers>,
 ) -> Result<WorkspaceInfo, WorkspaceError> {
     let list = load_recent(&services)?;
     if !list.contains(&path) {
@@ -89,6 +94,7 @@ pub async fn open_recent(
 
     match opened {
         Ok((canonical, info)) => {
+            servers.stop_all();
             state.set(canonical);
             save_recent(&services, &recent::push(list, info.path.clone()));
             Ok(info)
@@ -106,7 +112,11 @@ pub async fn open_recent(
 
 #[tauri::command]
 #[specta::specta]
-pub fn close_folder(state: State<'_, WorkspaceState>) -> Result<(), WorkspaceError> {
+pub fn close_folder(
+    state: State<'_, WorkspaceState>,
+    servers: State<'_, Servers>,
+) -> Result<(), WorkspaceError> {
+    servers.stop_all();
     state.clear();
     Ok(())
 }

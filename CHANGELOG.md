@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Servers the agent starts:** the agent can start a dev server that keeps running (`start_server`, asked like any command), read its output and stop it, so Browser checks no longer need you to start the server (decision 0030).
 - **Always allow:** a Run card can remember that exact command for the folder, so it runs without asking next time. Settings lists them with Remove (decision 0030).
 - **Run commands without asking:** a switch beside Review at end lets the agent's commands run for one task without the Run button (it asks you first, shows every command on a card, and turns itself off when the task ends; decision 0030).
 - **Review at end:** A switch next to **Agent** in the Workspace. With it on, the agent writes its edits and new files as it works instead of stopping at each one, so it can test what it built; when it finishes, a card lists every changed file with its diff and **Undo**, **Undo all** or **Keep all**. Commands and outside tools still ask every time. Off by default; asks first in a folder without git (decision 0028).

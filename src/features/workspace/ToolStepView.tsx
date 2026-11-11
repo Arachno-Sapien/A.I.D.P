@@ -21,6 +21,12 @@ function stepLabel(action: ToolAction): string {
       return `Create ${action.path}`;
     case "runCommand":
       return `Run command`;
+    case "startServer":
+      return `Start server`;
+    case "serverOutput":
+      return `Read server ${action.server} output`;
+    case "stopServer":
+      return `Stop server ${action.server}`;
     case "mcpStart":
       return `Start outside tools: ${action.server}`;
     case "mcpTool":
@@ -41,9 +47,18 @@ export function ToolStepView({ step, onAnswer }: ToolStepViewProps) {
   const label = stepLabel(step.action);
   const isPending = !step.outcome;
   const showApproval = awaitsAnswer(step);
+  const command =
+    step.action.tool === "runCommand" || step.action.tool === "startServer"
+      ? step.action.command
+      : null;
   const runCard =
     step.action.tool === "runCommand"
       ? { subtitle: `in ${step.action.folder}`, body: step.action.command }
+      : step.action.tool === "startServer"
+        ? {
+            subtitle: `in ${step.action.folder}. Keeps running in a terminal tab until you stop it.`,
+            body: step.action.command,
+          }
       : step.action.tool === "mcpTool"
         ? {
             subtitle: `Outside tool. This is sent to ${step.action.server}:`,
@@ -86,12 +101,11 @@ export function ToolStepView({ step, onAnswer }: ToolStepViewProps) {
               >
                 Deny
               </button>
-              {step.action.tool === "runCommand" && (
+              {command !== null && (
                 <button
                   type="button"
                   title="Run it now and from now on in this folder without asking (Settings lists these)"
                   onClick={() => {
-                    const command = step.action.tool === "runCommand" ? step.action.command : "";
                     void commands.allowCommand(command).then(() => onAnswer?.(step.id, true));
                   }}
                   className="px-2.5 py-1 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs font-semibold rounded transition-colors cursor-pointer focus-visible:ring-1 focus-visible:ring-neutral-400 focus-visible:outline-none"
@@ -148,6 +162,16 @@ export function ToolStepView({ step, onAnswer }: ToolStepViewProps) {
             <pre className="max-h-48 overflow-auto p-2 rounded bg-neutral-950 font-mono text-xs text-neutral-200 whitespace-pre-wrap">
               {step.outcome.output}
             </pre>
+          )}
+          {step.outcome.status === "server" && (
+            <div className="space-y-1">
+              <div className="text-neutral-400">
+                {`Server ${step.outcome.server}: its output is in a terminal tab`}
+              </div>
+              <pre className="max-h-48 overflow-auto p-2 rounded bg-neutral-950 font-mono text-xs text-neutral-200 whitespace-pre-wrap">
+                {step.outcome.output}
+              </pre>
+            </div>
           )}
           {step.outcome.status === "command" && (
             <div className="space-y-1">

@@ -33,6 +33,40 @@ pub enum ToolInput {
     RunCommand {
         command: String,
     },
+    StartServer {
+        command: String,
+    },
+    ServerOutput {
+        server: u32,
+    },
+    StopServer {
+        server: u32,
+    },
+}
+
+#[derive(Deserialize)]
+struct ServerArgs {
+    server: u32,
+}
+
+/// The command as the user will see it on the card, or why it can't be shown exactly.
+fn check_command(name: &str, command: String) -> Result<String, String> {
+    // A carriage return is allowed only as part of CRLF.
+    let lone_cr = command.replace("\r\n", "").contains('\r');
+    let hidden = command.chars().find(|&c| is_hidden(c));
+    if let Some(c) = hidden.or(lone_cr.then_some('\r')) {
+        return Err(format!(
+            "Invalid arguments for {name}: the command contains a hidden or control character (U+{:04X}), which would make the approval card differ from what runs. Use plain characters.",
+            c as u32
+        ));
+    }
+    if let Some(c) = command.chars().find(|&c| received_differently(c)) {
+        return Err(format!(
+            "Invalid arguments for {name}: the command contains a character (U+{:04X}) that some programs would receive as a different ASCII character. Use plain ASCII.",
+            c as u32
+        ));
+    }
+    Ok(command)
 }
 
 #[derive(Deserialize)]
@@ -123,23 +157,24 @@ pub fn parse(name: &str, input: &serde_json::Value) -> Result<ToolInput, String>
         "run_command" => {
             let args: RunCommandArgs = serde_json::from_value(input.clone())
                 .map_err(|e| format!("Invalid arguments for {name}: {e}."))?;
-            // A carriage return is allowed only as part of CRLF.
-            let lone_cr = args.command.replace("\r\n", "").contains('\r');
-            let hidden = args.command.chars().find(|&c| is_hidden(c));
-            if let Some(c) = hidden.or(lone_cr.then_some('\r')) {
-                return Err(format!(
-                    "Invalid arguments for {name}: the command contains a hidden or control character (U+{:04X}), which would make the approval card differ from what runs. Use plain characters.",
-                    c as u32
-                ));
-            }
-            if let Some(c) = args.command.chars().find(|&c| received_differently(c)) {
-                return Err(format!(
-                    "Invalid arguments for {name}: the command contains a character (U+{:04X}) that some programs would receive as a different ASCII character. Use plain ASCII.",
-                    c as u32
-                ));
-            }
             Ok(ToolInput::RunCommand {
-                command: args.command,
+                command: check_command(name, args.command)?,
+            })
+        }
+        "start_server" => {
+            let args: RunCommandArgs = serde_json::from_value(input.clone())
+                .map_err(|e| format!("Invalid arguments for {name}: {e}."))?;
+            Ok(ToolInput::StartServer {
+                command: check_command(name, args.command)?,
+            })
+        }
+        "server_output" | "stop_server" => {
+            let args: ServerArgs = serde_json::from_value(input.clone())
+                .map_err(|e| format!("Invalid arguments for {name}: {e}."))?;
+            Ok(if name == "server_output" {
+                ToolInput::ServerOutput { server: args.server }
+            } else {
+                ToolInput::StopServer { server: args.server }
             })
         }
         _ => Err(format!("There is no tool named {name}.")),

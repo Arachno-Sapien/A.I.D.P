@@ -28,6 +28,38 @@ describe("ToolStepView", () => {
     expect(commands.allowCommand).toHaveBeenCalledWith("npm test");
   });
 
+  it("a start server card asks like a command and shows where it runs", async () => {
+    const onAnswer = vi.fn();
+    const step: ToolStep = {
+      id: 11,
+      action: { tool: "startServer", command: "npm run dev", folder: "C:/p" },
+      needsAnswer: true,
+    };
+    const { rerender } = render(<ToolStepView step={step} onAnswer={onAnswer} />);
+    expect(screen.getByText("Start server")).toBeDefined();
+    expect(screen.getByText("npm run dev")).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: "Always allow" }));
+    await vi.waitFor(() => expect(onAnswer).toHaveBeenCalledWith(11, true));
+    expect(commands.allowCommand).toHaveBeenCalledWith("npm run dev");
+
+    rerender(
+      <ToolStepView
+        step={{ ...step, answered: true, outcome: { status: "server", server: 2, output: "http://localhost:5173" } }}
+        onAnswer={onAnswer}
+      />,
+    );
+    expect(screen.getByText("Server 2: its output is in a terminal tab")).toBeDefined();
+    expect(screen.getByText("http://localhost:5173")).toBeDefined();
+  });
+
+  it("labels server output and stop steps", () => {
+    render(<ToolStepView step={{ id: 12, action: { tool: "serverOutput", server: 2 }, needsAnswer: false }} />);
+    expect(screen.getByText("Read server 2 output")).toBeDefined();
+    cleanup();
+    render(<ToolStepView step={{ id: 13, action: { tool: "stopServer", server: 2 }, needsAnswer: false }} />);
+    expect(screen.getByText("Stop server 2")).toBeDefined();
+  });
+
   it("an outside tool card has no Always allow", () => {
     const step: ToolStep = {
       id: 10,
