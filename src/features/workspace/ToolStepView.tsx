@@ -159,9 +159,20 @@ export function ToolStepView({ step, onAnswer }: ToolStepViewProps) {
             <div className="text-neutral-400">Stopped</div>
           )}
           {step.outcome.status === "text" && (
-            <pre className="max-h-48 overflow-auto p-2 rounded bg-neutral-950 font-mono text-xs text-neutral-200 whitespace-pre-wrap">
-              {step.outcome.output}
-            </pre>
+            <div className="space-y-1">
+              <pre className="max-h-48 overflow-auto p-2 rounded bg-neutral-950 font-mono text-xs text-neutral-200 whitespace-pre-wrap">
+                {step.outcome.output}
+              </pre>
+              {/* Rust checked each image's bytes (PNG, JPEG, GIF or WebP; decision 0031). */}
+              {(step.outcome.images ?? []).map((img, i) => (
+                <img
+                  key={i}
+                  src={`data:${img.mime};base64,${img.dataBase64}`}
+                  alt={`Image from ${step.action.tool === "mcpTool" ? step.action.name : "the tool"}`}
+                  className="max-w-full max-h-96 rounded border border-neutral-800"
+                />
+              ))}
+            </div>
           )}
           {step.outcome.status === "server" && (
             <div className="space-y-1">

@@ -280,7 +280,7 @@ describe("OutsideTools", () => {
     expect(BROWSER_PRESET.command).toMatch(/@playwright\/mcp@\d+\.\d+\.\d+ /);
     expect(BROWSER_PRESET.command).not.toContain("--headless");
     expect(BROWSER_PRESET.command).toContain("--isolated");
-    expect(BROWSER_PRESET.command).toContain("--image-responses omit");
+    expect(BROWSER_PRESET.command).toContain("--image-responses allow");
     expect(BROWSER_PRESET.command).toContain("--allowed-origins");
     expect(BROWSER_PRESET.command).not.toContain("@latest");
   });

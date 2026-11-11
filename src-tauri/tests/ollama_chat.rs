@@ -400,6 +400,7 @@ async fn renders_tool_rounds() {
                 is_error: true,
             },
         ],
+        images: vec![],
     }];
 
     let adapter = OllamaChat::new(reqwest::Client::new(), server.uri());
@@ -598,4 +599,50 @@ async fn stop_works_while_the_model_loads() {
     .expect("Stop must not wait for the model")
     .expect_err("stopped");
     assert_eq!(err, ProviderError::Cancelled);
+}
+
+/// A round's images follow its tool messages as a user message with `images`.
+#[tokio::test]
+async fn round_images_follow_the_tool_results() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/api/chat"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(ndjson(&[r#"{"done":true}"#])))
+        .mount(&server)
+        .await;
+
+    let mut req = base_req();
+    req.rounds = vec![ToolRound {
+        assistant: json!({"role": "assistant", "content": "", "tool_calls": [
+            { "function": { "name": "mcp__browser__browser_take_screenshot", "arguments": {} } }
+        ]}),
+        results: vec![ToolOutput {
+            call_id: "call_0".to_string(),
+            content: "[image image/png]".to_string(),
+            is_error: false,
+        }],
+        images: vec![ImageInput {
+            mime: "image/png".to_string(),
+            data_base64: "iVBORw0KGgo=".to_string(),
+        }],
+    }];
+    let adapter = OllamaChat::new(reqwest::Client::new(), server.uri());
+    let (ch, _) = capture();
+    adapter
+        .stream_chat(req, ch, CancellationToken::new())
+        .await
+        .unwrap();
+
+    let requests = server.received_requests().await.unwrap();
+    let body: serde_json::Value = serde_json::from_slice(&requests[0].body).unwrap();
+    let msgs = body["messages"].as_array().unwrap();
+    assert_eq!(msgs[msgs.len() - 2]["role"], "tool");
+    assert_eq!(
+        msgs[msgs.len() - 1],
+        json!({
+            "role": "user",
+            "content": "Images from the tool results above:",
+            "images": ["iVBORw0KGgo="]
+        })
+    );
 }

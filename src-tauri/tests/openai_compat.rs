@@ -753,6 +753,7 @@ async fn renders_tool_rounds() {
                 is_error: true,
             },
         ],
+        images: vec![],
     }];
 
     p.stream_chat(request, channel, CancellationToken::new())
@@ -773,4 +774,54 @@ async fn renders_tool_rounds() {
     assert_eq!(msgs[len - 1]["role"], "tool");
     assert_eq!(msgs[len - 1]["tool_call_id"], "call_2");
     assert_eq!(msgs[len - 1]["content"], "Error: file not found");
+}
+
+fn png() -> ImageInput {
+    ImageInput {
+        mime: "image/png".to_string(),
+        data_base64: "iVBORw0KGgo=".to_string(),
+    }
+}
+
+/// Tool messages take text only, so a round's images follow its results as a user message.
+#[tokio::test]
+async fn round_images_follow_the_tool_results() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(sse(&["[DONE]"])))
+        .mount(&server)
+        .await;
+
+    let mut request = req();
+    request.rounds = vec![ToolRound {
+        assistant: json!({"role": "assistant", "content": null, "tool_calls": []}),
+        results: vec![ToolOutput {
+            call_id: "call_1".to_string(),
+            content: "[image image/png]".to_string(),
+            is_error: false,
+        }],
+        images: vec![png()],
+    }];
+    let (channel, _) = capture();
+    provider(&server)
+        .stream_chat(request, channel, CancellationToken::new())
+        .await
+        .unwrap();
+
+    let requests = server.received_requests().await.unwrap();
+    let body: serde_json::Value = serde_json::from_slice(&requests[0].body).unwrap();
+    let msgs = body["messages"].as_array().unwrap();
+    let len = msgs.len();
+    assert_eq!(msgs[len - 2]["role"], "tool");
+    assert_eq!(
+        msgs[len - 1],
+        json!({
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "Images from the tool results above:"},
+                {"type": "image_url", "image_url": {"url": "data:image/png;base64,iVBORw0KGgo="}}
+            ]
+        })
+    );
 }

@@ -60,7 +60,13 @@ pub enum ToolOutcome {
         #[serde(rename = "timedOut")]
         timed_out: bool,
     },
-    Text { output: String },
+    Text {
+        output: String,
+        /// Images an outside tool returned, shown on its card (decision 0031).
+        /// Missing in chats saved before, and dropped when a chat is saved.
+        #[serde(default)]
+        images: Vec<crate::gateway::ImageInput>,
+    },
     /// A server the agent started that keeps running in a terminal tab.
     Server { server: u32, output: String },
     Declined,

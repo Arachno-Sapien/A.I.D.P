@@ -69,6 +69,7 @@ async fn call_round_trip() {
         CallResult {
             text: "hello".to_string(),
             is_error: false,
+            images: vec![],
         }
     );
 

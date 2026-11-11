@@ -1,4 +1,8 @@
 use super::{ACCEPTED_VERSIONS, MAX_LINE_BYTES, McpError, PROTOCOL_VERSION};
+use crate::attachments::{detect, AttachmentKind, MAX_IMAGE};
+use crate::gateway::ImageInput;
+use base64::engine::general_purpose::STANDARD as BASE64;
+use base64::Engine as _;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -20,6 +24,8 @@ pub struct RemoteTool {
 pub struct CallResult {
     pub text: String,
     pub is_error: bool,
+    /// Images that passed the attachment checks (decision 0031); untrusted data.
+    pub images: Vec<ImageInput>,
 }
 
 type PendingMap = HashMap<u64, oneshot::Sender<Result<Value, McpError>>>;
@@ -290,8 +296,10 @@ impl Client {
             )
             .await?;
 
+        let (text, images) = flatten(result.get("content").unwrap_or(&Value::Null));
         Ok(CallResult {
-            text: flatten(result.get("content").unwrap_or(&Value::Null)),
+            text,
+            images,
             is_error: result
                 .get("isError")
                 .and_then(|b| b.as_bool())
@@ -426,13 +434,29 @@ async fn reader_loop<R: AsyncRead + Unpin>(reader: R, weak: Weak<Client>) {
     }
 }
 
-/// Joins a `tools/call` result's `content` items with `\n`.
-pub fn flatten(content: &Value) -> String {
+/// An image item's bytes, kept only when they are PNG, JPEG, GIF or WebP of at most
+/// 5 MB, as for attachments. The MIME type comes from the bytes, not the server.
+fn checked_image(item: &Value) -> Option<ImageInput> {
+    let data = item.get("data")?.as_str()?;
+    let bytes = BASE64.decode(data).ok()?;
+    match detect(&bytes) {
+        Some((AttachmentKind::Image, mime)) if bytes.len() <= MAX_IMAGE => Some(ImageInput {
+            mime: mime.to_string(),
+            data_base64: data.to_string(),
+        }),
+        _ => None,
+    }
+}
+
+/// Joins a `tools/call` result's `content` items with `\n`, and returns the images
+/// that passed `checked_image`; each still leaves an `[image ...]` line in the text.
+pub fn flatten(content: &Value) -> (String, Vec<ImageInput>) {
     let Some(items) = content.as_array() else {
-        return "[content not shown]".to_string();
+        return ("[content not shown]".to_string(), Vec::new());
     };
 
-    items
+    let mut images = Vec::new();
+    let text = items
         .iter()
         .map(|item| {
             let kind = item.get("type").and_then(|t| t.as_str()).unwrap_or("");
@@ -442,13 +466,20 @@ pub fn flatten(content: &Value) -> String {
                     .and_then(|t| t.as_str())
                     .unwrap_or("")
                     .to_string(),
-                "image" => {
-                    let mime = item
-                        .get("mimeType")
-                        .and_then(|m| m.as_str())
-                        .unwrap_or("");
-                    format!("[image {mime}, not shown]")
-                }
+                "image" => match checked_image(item) {
+                    Some(image) => {
+                        let line = format!("[image {}]", image.mime);
+                        images.push(image);
+                        line
+                    }
+                    None => {
+                        let mime = item
+                            .get("mimeType")
+                            .and_then(|m| m.as_str())
+                            .unwrap_or("");
+                        format!("[image {mime}, not shown]")
+                    }
+                },
                 "audio" => {
                     let mime = item
                         .get("mimeType")
@@ -476,7 +507,8 @@ pub fn flatten(content: &Value) -> String {
             }
         })
         .collect::<Vec<_>>()
-        .join("\n")
+        .join("\n");
+    (text, images)
 }
 
 #[cfg(test)]
@@ -824,6 +856,9 @@ mod tests {
         srv.await.unwrap();
     }
 
+    /// The PNG signature: enough for `attachments::detect`.
+    const PNG: &str = "iVBORw0KGgo=";
+
     #[tokio::test]
     async fn call_tool_flattens_content() {
         let (client, mut from_client, mut to_client) = pair();
@@ -843,7 +878,9 @@ mod tests {
                         "content": [
                             {"type": "text", "text": "one"},
                             {"type": "image", "mimeType": "image/png", "data": "AAAA"},
-                            {"type": "resource_link", "uri": "file:///x"}
+                            {"type": "resource_link", "uri": "file:///x"},
+                            // Declared JPEG, but its bytes are a PNG: the bytes decide.
+                            {"type": "image", "mimeType": "image/jpeg", "data": PNG}
                         ],
                         "isError": true
                     }
@@ -859,9 +896,27 @@ mod tests {
         assert_eq!(
             result,
             CallResult {
-                text: "one\n[image image/png, not shown]\n[link file:///x]".to_string(),
+                text: "one\n[image image/png, not shown]\n[link file:///x]\n[image image/png]"
+                    .to_string(),
                 is_error: true,
+                images: vec![ImageInput {
+                    mime: "image/png".to_string(),
+                    data_base64: PNG.to_string(),
+                }],
             }
+        );
+        // Only an image whose bytes are PNG, JPEG, GIF or WebP is kept.
+        assert_eq!(
+            flatten(&json!([
+                {"type": "image", "mimeType": "image/svg+xml", "data": "PHN2Zz4="},
+                {"type": "image", "mimeType": "image/png", "data": "not base64!"},
+                {"type": "image", "mimeType": "image/png"}
+            ])),
+            (
+                "[image image/svg+xml, not shown]\n[image image/png, not shown]\n[image image/png, not shown]"
+                    .to_string(),
+                vec![]
+            )
         );
         assert_eq!(
             flatten(&json!([
@@ -870,9 +925,16 @@ mod tests {
                 {"type": "resource", "resource": {"uri": "file:///b"}},
                 {"type": "other"}
             ])),
-            "[audio audio/wav, not shown]\ninline\n[file file:///b, not shown]\n[content not shown]"
+            (
+                "[audio audio/wav, not shown]\ninline\n[file file:///b, not shown]\n[content not shown]"
+                    .to_string(),
+                vec![]
+            )
         );
-        assert_eq!(flatten(&json!("not an array")), "[content not shown]");
+        assert_eq!(
+            flatten(&json!("not an array")),
+            ("[content not shown]".to_string(), vec![])
+        );
         srv.await.unwrap();
     }
 

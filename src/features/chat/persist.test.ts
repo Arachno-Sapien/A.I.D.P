@@ -4,6 +4,47 @@ import type { UiMessage } from "./store";
 import type { StoredMessage } from "../../lib/bindings";
 
 describe("persist", () => {
+  it("a saved chat keeps a tool's text but not its images", () => {
+    const msg: UiMessage = {
+      id: "a2",
+      role: "assistant",
+      text: "",
+      status: "complete",
+      parts: [
+        {
+          kind: "step",
+          step: {
+            id: 1,
+            action: {
+              tool: "mcpTool",
+              server: "browser",
+              name: "browser_take_screenshot",
+              arguments: "{}",
+            },
+            needsAnswer: false,
+            outcome: {
+              status: "text",
+              output: "[image image/png]",
+              images: [{ mime: "image/png", dataBase64: "iVBORw0KGgo=" }],
+            },
+          },
+        },
+      ],
+    };
+
+    const stored = toStored(msg);
+
+    expect(stored).not.toContain("iVBORw0KGgo=");
+    const part = fromStored(stored).parts?.[0];
+    expect(part?.kind === "step" && part.step.outcome).toEqual({
+      status: "text",
+      output: "[image image/png]",
+      images: [],
+    });
+    // The message on screen keeps its images.
+    expect(JSON.stringify(msg)).toContain("iVBORw0KGgo=");
+  });
+
   it("round-trips stored messages", () => {
     const userMsg: UiMessage = {
       id: "u1",

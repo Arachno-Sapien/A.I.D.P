@@ -146,6 +146,7 @@ async fn outside_path_is_refused_and_never_sent() {
         review_at_end: false,
         run_commands: false,
         command_allowed: &|_| false,
+        vision: false,
         servers: None,
         mcp: None,
     })
@@ -239,6 +240,7 @@ async fn denied_command_never_runs() {
         review_at_end: false,
         run_commands: false,
         command_allowed: &|_| false,
+        vision: false,
         servers: None,
         mcp: None,
         })
@@ -328,6 +330,7 @@ async fn approved_command_runs() {
         review_at_end: false,
         run_commands: false,
         command_allowed: &|_| false,
+        vision: false,
         servers: None,
         mcp: None,
         })
@@ -406,6 +409,7 @@ async fn run_commands_without_asking_skips_the_card() {
             review_at_end: false,
             run_commands: true,
             command_allowed: &|_| false,
+            vision: false,
             servers: None,
             mcp: None,
         }),
@@ -466,6 +470,7 @@ async fn allowed_command_skips_the_card() {
             review_at_end: false,
             run_commands: false,
             command_allowed: &|c| c == "echo hi",
+            vision: false,
             servers: None,
             mcp: None,
         })
@@ -536,6 +541,7 @@ async fn allowed_command_asks_with_review_at_end() {
             review_at_end: true,
             run_commands: false,
             command_allowed: &|_| true,
+            vision: false,
             servers: None,
             mcp: None,
         })
@@ -597,6 +603,7 @@ async fn start_server_returns_its_number() {
             review_at_end: false,
             run_commands: true,
             command_allowed: &|_| false,
+            vision: false,
             servers: Some(&servers),
             mcp: None,
         }),
@@ -665,6 +672,7 @@ async fn secret_file_is_never_sent() {
         review_at_end: false,
         run_commands: false,
         command_allowed: &|_| false,
+        vision: false,
         servers: None,
         mcp: None,
     })
@@ -731,6 +739,7 @@ async fn instructions_in_files_never_skip_approval() {
         review_at_end: false,
         run_commands: false,
         command_allowed: &|_| false,
+        vision: false,
         servers: None,
         mcp: None,
         })
@@ -812,6 +821,7 @@ async fn edit_waits_for_accept() {
         review_at_end: false,
         run_commands: false,
         command_allowed: &|_| false,
+        vision: false,
         servers: None,
         mcp: None,
         })
@@ -894,6 +904,7 @@ async fn edit_waits_for_accept() {
         review_at_end: false,
         run_commands: false,
         command_allowed: &|_| false,
+        vision: false,
         servers: None,
         mcp: None,
         })
@@ -976,6 +987,7 @@ async fn stop_while_waiting() {
         review_at_end: false,
         run_commands: false,
         command_allowed: &|_| false,
+        vision: false,
         servers: None,
         mcp: None,
         })
@@ -1055,6 +1067,7 @@ async fn every_call_gets_one_result() {
         review_at_end: false,
         run_commands: false,
         command_allowed: &|_| false,
+        vision: false,
         servers: None,
         mcp: None,
     })
@@ -1131,6 +1144,7 @@ async fn step_limit() {
         review_at_end: false,
         run_commands: false,
         command_allowed: &|_| false,
+        vision: false,
         servers: None,
         mcp: None,
     })
@@ -1197,6 +1211,7 @@ async fn small_context_cuts_reads() {
         review_at_end: false,
         run_commands: false,
         command_allowed: &|_| false,
+        vision: false,
         servers: None,
         mcp: None,
     })
@@ -1267,6 +1282,7 @@ async fn mcp_call_waits_for_approval_and_returns_text() {
             review_at_end: false,
         run_commands: false,
         command_allowed: &|_| false,
+        vision: false,
         servers: None,
             mcp: Some(McpAccess {
                 hub: &hub_clone,
@@ -1338,7 +1354,7 @@ async fn mcp_call_waits_for_approval_and_returns_text() {
     assert!(matches!(
         &evs[3],
         ChatEvent::ToolResult {
-            outcome: ToolOutcome::Text { output },
+            outcome: ToolOutcome::Text { output, .. },
             ..
         } if output == "hello"
     ));
@@ -1402,6 +1418,7 @@ async fn run_without_asking_server_skips_the_card() {
             review_at_end: false,
         run_commands: false,
         command_allowed: &|_| false,
+        vision: false,
         servers: None,
             mcp: Some(McpAccess {
                 hub: &hub,
@@ -1429,7 +1446,7 @@ async fn run_without_asking_server_skips_the_card() {
     assert!(matches!(
         &evs[3],
         ChatEvent::ToolResult {
-            outcome: ToolOutcome::Text { output },
+            outcome: ToolOutcome::Text { output, .. },
             ..
         } if output == "hello"
     ));
@@ -1479,6 +1496,7 @@ async fn declined_mcp_call_is_not_sent() {
             review_at_end: false,
         run_commands: false,
         command_allowed: &|_| false,
+        vision: false,
         servers: None,
             mcp: Some(McpAccess {
                 hub: &hub_clone,
@@ -1564,6 +1582,7 @@ async fn stop_during_mcp_call() {
             review_at_end: false,
         run_commands: false,
         command_allowed: &|_| false,
+        vision: false,
         servers: None,
             mcp: Some(McpAccess {
                 hub: &hub_clone,
@@ -1650,6 +1669,7 @@ async fn unknown_mcp_tool_is_never_put_to_the_user() {
         review_at_end: false,
         run_commands: false,
         command_allowed: &|_| false,
+        vision: false,
         servers: None,
         mcp: Some(McpAccess {
             hub: &hub,
@@ -1712,6 +1732,7 @@ async fn mcp_names_without_access_are_unknown() {
         review_at_end: false,
         run_commands: false,
         command_allowed: &|_| false,
+        vision: false,
         servers: None,
         mcp: None,
     })
@@ -1779,6 +1800,7 @@ async fn start_failure_shows_and_run_continues() {
         review_at_end: false,
         run_commands: false,
         command_allowed: &|_| false,
+        vision: false,
         servers: None,
         mcp: Some(McpAccess {
             hub: &hub,
@@ -1850,6 +1872,7 @@ async fn disabled_server_is_not_started() {
         review_at_end: false,
         run_commands: false,
         command_allowed: &|_| false,
+        vision: false,
         servers: None,
         mcp: Some(McpAccess {
             hub: &hub,
@@ -1913,6 +1936,7 @@ async fn mcp_result_is_cut() {
             review_at_end: false,
         run_commands: false,
         command_allowed: &|_| false,
+        vision: false,
         servers: None,
             mcp: Some(McpAccess {
                 hub: &hub_clone,
@@ -1951,7 +1975,7 @@ async fn mcp_result_is_cut() {
     assert!(events.lock().unwrap().iter().any(|e| matches!(
         e,
         ChatEvent::ToolResult {
-            outcome: ToolOutcome::Text { output },
+            outcome: ToolOutcome::Text { output, .. },
             ..
         } if output == &expected
     )));
@@ -2001,6 +2025,7 @@ async fn review_at_end_writes_edits_without_asking() {
         review_at_end: true,
         run_commands: false,
         command_allowed: &|_| false,
+        vision: false,
         servers: None,
         mcp: None,
     })
@@ -2072,6 +2097,7 @@ async fn review_at_end_still_asks_for_commands() {
             review_at_end: true,
             run_commands: false,
             command_allowed: &|_| false,
+            vision: false,
             servers: None,
             mcp: None,
         })
@@ -2094,4 +2120,107 @@ async fn review_at_end_still_asks_for_commands() {
     assert!(answered, "the command was not put to the user");
     assert!(run_handle.await.unwrap().is_ok());
     assert!(!root.join("marker.txt").exists());
+}
+
+/// One MCP call to `echo` with an image, answered by a server set to run without
+/// asking; returns the events and the second request's messages.
+async fn screenshot_run(vision: bool) -> (Vec<ChatEvent>, Vec<serde_json::Value>) {
+    let server = MockServer::start().await;
+    let dir = TempDir::new();
+    let mcp_dir = TempDir::new();
+    let resp1 = sse_tool_calls(&[(
+        "call_1",
+        "mcp__fake__echo",
+        json!({"text": "shot", "png": true}),
+    )]);
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(QueueResponder::new(vec![resp1, sse_text("Done.")]))
+        .mount(&server)
+        .await;
+
+    let p = make_provider(&server);
+    let (channel, events) = capture();
+    let approvals = Approvals::new();
+    let hub = Hub::new(mcp_dir.path().to_path_buf());
+    let res = run(AgentRun {
+        provider: &p,
+        model: "test-model".into(),
+        messages: vec![ChatMessage {
+            role: Role::User,
+            content: "Take a screenshot".into(),
+        }],
+        root: dir.path().to_path_buf(),
+        approvals: &approvals,
+        out: channel,
+        cancel: CancellationToken::new(),
+        command_timeout: Duration::from_secs(5),
+        local: Default::default(),
+        text_limit: aidp_lib::tools::READ_LIMIT,
+        review_at_end: false,
+        run_commands: false,
+        command_allowed: &|_| false,
+        servers: None,
+        vision,
+        mcp: Some(McpAccess {
+            hub: &hub,
+            servers: vec![ServerConfig {
+                auto_approve: true,
+                ..fake_config("", true)
+            }],
+        }),
+    })
+    .await;
+    hub.stop_all().await;
+    assert!(res.is_ok());
+
+    let reqs = server.received_requests().await.unwrap();
+    assert_eq!(reqs.len(), 2);
+    let body: serde_json::Value = reqs[1].body_json().unwrap();
+    let msgs = body["messages"].as_array().unwrap().clone();
+    let evs = events.lock().unwrap().clone();
+    (evs, msgs)
+}
+
+fn png() -> aidp_lib::gateway::ImageInput {
+    aidp_lib::gateway::ImageInput {
+        mime: "image/png".to_string(),
+        data_base64: "iVBORw0KGgo=".to_string(),
+    }
+}
+
+#[tokio::test]
+async fn tool_image_reaches_a_vision_model_and_the_card() {
+    let (evs, msgs) = screenshot_run(true).await;
+    assert!(evs.iter().any(|ev| matches!(
+        ev,
+        ChatEvent::ToolResult { outcome: ToolOutcome::Text { output, images }, .. }
+            if output == "shot\n[image image/png]" && images == &vec![png()]
+    )));
+    let tool = msgs.iter().find(|m| m["role"] == "tool").unwrap();
+    assert_eq!(tool["content"], "shot\n[image image/png]");
+    let last = msgs.last().unwrap();
+    assert_eq!(last["role"], "user");
+    assert_eq!(
+        last["content"][1]["image_url"]["url"],
+        "data:image/png;base64,iVBORw0KGgo="
+    );
+}
+
+#[tokio::test]
+async fn tool_image_never_reaches_a_model_without_vision() {
+    let (evs, msgs) = screenshot_run(false).await;
+    // The card still shows it.
+    assert!(evs.iter().any(|ev| matches!(
+        ev,
+        ChatEvent::ToolResult { outcome: ToolOutcome::Text { images, .. }, .. }
+            if images == &vec![png()]
+    )));
+    let tool = msgs.iter().find(|m| m["role"] == "tool").unwrap();
+    assert_eq!(
+        tool["content"],
+        format!("shot\n[image image/png]{}", aidp_lib::tools::agent::IMAGES_NOT_SENT)
+    );
+    assert!(!serde_json::to_string(&msgs).unwrap().contains("image_url"));
+    assert_eq!(msgs.last().unwrap()["role"], "tool");
 }

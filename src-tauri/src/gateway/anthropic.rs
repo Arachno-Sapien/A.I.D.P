@@ -239,7 +239,7 @@ impl ModelProvider for Anthropic {
 
         for round in req.rounds {
             anthropic_messages.push(round.assistant);
-            let results_val: Vec<serde_json::Value> = round
+            let mut results_val: Vec<serde_json::Value> = round
                 .results
                 .into_iter()
                 .map(|res| {
@@ -254,6 +254,17 @@ impl ModelProvider for Anthropic {
                     obj
                 })
                 .collect();
+            // Other blocks may follow the tool_result blocks of the same user message.
+            results_val.extend(round.images.iter().map(|img| {
+                json!({
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": img.mime,
+                        "data": img.data_base64,
+                    },
+                })
+            }));
             anthropic_messages.push(json!({
                 "role": "user",
                 "content": results_val,

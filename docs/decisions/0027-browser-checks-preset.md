@@ -1,7 +1,7 @@
 # Decision Record 0027: Browser Checks Preset (`@playwright/mcp`)
 
 **Date:** 2026-11-10
-**Status:** Accepted (D5, D6 defaults approved on 2026-11-10)
+**Status:** Accepted (D5, D6 defaults approved on 2026-11-10); D5 replaced by decision 0031 on 2026-11-11
 
 ---
 
@@ -24,14 +24,15 @@ A.I.D.P needs a practical way for the Workspace agent to verify locally running 
 Ship no browser-specific Rust code; instead provide a one-click **Fill in Browser checks (Playwright)** preset button in Settings → Outside tools (MCP) that populates the form (user still clicks Add):
 
 - **Name:** `browser`
-- **Command:** `npx -y @playwright/mcp@0.0.85 --isolated --image-responses omit --allowed-origins "http://localhost:*;http://127.0.0.1:*"`
+- **Command:** `npx -y @playwright/mcp@0.0.85 --isolated --image-responses allow --allowed-origins "http://localhost:*;http://127.0.0.1:*"`
 
 The UI notes that Node.js 18+ is required, `@playwright/mcp` is downloaded on first start, and the user may be prompted to install a browser if Playwright's browser is not yet present.
 
 ## Consequences
 
 - 2026-11-11: `--headless` dropped so the user watches the browser in its own window (the human's choice); add it back to hide the window.
+- 2026-11-11: D5 replaced by decision 0031: `--image-responses allow`; screenshots show on their cards and reach models whose vision flag is yes.
 
 - Keeps the installer size unchanged (Playwright is not bundled).
-- Works across all tool-calling models (no vision requirement in tool outputs).
-- Returning screenshots from MCP tools remains a future cross-adapter task; opening remote origins requires editing or removing `--allowed-origins` in the user's server entry.
+- Works across all tool-calling models: a model without vision gets the screenshot's text line only (decision 0031).
+- Opening remote origins requires editing or removing `--allowed-origins` in the user's server entry.

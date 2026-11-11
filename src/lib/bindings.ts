@@ -298,6 +298,15 @@ export type FileContent = {
 	isSecret: boolean,
 };
 
+/**
+ *  An image attached to one message, as base64 (decision 0019), or returned by an
+ *  outside tool (decision 0031).
+ */
+export type ImageInput = {
+	mime: string,
+	dataBase64: string,
+};
+
 export type KeepAlive = "ollamaDefault" | "fiveMinutes" | "thirtyMinutes" | "oneHour" | "untilFreed" | "afterEachReply";
 
 export type LineEnding = "lf" | "crlf";
@@ -447,11 +456,21 @@ export type ToolAction = { tool: "listFiles"; path: string } | { tool: "readFile
 
 export type ToolOutcome = ToolOutcome_Serialize | ToolOutcome_Deserialize;
 
-export type ToolOutcome_Deserialize = { status: "ok"; summary: string } | { status: "command"; exitCode?: number | null; output: string; timedOut: boolean } | { status: "text"; output: string } | 
+export type ToolOutcome_Deserialize = { status: "ok"; summary: string } | { status: "command"; exitCode?: number | null; output: string; timedOut: boolean } | { status: "text"; output: string; 
+/**
+ *  Images an outside tool returned, shown on its card (decision 0031).
+ *  Missing in chats saved before, and dropped when a chat is saved.
+ */
+images?: ImageInput[] } | 
 /**  A server the agent started that keeps running in a terminal tab. */
 { status: "server"; server: number; output: string } | { status: "declined" } | { status: "error"; message: string } | { status: "stopped" };
 
-export type ToolOutcome_Serialize = { status: "ok"; summary: string } | { status: "command"; exitCode: number | null; output: string; timedOut: boolean } | { status: "text"; output: string } | 
+export type ToolOutcome_Serialize = { status: "ok"; summary: string } | { status: "command"; exitCode: number | null; output: string; timedOut: boolean } | { status: "text"; output: string; 
+/**
+ *  Images an outside tool returned, shown on its card (decision 0031).
+ *  Missing in chats saved before, and dropped when a chat is saved.
+ */
+images: ImageInput[] } | 
 /**  A server the agent started that keeps running in a terminal tab. */
 { status: "server"; server: number; output: string } | { status: "declined" } | { status: "error"; message: string } | { status: "stopped" };
 

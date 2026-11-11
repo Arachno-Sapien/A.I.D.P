@@ -115,6 +115,7 @@ pub async fn run_agent(
     let provider = services.provider_for(connection_id)?;
     let local = services.model_options(connection_id, &model_id);
     let context = services.context_tokens(connection_id, &model_id);
+    let vision = services.supports_vision(connection_id, &model_id) == Some(true);
     let text_limit = crate::tools::text_budget(context);
     let cancel = chat.begin(ChatSurface::Workspace);
     let folder = crate::workspace::display_path(&root);
@@ -137,6 +138,7 @@ pub async fn run_agent(
         run_commands: options.run_commands,
         command_allowed: &command_allowed,
         servers: Some(&app.state::<crate::tools::servers::Servers>()),
+        vision,
         mcp: Some(crate::tools::agent::McpAccess {
             hub: &hub,
             servers,

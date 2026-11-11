@@ -217,6 +217,29 @@ describe("ToolStepView", () => {
     expect(screen.queryByRole("button", { name: "Deny" })).toBeNull();
   });
 
+  it("a screenshot shows on its card", () => {
+    const step: ToolStep = {
+      id: 13,
+      action: {
+        tool: "mcpTool",
+        server: "browser",
+        name: "browser_take_screenshot",
+        arguments: "{}",
+      },
+      needsAnswer: false,
+      outcome: {
+        status: "text",
+        output: "Took the viewport screenshot\n[image image/png]",
+        images: [{ mime: "image/png", dataBase64: "iVBORw0KGgo=" }],
+      },
+    };
+
+    render(<ToolStepView step={step} />);
+
+    const img = screen.getByRole("img", { name: "Image from browser_take_screenshot" });
+    expect(img.getAttribute("src")).toBe("data:image/png;base64,iVBORw0KGgo=");
+  });
+
   it("starting outside tools is labelled", () => {
     const step: ToolStep = {
       id: 12,

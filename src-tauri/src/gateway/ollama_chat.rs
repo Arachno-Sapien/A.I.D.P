@@ -95,6 +95,15 @@ impl ModelProvider for OllamaChat {
                     "content": content,
                 }));
             }
+            if !round.images.is_empty() {
+                let images: Vec<&str> =
+                    round.images.iter().map(|img| img.data_base64.as_str()).collect();
+                messages.push(json!({
+                    "role": "user",
+                    "content": super::TOOL_IMAGES_NOTE,
+                    "images": images,
+                }));
+            }
         }
 
         let mut body = json!({

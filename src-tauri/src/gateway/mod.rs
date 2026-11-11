@@ -132,10 +132,16 @@ pub struct ToolOutput {
     pub is_error: bool,
 }
 
+/// The text before a round's tool images, where they go in a user message of their own.
+pub const TOOL_IMAGES_NOTE: &str = "Images from the tool results above:";
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct ToolRound {
     pub assistant: serde_json::Value,
     pub results: Vec<ToolOutput>,
+    /// Images the round's tools returned, for a model that reads images (decision 0031).
+    /// Each adapter sends them after the round's results.
+    pub images: Vec<ImageInput>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -152,8 +158,10 @@ pub struct LocalOptions {
     pub keep_alive: Option<i32>,
 }
 
-/// An image attached to one message, as base64 (decision 0019).
-#[derive(Clone, Debug, PartialEq)]
+/// An image attached to one message, as base64 (decision 0019), or returned by an
+/// outside tool (decision 0031).
+#[derive(Serialize, Deserialize, Type, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct ImageInput {
     pub mime: String,
     pub data_base64: String,
@@ -294,10 +302,14 @@ mod tests {
                 id: 4,
                 outcome: crate::tools::ToolOutcome::Text {
                     output: "ok".to_string(),
+                    images: vec![ImageInput {
+                        mime: "image/png".to_string(),
+                        data_base64: "iVBORw0KGgo=".to_string(),
+                    }],
                 },
             })
             .unwrap(),
-            r#"{"event":"toolResult","data":{"id":4,"outcome":{"status":"text","output":"ok"}}}"#
+            r#"{"event":"toolResult","data":{"id":4,"outcome":{"status":"text","output":"ok","images":[{"mime":"image/png","dataBase64":"iVBORw0KGgo="}]}}}"#
         );
     }
 }

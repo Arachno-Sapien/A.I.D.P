@@ -108,6 +108,8 @@ Outside-tools note fix 2026-11-11 by Claude Code (Opus 5.5): a local model asked
 
 Decision 0030 built 2026-11-11 by Claude Code (Opus 5.5), all committed: Browser checks window visible, Run commands without asking (per task), Always allow (per folder, not with Review at end), start_server with terminal tabs. Gate green (rust 317, vitest 379). Not yet tried live. Details: `log/2026-11-11-m6-commands-and-servers.md`.
 
+Screenshots on browser cards done 2026-11-11 by Claude Code (Opus 5.5), the human's "screenshots later, as their own task": preset `--image-responses allow`; MCP images checked like attachments, shown on the card, sent only to models whose vision flag is yes (unknown = no, so cloud models get text), not saved with the chat. Decision 0031 (replaces 0027 D5). Gate green (rust 322, vitest 381). Not yet tried live. Details: `log/2026-11-11-m6-browser-screenshots.md`.
+
 ## Next 3 tasks
 
 1. Task 8 live check: test Outside tools & Browser checks preset (`@playwright/mcp@0.0.85`) in `npm run tauri dev`, and measure Task Manager RAM with a server running (plus RAM with Dark/Glass and `.ts` worker).

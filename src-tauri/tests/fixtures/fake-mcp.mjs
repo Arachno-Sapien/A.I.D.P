@@ -23,7 +23,8 @@ createInterface({ input: process.stdin }).on("line", (line) => {
     ] });
   if (m.method === "tools/call") {
     const { name, arguments: args } = m.params;
-    if (name === "echo") return ok({ content: [{ type: "text", text: String(args?.text ?? "") }], isError: false });
+    // With png: true, a screenshot-like image follows the text (the PNG signature).
+    if (name === "echo") return ok({ content: [{ type: "text", text: String(args?.text ?? "") }, ...(args?.png ? [{ type: "image", mimeType: "image/png", data: "iVBORw0KGgo=" }] : [])], isError: false });
     if (name === "die") { process.stderr.write("fatal: asked to die\n"); process.exit(3); }
     if (name === "slow") return;
   }

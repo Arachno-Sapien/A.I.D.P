@@ -10,12 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Screenshots on browser cards:** a Browser checks screenshot shows on its card, and a model that reads images (a local vision model) gets it too; other models get its text only. Saved chats keep the text, not the image. Re-add the Browser checks server from the preset to get screenshots (decision 0031).
 - **Servers the agent starts:** the agent can start a dev server that keeps running (`start_server`, asked like any command), read its output and stop it, so Browser checks no longer need you to start the server (decision 0030).
 - **Always allow:** a Run card can remember that exact command for the folder, so it runs without asking next time. Settings lists them with Remove (decision 0030).
 - **Run commands without asking:** a switch beside Review at end lets the agent's commands run for one task without the Run button (it asks you first, shows every command on a card, and turns itself off when the task ends; decision 0030).
 - **Review at end:** A switch next to **Agent** in the Workspace. With it on, the agent writes its edits and new files as it works instead of stopping at each one, so it can test what it built; when it finishes, a card lists every changed file with its diff and **Undo**, **Undo all** or **Keep all**. Commands and outside tools still ask every time. Off by default; asks first in a folder without git (decision 0028).
 - **Outside tools (MCP):** Add, test, turn on/off, and remove stdio MCP servers under **Settings → Outside tools (MCP)** (`mcp_servers`, migration 7; decisions 0025–0026). Enabled servers expose tools (`mcp__<server>__<tool>`) to the Workspace agent with every call shown on a step card for explicit **Run** / **Deny** approval before running.
-- **Browser checks (Playwright):** One-click preset in Settings (`@playwright/mcp@0.0.85`, headless, isolated, screenshots omitted, `localhost`/`127.0.0.1` origins; decision 0027) so the Workspace agent can inspect locally running web apps with your approval.
+- **Browser checks (Playwright):** One-click preset in Settings (`@playwright/mcp@0.0.85`, isolated, `localhost`/`127.0.0.1` origins; decision 0027) so the Workspace agent can inspect locally running web apps with your approval.
 
 - **Run without asking:** a switch on each outside tool server in Settings, off by default. With it on, the agent calls that server's tools (for example every browser click) without Run or Deny; each call still shows on a card. Turning it on asks first. Commands still ask every time (decision 0029).
 

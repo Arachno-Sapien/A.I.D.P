@@ -2,7 +2,7 @@ use crate::gateway::http::{
     list_error, map_http_error, map_reqwest_error, read_sse, Step, LIST_TIMEOUT,
 };
 use crate::gateway::{
-    ChatEvent, ChatRequest, ModelInfo, ModelProvider, ProviderError, Reply, Usage,
+    ChatEvent, ChatRequest, ImageInput, ModelInfo, ModelProvider, ProviderError, Reply, Usage,
 };
 use async_trait::async_trait;
 use reqwest::header::HeaderValue;
@@ -83,6 +83,13 @@ struct StreamChunk {
     choices: Vec<ChunkChoice>,
     usage: Option<ChunkUsage>,
     error: Option<ErrorMessage>,
+}
+
+fn image_part(img: &ImageInput) -> serde_json::Value {
+    json!({
+        "type": "image_url",
+        "image_url": { "url": format!("data:{};base64,{}", img.mime, img.data_base64) },
+    })
 }
 
 #[async_trait]
@@ -199,12 +206,7 @@ impl ModelProvider for OpenAiCompat {
                     if !m.content.is_empty() {
                         parts.push(json!({ "type": "text", "text": m.content }));
                     }
-                    parts.extend(list.iter().map(|img| {
-                        json!({
-                            "type": "image_url",
-                            "image_url": { "url": format!("data:{};base64,{}", img.mime, img.data_base64) },
-                        })
-                    }));
+                    parts.extend(list.iter().map(image_part));
                     json!({
                         "role": m.role,
                         "content": parts,
@@ -226,6 +228,12 @@ impl ModelProvider for OpenAiCompat {
                     "tool_call_id": res.call_id,
                     "content": content,
                 }));
+            }
+            // A tool message takes text only, so the images follow as a user message.
+            if !round.images.is_empty() {
+                let mut parts = vec![json!({ "type": "text", "text": super::TOOL_IMAGES_NOTE })];
+                parts.extend(round.images.iter().map(image_part));
+                messages_val.push(json!({ "role": "user", "content": parts }));
             }
         }
         body_map.insert("messages".to_string(), json!(messages_val));

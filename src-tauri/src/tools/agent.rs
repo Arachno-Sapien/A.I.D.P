@@ -18,6 +18,9 @@ use std::time::Duration;
 use tauri::ipc::Channel;
 use tokio_util::sync::CancellationToken;
 
+/// Added to a tool result whose images a model that can't read them doesn't get.
+pub const IMAGES_NOT_SENT: &str = "\n[This model is not set to read images, so the images were not sent.]";
+
 pub struct McpAccess<'a> {
     pub hub: &'a Hub,
     pub servers: Vec<ServerConfig>,
@@ -44,6 +47,8 @@ pub struct AgentRun<'a> {
     pub command_allowed: &'a (dyn Fn(&str) -> bool + Send + Sync),
     /// Where start_server keeps its servers; `None` leaves the server tools out.
     pub servers: Option<&'a Servers>,
+    /// The model is known to read images; only then do tool images reach it (decision 0031).
+    pub vision: bool,
     pub mcp: Option<McpAccess<'a>>,
 }
 
@@ -241,6 +246,7 @@ pub async fn run_with_images(
         }
 
         let mut results: Vec<ToolOutput> = Vec::new();
+        let mut round_images: Vec<ImageInput> = Vec::new();
         for call in reply.tool_calls {
             let id = args.approvals.next_id();
             if let Some(mcp) = &args.mcp
@@ -308,13 +314,20 @@ pub async fn run_with_images(
                                     &res.text,
                                     crate::tools::OUTPUT_LIMIT.min(args.text_limit),
                                 );
+                                let mut for_model = text.clone();
                                 let outcome = if res.is_error {
                                     ToolOutcome::Error {
-                                        message: text.clone(),
+                                        message: text,
                                     }
                                 } else {
+                                    if args.vision {
+                                        round_images.extend(res.images.iter().cloned());
+                                    } else if !res.images.is_empty() {
+                                        for_model.push_str(IMAGES_NOT_SENT);
+                                    }
                                     ToolOutcome::Text {
-                                        output: text.clone(),
+                                        output: text,
+                                        images: res.images,
                                     }
                                 };
                                 args.out
@@ -322,7 +335,7 @@ pub async fn run_with_images(
                                     .map_err(|_| ProviderError::Cancelled)?;
                                 results.push(ToolOutput {
                                     call_id: call.id,
-                                    content: text,
+                                    content: for_model,
                                     is_error: res.is_error,
                                 });
                             }
@@ -954,7 +967,11 @@ pub async fn run_with_images(
                     };
                     let (outcome, content, is_error) = match found {
                         Some(text) if stop => (ToolOutcome::Ok { summary: text.clone() }, text, false),
-                        Some(text) => (ToolOutcome::Text { output: text.clone() }, text, false),
+                        Some(text) => (
+                            ToolOutcome::Text { output: text.clone(), images: Vec::new() },
+                            text,
+                            false,
+                        ),
                         None => {
                             let message = format!("There is no server {server}. Start one with start_server.");
                             (ToolOutcome::Error { message: message.clone() }, message, true)
@@ -972,9 +989,17 @@ pub async fn run_with_images(
             }
         }
 
+        // Only the newest round's images go with later requests; older rounds keep
+        // their `[image ...]` lines. ponytail: keep the last few if models need them.
+        if !round_images.is_empty() {
+            for old in &mut rounds {
+                old.images.clear();
+            }
+        }
         rounds.push(ToolRound {
             assistant: reply.assistant,
             results,
+            images: round_images,
         });
     }
 

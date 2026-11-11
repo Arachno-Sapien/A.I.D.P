@@ -13,6 +13,15 @@ export interface StoredEnvelope {
   error?: UiMessage["error"];
 }
 
+/** Tool images show only while the app runs; a saved chat keeps their text (decision 0031). */
+function withoutImages(parts: UiMessage["parts"]): UiMessage["parts"] {
+  return parts?.map((p) =>
+    p.kind === "step" && p.step.outcome?.status === "text"
+      ? { ...p, step: { ...p.step, outcome: { ...p.step.outcome, images: [] } } }
+      : p,
+  );
+}
+
 export function toStored(m: UiMessage): string {
   const envelope: StoredEnvelope = {
     v: 1,
@@ -20,7 +29,7 @@ export function toStored(m: UiMessage): string {
     content: m.content,
     chips: m.chips,
     target: m.target,
-    parts: m.parts,
+    parts: withoutImages(m.parts),
     attachments: m.attachments,
     error: m.error,
   };
