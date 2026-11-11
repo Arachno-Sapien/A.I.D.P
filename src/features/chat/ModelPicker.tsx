@@ -40,7 +40,7 @@ export function ModelPicker({ children, left }: ModelPickerProps = {}) {
     currentModel?.displayName || currentModel?.modelId || undefined;
 
   return (
-    <div className="app-surface flex items-center justify-between gap-3 px-6 py-2 border-b border-neutral-800 bg-neutral-900/50 backdrop-blur select-none">
+    <div className="app-surface flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 px-6 py-2 border-b border-neutral-800 bg-neutral-900/50 backdrop-blur select-none">
       <div className="flex items-center gap-2 min-w-0">
         {left}
         {hasModels && (

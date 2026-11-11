@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Run without asking:** a switch on each outside tool server in Settings, off by default. With it on, the agent calls that server's tools (for example every browser click) without Run or Deny; each call still shows on a card. Turning it on asks first. Commands still ask every time (decision 0029).
 
 ### Fixed
+- **AI panel options:** in a narrow panel, Agent, Review at end, Run commands without asking and the no-git note wrap onto their own row instead of covering the model picker, and the "Run commands without asking?" dialog opens over the whole window instead of clipped inside the panel.
 - **Browser checks:** the agent no longer loops trying to start a web server, which every command's end stops. With outside tools on, it now asks you to start your server in the workspace terminal and give it the address.
 - **Outside tools:** the agent is told its outside tools are already running, so asked to "install the Playwright MCP" it uses the browser tools instead of setting one up in your folder.
 - **Outside tools:** a server is no longer stopped as idle in the middle of an agent run (a long run of commands could take it away, and later calls failed with "no such tool").

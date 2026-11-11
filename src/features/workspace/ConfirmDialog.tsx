@@ -1,4 +1,5 @@
 import { useId, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useModalFocus } from "./useModalFocus";
 
 export interface ConfirmDialogProps {
@@ -24,7 +25,9 @@ export function ConfirmDialog({
   const cancelRef = useRef<HTMLButtonElement>(null);
   useModalFocus(panelRef, cancelRef, onCancel);
 
-  return (
+  // A portal: an ancestor with backdrop-filter (the model bar) would otherwise
+  // pin `fixed` to itself and clip the dialog.
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
       <div
         ref={panelRef}
@@ -58,6 +61,7 @@ export function ConfirmDialog({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

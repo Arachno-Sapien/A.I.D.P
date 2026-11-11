@@ -221,7 +221,7 @@ export function AiPanel({ onApply }: AiPanelProps) {
   return (
     <div className="flex flex-col h-full bg-neutral-900/30 text-neutral-100">
       <ModelPicker>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
           <label
             className={`flex items-center gap-1.5 text-xs select-none shrink-0 whitespace-nowrap ${
               isAgentDisabled
@@ -296,7 +296,10 @@ export function AiPanel({ onApply }: AiPanelProps) {
           )}
 
           {confirmNoGit && (
-            <span role="alert" className="flex items-center gap-1.5 text-xs text-amber-200">
+            <span
+              role="alert"
+              className="flex flex-wrap items-center gap-1.5 text-xs text-amber-200 basis-full"
+            >
               <span>No git here: edits can be undone only from the review.</span>
               <button
                 type="button"
@@ -322,7 +325,7 @@ export function AiPanel({ onApply }: AiPanelProps) {
           {messages.length > 0 &&
             !streaming &&
             (confirmClear ? (
-              <span className="flex items-center gap-1.5 text-xs text-neutral-300">
+              <span className="flex items-center gap-1.5 text-xs text-neutral-300 whitespace-nowrap">
                 <span>Clear this chat?</span>
                 <button
                   type="button"
