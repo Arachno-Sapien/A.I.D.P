@@ -24,11 +24,13 @@ A.I.D.P needs a practical way for the Workspace agent to verify locally running 
 Ship no browser-specific Rust code; instead provide a one-click **Fill in Browser checks (Playwright)** preset button in Settings → Outside tools (MCP) that populates the form (user still clicks Add):
 
 - **Name:** `browser`
-- **Command:** `npx -y @playwright/mcp@0.0.85 --headless --isolated --image-responses omit --allowed-origins "http://localhost:*;http://127.0.0.1:*"`
+- **Command:** `npx -y @playwright/mcp@0.0.85 --isolated --image-responses omit --allowed-origins "http://localhost:*;http://127.0.0.1:*"`
 
 The UI notes that Node.js 18+ is required, `@playwright/mcp` is downloaded on first start, and the user may be prompted to install a browser if Playwright's browser is not yet present.
 
 ## Consequences
+
+- 2026-11-11: `--headless` dropped so the user watches the browser in its own window (the human's choice); add it back to hide the window.
 
 - Keeps the installer size unchanged (Playwright is not bundled).
 - Works across all tool-calling models (no vision requirement in tool outputs).

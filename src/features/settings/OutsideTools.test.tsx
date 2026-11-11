@@ -278,7 +278,7 @@ describe("OutsideTools", () => {
 
   it("the preset command is pinned and local", () => {
     expect(BROWSER_PRESET.command).toMatch(/@playwright\/mcp@\d+\.\d+\.\d+ /);
-    expect(BROWSER_PRESET.command).toContain("--headless");
+    expect(BROWSER_PRESET.command).not.toContain("--headless");
     expect(BROWSER_PRESET.command).toContain("--isolated");
     expect(BROWSER_PRESET.command).toContain("--image-responses omit");
     expect(BROWSER_PRESET.command).toContain("--allowed-origins");

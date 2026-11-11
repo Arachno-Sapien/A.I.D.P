@@ -7,7 +7,7 @@ import { ConfirmDialog } from "../workspace/ConfirmDialog";
 export const BROWSER_PRESET = {
   name: "browser",
   command:
-    'npx -y @playwright/mcp@0.0.85 --headless --isolated --image-responses omit --allowed-origins "http://localhost:*;http://127.0.0.1:*"',
+    'npx -y @playwright/mcp@0.0.85 --isolated --image-responses omit --allowed-origins "http://localhost:*;http://127.0.0.1:*"',
 } as const;
 
 type TestStatus = { ok: boolean; text: string };

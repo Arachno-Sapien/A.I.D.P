@@ -135,7 +135,7 @@ With Agent turned on, the model can iteratively explore your project:
 ### Outside tools & Browser checks
 
 - **Outside tools (MCP):** Connect external stdio tool servers in **Settings → Outside tools (MCP)**. Commands run as your user outside the project folder and are saved in SQLite as plain text, so never put passwords or tokens in a command. When **Agent** is on in the workspace, enabled servers start when a reply needs them (`Start outside tools: <name>`) and stop when idle for 10 minutes, turned off, removed, or when A.I.D.P closes. Every tool call pauses at an approval card showing the server, tool, and exact JSON arguments before anything runs.
-- **Browser checks:** Click **Fill in Browser checks (Playwright)** in Settings, then click **Add** (and optionally **Test**). Needs **Node.js 18 or newer** (`npx`). Start your local web server in the workspace terminal first, then ask the agent things like:
+- **Browser checks:** Click **Fill in Browser checks (Playwright)** in Settings, then click **Add** (and optionally **Test**). Needs **Node.js 18 or newer** (`npx`). A Chromium window opens so you can watch the agent work; add `--headless` to the command to hide it. A server added before 2026-11-11 is hidden: remove it and add it again from the preset. Start your local web server in the workspace terminal first, then ask the agent things like:
   - *"Open http://localhost:5173 and tell me the page title and any console errors."*
   - *"Open http://localhost:3000/login, try submitting an empty form, and check what errors appear."*
   Cards labelled `browser: browser_*` show each browser action waiting for your **Run** or **Deny** decision.

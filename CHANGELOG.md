@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Copy** on a code block no longer says "Copied" when the clipboard refused.
 
 ### Changed
+- **Browser checks:** the preset opens a Chromium window you can watch instead of a hidden browser. Remove and re-add an existing `browser` server to get it.
 - The message box grows as you type, up to a few lines.
 - Scrollbars are thin and in the theme's colours.
 - The open editor tab and its unsaved dot use the theme's accent colour; the middle mouse button closes a tab, and hovering one shows its path.
