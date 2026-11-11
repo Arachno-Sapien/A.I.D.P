@@ -38,15 +38,50 @@ pub struct Hub {
     /// How many times each server was stopped. A start that began before a stop
     /// (Remove or Off pressed while it starts) must not add the server afterwards.
     stops: Arc<Mutex<HashMap<u32, u64>>>,
+    /// How many agent runs use each server. A held server is never idle: a run can
+    /// spend over 10 minutes on commands and approvals between two calls.
+    holds: Arc<Mutex<HashMap<u32, usize>>>,
+}
+
+/// Keeps servers from the idle stop while it lives (one agent run).
+pub struct Hold {
+    holds: Arc<Mutex<HashMap<u32, usize>>>,
+    ids: Vec<u32>,
+}
+
+impl Drop for Hold {
+    fn drop(&mut self) {
+        let mut guard = self.holds.lock().unwrap_or_else(PoisonError::into_inner);
+        for id in &self.ids {
+            if let Some(n) = guard.get_mut(id) {
+                *n -= 1;
+                if *n == 0 {
+                    guard.remove(id);
+                }
+            }
+        }
+    }
 }
 
 impl Hub {
+    pub fn hold(&self, ids: &[u32]) -> Hold {
+        let mut guard = self.holds.lock().unwrap_or_else(PoisonError::into_inner);
+        for id in ids {
+            *guard.entry(*id).or_insert(0) += 1;
+        }
+        Hold {
+            holds: Arc::clone(&self.holds),
+            ids: ids.to_vec(),
+        }
+    }
+
     /// `base` is `<app data dir>/mcp`; each server runs in `base/<name>` (created on start).
     pub fn new(base: PathBuf) -> Self {
         Self {
             base,
             running: Arc::new(AsyncMutex::new(HashMap::new())),
             stops: Arc::new(Mutex::new(HashMap::new())),
+            holds: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
@@ -284,15 +319,21 @@ impl Hub {
         futures_util::future::join_all(entries.into_iter().map(|e| kill_running(e, false))).await;
     }
 
-    /// Stops servers not used for `older_than`.
+    /// Stops closed servers, and servers no run holds that were not used for `older_than`.
     pub async fn stop_idle(&self, older_than: Duration) {
         let now = Instant::now();
         let entries: Vec<Running> = {
             let mut guard = self.running.lock().await;
+            let held: Vec<u32> = {
+                let holds = self.holds.lock().unwrap_or_else(PoisonError::into_inner);
+                holds.keys().copied().collect()
+            };
             let stale: Vec<u32> = guard
                 .iter()
-                .filter(|(_, r)| {
-                    r.client.is_closed() || now.saturating_duration_since(r.last_used) >= older_than
+                .filter(|(id, r)| {
+                    r.client.is_closed()
+                        || (!held.contains(id)
+                            && now.saturating_duration_since(r.last_used) >= older_than)
                 })
                 .map(|(id, _)| *id)
                 .collect();

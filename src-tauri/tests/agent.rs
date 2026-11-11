@@ -932,6 +932,7 @@ fn fake_config(mode: &str, enabled: bool) -> ServerConfig {
         name: "fake".to_string(),
         command: format!("node \"{MCP_FIXTURE}\" {mode}"),
         enabled,
+        auto_approve: false,
     }
 }
 
@@ -1066,6 +1067,77 @@ async fn mcp_call_waits_for_approval_and_returns_text() {
     assert!(tools
         .iter()
         .any(|t| t["function"]["name"] == "mcp__fake__echo"));
+
+    hub.stop_all().await;
+}
+
+#[tokio::test]
+async fn run_without_asking_server_skips_the_card() {
+    let server = MockServer::start().await;
+    let dir = TempDir::new();
+    let mcp_dir = TempDir::new();
+
+    let resp1 = sse_tool_calls(&[("call_1", "mcp__fake__echo", json!({"text": "hello"}))]);
+    let resp2 = sse_text("Done.");
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(QueueResponder::new(vec![resp1, resp2]))
+        .mount(&server)
+        .await;
+
+    let p = make_provider(&server);
+    let (channel, events) = capture();
+    let approvals = Approvals::new();
+    let hub = Hub::new(mcp_dir.path().to_path_buf());
+
+    // Nobody answers: the run must finish on its own.
+    let res = tokio::time::timeout(
+        Duration::from_secs(30),
+        run(AgentRun {
+            provider: &p,
+            model: "test-model".into(),
+            messages: vec![ChatMessage {
+                role: Role::User,
+                content: "Echo hello".into(),
+            }],
+            root: dir.path().to_path_buf(),
+            approvals: &approvals,
+            out: channel,
+            cancel: CancellationToken::new(),
+            command_timeout: Duration::from_secs(5),
+            local: Default::default(),
+            text_limit: aidp_lib::tools::READ_LIMIT,
+            review_at_end: false,
+            mcp: Some(McpAccess {
+                hub: &hub,
+                servers: vec![ServerConfig {
+                    auto_approve: true,
+                    ..fake_config("", true)
+                }],
+            }),
+        }),
+    )
+    .await
+    .expect("the run waited for an approval");
+    assert!(res.is_ok());
+
+    let evs = events.lock().unwrap().clone();
+    // The card still shows what was sent, without Run and Deny.
+    assert!(matches!(
+        &evs[2],
+        ChatEvent::ToolCall {
+            action: ToolAction::McpTool { server, name, .. },
+            needs_answer: false,
+            ..
+        } if server == "fake" && name == "echo"
+    ));
+    assert!(matches!(
+        &evs[3],
+        ChatEvent::ToolResult {
+            outcome: ToolOutcome::Text { output },
+            ..
+        } if output == "hello"
+    ));
 
     hub.stop_all().await;
 }
@@ -1380,6 +1452,7 @@ async fn start_failure_shows_and_run_continues() {
         name: "bad".to_string(),
         command: "node -e \"process.exit(1)\"".to_string(),
         enabled: true,
+        auto_approve: false,
     };
 
     let res = run(AgentRun {

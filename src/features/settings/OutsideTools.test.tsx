@@ -15,6 +15,7 @@ vi.mock("../../lib/bindings", () => ({
     listMcpServers: vi.fn().mockResolvedValue({ status: "ok", data: [] }),
     addMcpServer: vi.fn(),
     setMcpServerEnabled: vi.fn().mockResolvedValue({ status: "ok", data: null }),
+    setMcpServerAutoApprove: vi.fn().mockResolvedValue({ status: "ok", data: null }),
     deleteMcpServer: vi.fn().mockResolvedValue({ status: "ok", data: null }),
     testMcpServer: vi.fn(),
   },
@@ -40,8 +41,8 @@ describe("OutsideTools", () => {
     vi.mocked(commands.listMcpServers).mockResolvedValueOnce({
       status: "ok",
       data: [
-        { id: 1, name: "browser", command: "npx browser", enabled: true },
-        { id: 2, name: "docs", command: "node docs.js", enabled: false },
+        { id: 1, name: "browser", command: "npx browser", enabled: true, autoApprove: false },
+        { id: 2, name: "docs", command: "node docs.js", enabled: false, autoApprove: false },
       ],
     });
 
@@ -85,7 +86,7 @@ describe("OutsideTools", () => {
   it("Add sends the fields and reloads", async () => {
     vi.mocked(commands.addMcpServer).mockResolvedValueOnce({
       status: "ok",
-      data: { id: 3, name: "docs", command: "node server.js", enabled: true },
+      data: { id: 3, name: "docs", command: "node server.js", enabled: true, autoApprove: false },
     });
 
     render(<OutsideTools />);
@@ -98,7 +99,7 @@ describe("OutsideTools", () => {
 
     vi.mocked(commands.listMcpServers).mockResolvedValueOnce({
       status: "ok",
-      data: [{ id: 3, name: "docs", command: "node server.js", enabled: true }],
+      data: [{ id: 3, name: "docs", command: "node server.js", enabled: true, autoApprove: false }],
     });
 
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
@@ -143,7 +144,7 @@ describe("OutsideTools", () => {
   it("the switch turns a server off", async () => {
     vi.mocked(commands.listMcpServers).mockResolvedValue({
       status: "ok",
-      data: [{ id: 1, name: "browser", command: "npx x", enabled: true }],
+      data: [{ id: 1, name: "browser", command: "npx x", enabled: true, autoApprove: false }],
     });
 
     render(<OutsideTools />);
@@ -157,10 +158,50 @@ describe("OutsideTools", () => {
     });
   });
 
+  it("Run without asking is confirmed before it turns on, not before it turns off", async () => {
+    vi.mocked(commands.listMcpServers).mockResolvedValue({
+      status: "ok",
+      data: [{ id: 1, name: "browser", command: "npx x", enabled: true, autoApprove: false }],
+    });
+
+    render(<OutsideTools />);
+    const box = (await screen.findByRole("checkbox", {
+      name: "browser runs without asking",
+    })) as HTMLInputElement;
+    expect(box.checked).toBe(false);
+
+    fireEvent.click(box);
+    let dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByText("Let browser run without asking?")).toBeDefined();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    expect(commands.setMcpServerAutoApprove).not.toHaveBeenCalled();
+
+    vi.mocked(commands.listMcpServers).mockResolvedValue({
+      status: "ok",
+      data: [{ id: 1, name: "browser", command: "npx x", enabled: true, autoApprove: true }],
+    });
+    fireEvent.click(box);
+    dialog = screen.getByRole("dialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Run without asking" }));
+    await waitFor(() => {
+      expect(commands.setMcpServerAutoApprove).toHaveBeenCalledWith(1, true);
+    });
+
+    const onBox = (await screen.findByRole("checkbox", {
+      name: "browser runs without asking",
+    })) as HTMLInputElement;
+    await waitFor(() => expect(onBox.checked).toBe(true));
+    fireEvent.click(onBox);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    await waitFor(() => {
+      expect(commands.setMcpServerAutoApprove).toHaveBeenCalledWith(1, false);
+    });
+  });
+
   it("Remove asks first", async () => {
     vi.mocked(commands.listMcpServers).mockResolvedValue({
       status: "ok",
-      data: [{ id: 5, name: "browser", command: "npx x", enabled: true }],
+      data: [{ id: 5, name: "browser", command: "npx x", enabled: true, autoApprove: false }],
     });
 
     render(<OutsideTools />);
@@ -191,7 +232,7 @@ describe("OutsideTools", () => {
   it("Test shows the tools, or the error", async () => {
     vi.mocked(commands.listMcpServers).mockResolvedValue({
       status: "ok",
-      data: [{ id: 1, name: "fake", command: "node fake.js", enabled: true }],
+      data: [{ id: 1, name: "fake", command: "node fake.js", enabled: true, autoApprove: false }],
     });
 
     let resolveTest!: (v: { status: "ok"; data: string[] }) => void;

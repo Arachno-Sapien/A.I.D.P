@@ -65,6 +65,8 @@ export const commands = {
 	listMcpServers: () => typedError<ServerConfig[], AppError_Serialize>(__TAURI_INVOKE("list_mcp_servers")),
 	addMcpServer: (name: string, command: string) => typedError<ServerConfig, AppError_Serialize>(__TAURI_INVOKE("add_mcp_server", { name, command })),
 	setMcpServerEnabled: (id: number, enabled: boolean) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("set_mcp_server_enabled", { id, enabled })),
+	/**  Read when an agent run starts, so a change applies from the next task. */
+	setMcpServerAutoApprove: (id: number, on: boolean) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("set_mcp_server_auto_approve", { id, on })),
 	deleteMcpServer: (id: number) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("delete_mcp_server", { id })),
 	testMcpServer: (id: number) => typedError<string[], AppError_Serialize>(__TAURI_INVOKE("test_mcp_server", { id })),
 	appVersion: () => __TAURI_INVOKE<string>("app_version"),
@@ -376,6 +378,8 @@ export type ServerConfig = {
 	name: string,
 	command: string,
 	enabled: boolean,
+	/**  Calls to this server run without a Run/Deny card (decision 0029). Off by default. */
+	autoApprove: boolean,
 };
 
 export type StoredMessage = StoredMessage_Serialize | StoredMessage_Deserialize;

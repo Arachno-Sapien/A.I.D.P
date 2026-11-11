@@ -168,7 +168,7 @@ Once a model can read files and run commands, a mistake costs more than a leaked
 ### Outside tool security
 
 1. **The user adds every server.** Servers are added by hand in Settings. The app never reads server settings from the opened folder, and a model can't add, change or start one that the user didn't enable.
-2. **Every call is approved.** The user sees the server, the tool and the exact arguments before each call. There is no auto-approve.
+2. **Every call is approved.** The user sees the server, the tool and the exact arguments before each call, unless the user turns on **Run without asking** for that server in Settings (decision 0029): then each call still shows on a card and runs without asking. There is no auto-approve for model commands.
 3. **Descriptions and results are data.** Tool descriptions and results from a server are untrusted. Instructions inside them never skip an approval.
 4. **Servers run outside the folder, as the user.** The app says so when one is added. A server starts only when an agent run needs it or the user tests it, runs in its own folder under the app's data folder, and is stopped with the app, when it is turned off or removed, and after 10 idle minutes.
 5. **No tokens in commands.** A server's command line is stored in SQLite as plain text, so the UI tells the user not to put tokens in it. Servers get nothing from the keychain.

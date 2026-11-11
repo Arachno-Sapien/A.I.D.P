@@ -14,7 +14,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Outside tools (MCP):** Add, test, turn on/off, and remove stdio MCP servers under **Settings → Outside tools (MCP)** (`mcp_servers`, migration 7; decisions 0025–0026). Enabled servers expose tools (`mcp__<server>__<tool>`) to the Workspace agent with every call shown on a step card for explicit **Run** / **Deny** approval before running.
 - **Browser checks (Playwright):** One-click preset in Settings (`@playwright/mcp@0.0.85`, headless, isolated, screenshots omitted, `localhost`/`127.0.0.1` origins; decision 0027) so the Workspace agent can inspect locally running web apps with your approval.
 
+- **Run without asking:** a switch on each outside tool server in Settings, off by default. With it on, the agent calls that server's tools (for example every browser click) without Run or Deny; each call still shows on a card. Turning it on asks first. Commands still ask every time (decision 0029).
+
 ### Fixed
+- **Browser checks:** the agent no longer loops trying to start a web server, which every command's end stops. With outside tools on, it now asks you to start your server in the workspace terminal and give it the address.
+- **Outside tools:** the agent is told its outside tools are already running, so asked to "install the Playwright MCP" it uses the browser tools instead of setting one up in your folder.
+- **Outside tools:** a server is no longer stopped as idle in the middle of an agent run (a long run of commands could take it away, and later calls failed with "no such tool").
 - **Stop** now works while Ollama is still loading a local model into memory. Before, it did nothing until the first word arrived.
 - A chat no longer pulls you back to the bottom while a reply is being written. Scroll up to read and it stays there; scroll back to the end (or send a message) and it follows again.
 - Double-clicking a file in the workspace tree no longer opens it in two tabs.

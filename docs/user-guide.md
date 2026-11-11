@@ -127,7 +127,7 @@ With Agent turned on, the model can iteratively explore your project:
 6. `run_command`: Request running commands in the project folder (e.g. tests or builds).
 
 ### Strict Security Rules
-- **No auto-approve:** Commands and outside tools **always** pause for your approval. File edits do too, unless you turn on **Review at end**.
+- **Approvals:** Commands **always** pause for your approval. Outside tools do too, unless you turn on **Run without asking** for that server in Settings (it applies from the next task). File edits do too, unless you turn on **Review at end**.
 - **Command inspection:** Command cards display the exact command string and working directory. Commands with hidden characters, control characters, or unprintable unicode are refused before presentation.
 - **The `.git` folder is off limits:** Tools cannot read, modify, or create files inside `.git`.
 - **Hard timeouts & process cleanup:** Model commands run with a 120-second timeout. Clicking **Stop** kills the entire spawned process tree cleanly.
@@ -171,4 +171,5 @@ Open the **Settings** tab in the top navigation:
 | **Browser checks fails because `npx` is missing.** | Node.js 18 or newer isn't installed (or not on PATH). | Install Node.js 18+ from nodejs.org, restart A.I.D.P, and click **Test** again. |
 | **First Browser checks Test takes a while.** | `npx` is downloading `@playwright/mcp@0.0.85`. | Wait for the first download to finish (120 s start timeout); later starts are quick. |
 | **Browser checks reports a missing browser.** | Playwright's browser isn't installed yet. | Follow the browser install command shown in the error (for example `npx playwright install chromium`), then click **Test** again. |
+| **Browser checks gets `ERR_CONNECTION_REFUSED`, or the agent keeps trying to start a server.** | Everything a model command starts is stopped when the command ends, so the agent can't keep a web server running. | Start the server yourself in the workspace terminal (for example `python -m http.server 8765` or `npm run dev`), leave it running, and give the agent its address. |
 | **"The server did not answer in time."** | An outside tool server hung past its timeout. | Check the server command with **Test** in Settings, or press **Stop** in the agent panel and try again. |

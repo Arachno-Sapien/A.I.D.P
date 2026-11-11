@@ -59,6 +59,8 @@ pub struct ServerConfig {
     pub name: String,
     pub command: String,
     pub enabled: bool,
+    /// Calls to this server run without a Run/Deny card (decision 0029). Off by default.
+    pub auto_approve: bool,
 }
 
 /// `mcp__{server}__{tool}`, or `None` when the tool name is empty, has a character outside
@@ -192,6 +194,7 @@ impl Services {
             name: name.to_string(),
             command,
             enabled: true,
+            auto_approve: false,
         })
     }
 
@@ -201,6 +204,16 @@ impl Services {
         })?;
         let changed = crate::db::mcp::set_enabled(&conn, id, enabled)?;
         if changed == 0 {
+            return Err(AppError::NotFound);
+        }
+        Ok(())
+    }
+
+    pub fn set_mcp_server_auto_approve(&self, id: u32, on: bool) -> Result<(), AppError> {
+        let conn = self.db.lock().map_err(|e| AppError::Storage {
+            message: e.to_string(),
+        })?;
+        if crate::db::mcp::set_auto_approve(&conn, id, on)? == 0 {
             return Err(AppError::NotFound);
         }
         Ok(())

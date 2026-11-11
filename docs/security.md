@@ -117,7 +117,7 @@ Milestone 4 introduces autonomous agent tool execution (`list_files`, `read_file
 
 ### Approval Decided in Rust
 - **Name-based authorization:** Approval requirements are decided strictly by the tool's name in the Rust core (`tools::approvals`), never by the model, the UI, or a tool's output.
-- **No auto-approve path:** There is no auto-approve bypass in v1. System commands and outside-tool calls always wait for explicit user approval via `answer_tool`. Edits and file creations wait too, unless the user turns on **Review at end** for the task (decision 0028): `run_agent` then writes them at once, and the UI lists every changed file for Keep or Undo when the agent finishes. Undo writes the old text back only if the file still holds exactly what the agent wrote, and sends a file the agent created to the Recycle Bin or Trash. In a folder without git, turning the switch on asks first.
+- **No auto-approve for commands:** Model commands always wait for explicit user approval via `answer_tool`. Outside-tool calls do too, unless the user turns on **Run without asking** for that server in Settings (decision 0029, `mcp_servers.auto_approve`, read when a run starts; turning it on asks first): the call still shows on a card with its exact arguments. Edits and file creations wait too, unless the user turns on **Review at end** for the task (decision 0028): `run_agent` then writes them at once, and the UI lists every changed file for Keep or Undo when the agent finishes. Undo writes the old text back only if the file still holds exactly what the agent wrote, and sends a file the agent created to the Recycle Bin or Trash. In a folder without git, turning the switch on asks first.
 - **Atomic approval registration:** Every pending approval is registered in the core `Approvals` table before its `ChatEvent::ToolCall` event is emitted. Every call gets exactly one result.
 - **Untrusted model content:** Tool outputs and file contents returned to the model are treated as data, not instructions. Prompt injections inside repository files (e.g. `del notes.txt`) cannot skip an approval gate.
 
@@ -194,7 +194,7 @@ Milestone 5 introduces local model support via Ollama and persistent chat histor
 ## 13. Outside tools (MCP) (M6, decisions 0025–0027)
 
 1. **The user adds every server.** Servers are added by hand in Settings. The app never reads server settings from the opened folder (`.mcp.json` is never read), and a model can't add, change, or start a server the user didn't enable.
-2. **Every call is approved.** The user sees the server, the tool, and the exact arguments before each call. There is no auto-approve.
+2. **Every call is approved.** The user sees the server, the tool, and the exact arguments before each call, unless the user turns on **Run without asking** for that server (decision 0029). There is no auto-approve for model commands.
 3. **Descriptions and results are data.** Tool descriptions and results from a server are untrusted. Instructions inside them never skip an approval.
 4. **Servers run outside the folder, as the user.** The UI says so when adding one. A server starts only when an agent run needs it or the user clicks **Test**, runs in its own working folder under `<app data>/mcp/<name>`, and is stopped with the app, when turned off or removed, and after 10 idle minutes (using job objects / process-group tree kills).
 5. **No tokens in commands.** Server command lines are saved in SQLite as plain text, so Settings warns users not to put tokens or passwords in them. Servers receive nothing from the OS keychain.

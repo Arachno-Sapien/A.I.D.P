@@ -72,6 +72,9 @@ CREATE TABLE mcp_servers (
   enabled INTEGER NOT NULL DEFAULT 1
 );
 "#,
+    r#"
+ALTER TABLE mcp_servers ADD COLUMN auto_approve INTEGER NOT NULL DEFAULT 0;
+"#,
 ];
 
 pub fn open(path: &Path) -> rusqlite::Result<Connection> {
@@ -114,13 +117,13 @@ mod tests {
         let version: i32 = conn
             .query_row("PRAGMA user_version;", [], |row| row.get(0))
             .unwrap();
-        assert_eq!(version, 7);
+        assert_eq!(version, 8);
 
         migrate(&mut conn).unwrap();
         let version_after: i32 = conn
             .query_row("PRAGMA user_version;", [], |row| row.get(0))
             .unwrap();
-        assert_eq!(version_after, 7);
+        assert_eq!(version_after, 8);
     }
 
     #[test]

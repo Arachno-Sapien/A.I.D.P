@@ -111,6 +111,11 @@ pub async fn run_with_images(
             specs_list.extend(mcp.hub.specs(&enabled_ids).await);
         }
     }
+    // Lives until the run ends, so the idle stop can't take a server away mid-run.
+    let _hold = args.mcp.as_ref().map(|mcp| {
+        let ids: Vec<u32> = mcp.servers.iter().filter(|s| s.enabled).map(|s| s.id).collect();
+        mcp.hub.hold(&ids)
+    });
 
     let mut full_messages = vec![ChatMessage {
         role: Role::System,
@@ -192,7 +197,12 @@ pub async fn run_with_images(
                     continue;
                 }
 
-                let rx = args.approvals.register(id);
+                // The user set this server to run without asking (decision 0029).
+                let ask = !mcp
+                    .servers
+                    .iter()
+                    .any(|s| s.name == server && s.auto_approve);
+                let rx = ask.then(|| args.approvals.register(id));
                 args.out
                     .send(ChatEvent::ToolCall {
                         id,
@@ -201,11 +211,11 @@ pub async fn run_with_images(
                             name: tool.to_string(),
                             arguments: show_arguments(&call.input),
                         },
-                        needs_answer: true,
+                        needs_answer: rx.is_some(),
                     })
                     .map_err(|_| ProviderError::Cancelled)?;
 
-                match args.approvals.wait(id, rx, &args.cancel).await {
+                match edit_answer(args.approvals, id, rx, &args.cancel).await {
                     Answer::Yes => {
                         match mcp
                             .hub

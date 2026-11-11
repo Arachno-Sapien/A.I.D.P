@@ -3,7 +3,7 @@ use rusqlite::{params, Connection};
 
 pub fn list(conn: &Connection) -> rusqlite::Result<Vec<ServerConfig>> {
     let mut stmt =
-        conn.prepare("SELECT id, name, command, enabled FROM mcp_servers ORDER BY id;")?;
+        conn.prepare("SELECT id, name, command, enabled, auto_approve FROM mcp_servers ORDER BY id;")?;
     let rows = stmt.query_map([], |row| {
         let enabled_int: i64 = row.get(3)?;
         Ok(ServerConfig {
@@ -11,6 +11,7 @@ pub fn list(conn: &Connection) -> rusqlite::Result<Vec<ServerConfig>> {
             name: row.get(1)?,
             command: row.get(2)?,
             enabled: enabled_int != 0,
+            auto_approve: row.get::<_, i64>(4)? != 0,
         })
     })?;
     rows.collect()
@@ -28,6 +29,13 @@ pub fn set_enabled(conn: &Connection, id: u32, enabled: bool) -> rusqlite::Resul
     conn.execute(
         "UPDATE mcp_servers SET enabled = ?1 WHERE id = ?2;",
         params![i32::from(enabled), id],
+    )
+}
+
+pub fn set_auto_approve(conn: &Connection, id: u32, on: bool) -> rusqlite::Result<usize> {
+    conn.execute(
+        "UPDATE mcp_servers SET auto_approve = ?1 WHERE id = ?2;",
+        params![i32::from(on), id],
     )
 }
 
@@ -57,6 +65,11 @@ mod tests {
         assert!(rows[0].enabled);
         assert_eq!(rows[1].id, id2);
         assert_eq!(rows[1].name, "docs");
+
+        assert!(!rows[0].auto_approve);
+        assert_eq!(set_auto_approve(&conn, id1, true).unwrap(), 1);
+        assert_eq!(set_auto_approve(&conn, 999, true).unwrap(), 0);
+        assert!(list(&conn).unwrap()[0].auto_approve);
 
         assert_eq!(set_enabled(&conn, id1, false).unwrap(), 1);
         assert_eq!(set_enabled(&conn, 999, true).unwrap(), 0);

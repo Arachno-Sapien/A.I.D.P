@@ -35,6 +35,17 @@ pub async fn set_mcp_server_enabled(
     Ok(())
 }
 
+/// Read when an agent run starts, so a change applies from the next task.
+#[tauri::command]
+#[specta::specta]
+pub fn set_mcp_server_auto_approve(
+    services: State<'_, Services>,
+    id: u32,
+    on: bool,
+) -> Result<(), AppError> {
+    services.set_mcp_server_auto_approve(id, on)
+}
+
 #[tauri::command]
 #[specta::specta]
 pub async fn delete_mcp_server(

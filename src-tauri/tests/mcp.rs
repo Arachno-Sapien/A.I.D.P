@@ -18,6 +18,7 @@ fn fake(mode: &str) -> ServerConfig {
         name: "fake".to_string(),
         command: format!("node \"{FIXTURE}\" {mode}"),
         enabled: true,
+        auto_approve: false,
     }
 }
 
@@ -106,6 +107,7 @@ async fn bad_command_reports_stderr() {
         name: "bad".to_string(),
         command: "node -e \"console.error('boom'); process.exit(1)\"".to_string(),
         enabled: true,
+        auto_approve: false,
     };
     let err = hub.start(&bad, &cancel).await.unwrap_err();
     match err {
@@ -223,6 +225,35 @@ async fn stop_idle_stops_only_idle_servers() {
     assert!(hub.is_running(1).await);
 
     hub.stop_idle(Duration::ZERO).await;
+    assert!(!hub.is_running(1).await);
+}
+
+#[tokio::test]
+async fn a_server_held_by_a_run_is_never_idle() {
+    let dir = TempDir::new();
+    let hub = Hub::new(dir.path().to_path_buf());
+    let cancel = CancellationToken::new();
+
+    hub.start(&fake(""), &cancel).await.unwrap();
+    let hold = hub.hold(&[1]);
+    // A run can spend over 10 minutes on commands between browser calls.
+    hub.stop_idle(Duration::ZERO).await;
+    assert!(hub.is_running(1).await);
+
+    drop(hold);
+    hub.stop_idle(Duration::ZERO).await;
+    assert!(!hub.is_running(1).await);
+}
+
+#[tokio::test]
+async fn stop_still_stops_a_held_server() {
+    let dir = TempDir::new();
+    let hub = Hub::new(dir.path().to_path_buf());
+    let cancel = CancellationToken::new();
+
+    hub.start(&fake(""), &cancel).await.unwrap();
+    let _hold = hub.hold(&[1]);
+    hub.stop(1).await;
     assert!(!hub.is_running(1).await);
 }
 

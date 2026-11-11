@@ -4,6 +4,8 @@ Bugs, gotchas, and approaches that failed. Newest first. If you hit one of the "
 
 ## Seen in this repo
 
+- **2026-11-11 · A local model set up its own Playwright MCP instead of calling the browser tools.** Asked to "install the Playwright MCP properly & test it", qwen-3.8-27b ran `npm install @playwright/mcp`, wrote `.mcp.json` and an SDK client started with `--port 3001` (HTTP mode, so its stdio connect waits until the 120 s command timeout). Tool names say `mcp__browser__…`, not Playwright. `OUTSIDE_TOOLS_NOTE` now says the tools are already running and not to install or script a server; the app never reads `.mcp.json` from the folder (outside-tool rule 1).
+- **2026-11-11 · The agent can't keep a server running.** A model command's job object kills everything it started when it ends, `Start-Process` and `start /B` included (`tools/command.rs`, by design: workspace rule 4). In a live Browser checks run the model spent all 25 steps starting `python -m http.server` and getting `ERR_CONNECTION_REFUSED`. `OUTSIDE_TOOLS_NOTE` now tells it to ask the user to run the server in the terminal. Letting the agent start long-lived servers needs a decision first.
 - **2026-11-10 · A specta command takes at most 10 arguments, `State` and `AppHandle` included.** An 11th fails with `SpectaFn<_> is not satisfied` on the whole `collect_commands!`. `run_agent` hit it; it now takes `app: tauri::AppHandle` and gets the attachment store and the MCP hub with `app.state::<T>()`.
 - **2026-11-10 · Python on Windows writes CRLF in text mode.** A patch script using `open(p).read()` / `open(p, 'w').write()` turned five LF files into CRLF (git warned "CRLF will be replaced by LF"). Open files with `newline=""` in patch scripts.
 

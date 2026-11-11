@@ -30,6 +30,7 @@ export function OutsideTools() {
   const [testingId, setTestingId] = useState<number | null>(null);
   const [testResults, setTestResults] = useState<Record<number, TestStatus>>({});
   const [removing, setRemoving] = useState<ServerConfig | null>(null);
+  const [trusting, setTrusting] = useState<ServerConfig | null>(null);
 
   async function reload(checkAlive?: () => boolean) {
     const res = await commands.listMcpServers();
@@ -81,6 +82,17 @@ export function OutsideTools() {
           return next;
         });
       }
+      await reload();
+    } else {
+      setListError(appErrorText(res.error));
+    }
+  }
+
+  async function handleAutoApprove(server: ServerConfig, on: boolean) {
+    setTrusting(null);
+    setListError(null);
+    const res = await commands.setMcpServerAutoApprove(server.id, on);
+    if (res.status === "ok") {
       await reload();
     } else {
       setListError(appErrorText(res.error));
@@ -185,6 +197,20 @@ export function OutsideTools() {
                         className="rounded bg-neutral-800 border-neutral-700 cursor-pointer disabled:cursor-default disabled:opacity-60 focus-visible:ring-1 focus-visible:ring-neutral-400 focus-visible:outline-none"
                       />
                       <span>On</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 min-h-[24px] px-1 text-xs text-neutral-300 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={server.autoApprove}
+                        aria-label={`${server.name} runs without asking`}
+                        onChange={(e) =>
+                          e.target.checked
+                            ? setTrusting(server)
+                            : void handleAutoApprove(server, false)
+                        }
+                        className="rounded bg-neutral-800 border-neutral-700 cursor-pointer focus-visible:ring-1 focus-visible:ring-neutral-400 focus-visible:outline-none"
+                      />
+                      <span>Run without asking</span>
                     </label>
                     <button
                       type="button"
@@ -300,6 +326,18 @@ export function OutsideTools() {
           server, and may ask you to install a browser.
         </p>
       </form>
+
+      {trusting &&
+        createPortal(
+          <ConfirmDialog
+            title={`Let ${trusting.name} run without asking?`}
+            message="The agent will call its tools without Run or Deny; each call still shows on a card. A page or file the agent reads could steer what it does with them. Starts with the next task; press Stop to end one."
+            confirmLabel="Run without asking"
+            onConfirm={() => void handleAutoApprove(trusting, true)}
+            onCancel={() => setTrusting(null)}
+          />,
+          document.body,
+        )}
 
       {removing &&
         createPortal(
