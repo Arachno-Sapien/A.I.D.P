@@ -846,6 +846,15 @@ pub async fn run_with_images(
 
                     match edit_answer(args.approvals, id, rx, &args.cancel).await {
                         Answer::Yes => match servers.start(&args.root, &command).await {
+                            // The folder changed while it started (the run was stopped first).
+                            Ok(server) if args.cancel.is_cancelled() => {
+                                servers.stop(server);
+                                let _ = args.out.send(ChatEvent::ToolResult {
+                                    id,
+                                    outcome: ToolOutcome::Stopped,
+                                });
+                                return Err(ProviderError::Cancelled);
+                            }
                             Ok(server) => {
                                 let limit = crate::tools::OUTPUT_LIMIT.min(args.text_limit);
                                 let status = first_output(servers, server, &args.cancel).await;

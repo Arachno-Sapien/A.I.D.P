@@ -1,5 +1,13 @@
 use crate::connections::{AppError, Services};
+use crate::commands::chat::{ChatState, ChatSurface};
 use crate::tools::servers::Servers;
+
+/// The agent's run and its servers belong to the folder they started in. The run
+/// stops first, so it can't start a server in the old folder after this.
+fn stop_agent(chat: &ChatState, servers: &Servers) {
+    chat.stop(ChatSurface::Workspace);
+    servers.stop_all();
+}
 use crate::workspace::files::{DirEntry, FileContent, WriteFile};
 use crate::workspace::recent;
 use crate::workspace::{WorkspaceError, WorkspaceInfo, WorkspaceState};
@@ -44,6 +52,7 @@ pub async fn open_folder(
     state: State<'_, WorkspaceState>,
     services: State<'_, Services>,
     servers: State<'_, Servers>,
+    chat: State<'_, ChatState>,
 ) -> Result<Option<WorkspaceInfo>, WorkspaceError> {
     let opened = tauri::async_runtime::spawn_blocking(move || {
         let Some(picked) = app.dialog().file().blocking_pick_folder() else {
@@ -58,8 +67,7 @@ pub async fn open_folder(
     let Some((canonical, info)) = opened else {
         return Ok(None);
     };
-    // The agent's servers belong to the folder they started in.
-    servers.stop_all();
+    stop_agent(&chat, &servers);
     state.set(canonical);
     if let Ok(list) = load_recent(&services) {
         save_recent(&services, &recent::push(list, info.path.clone()));
@@ -80,6 +88,7 @@ pub async fn open_recent(
     state: State<'_, WorkspaceState>,
     services: State<'_, Services>,
     servers: State<'_, Servers>,
+    chat: State<'_, ChatState>,
 ) -> Result<WorkspaceInfo, WorkspaceError> {
     let list = load_recent(&services)?;
     if !list.contains(&path) {
@@ -94,7 +103,7 @@ pub async fn open_recent(
 
     match opened {
         Ok((canonical, info)) => {
-            servers.stop_all();
+            stop_agent(&chat, &servers);
             state.set(canonical);
             save_recent(&services, &recent::push(list, info.path.clone()));
             Ok(info)
@@ -115,8 +124,9 @@ pub async fn open_recent(
 pub fn close_folder(
     state: State<'_, WorkspaceState>,
     servers: State<'_, Servers>,
+    chat: State<'_, ChatState>,
 ) -> Result<(), WorkspaceError> {
-    servers.stop_all();
+    stop_agent(&chat, &servers);
     state.clear();
     Ok(())
 }

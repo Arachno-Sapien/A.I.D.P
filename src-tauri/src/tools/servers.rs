@@ -86,10 +86,23 @@ struct Server {
     job: Option<Job>,
 }
 
+impl Server {
+    /// Whether dropping it should kill by process id: not once the server has
+    /// ended, when that id may belong to another program.
+    fn kill_wanted(&self) -> bool {
+        self.pid.is_some() && lock(&self.shared).status.running
+    }
+}
+
 impl Drop for Server {
     /// Ends every process the server started: closing the job does it on Windows
     /// (with `taskkill /T` when Windows refused the job), the process group elsewhere.
     fn drop(&mut self) {
+        // ponytail: on Unix a server's children outlive it if it ended first;
+        // a pidfd per process would let us kill them safely.
+        if !self.kill_wanted() {
+            return;
+        }
         let Some(pid) = self.pid else { return };
         #[cfg(windows)]
         if self.job.is_none() {
@@ -327,6 +340,15 @@ mod tests {
         let out = servers.output(id).unwrap().output;
         assert!(out.len() <= SERVER_KEEP + 100, "{}", out.len());
         assert!(out.trim_end().ends_with("line 4000 of a chatty server"));
+    }
+
+    #[tokio::test]
+    async fn an_ended_server_is_not_killed_again() {
+        // Its process id may already belong to another program.
+        let servers = Servers::default();
+        let id = servers.start(&std::env::temp_dir(), "exit 0").await.unwrap();
+        assert!(until(|| servers.output(id).is_some_and(|s| !s.running)).await);
+        assert!(!servers.servers().get(&id).unwrap().kill_wanted());
     }
 
     #[tokio::test]
