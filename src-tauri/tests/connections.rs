@@ -1161,3 +1161,63 @@ fn mcp_server_rules() {
     services.delete_mcp_server(added.id).unwrap();
     assert!(services.mcp_servers().unwrap().is_empty());
 }
+
+fn gpt4o() -> ModelInfo {
+    ModelInfo {
+        id: "gpt-4o".to_string(),
+        display_name: "gpt-4o".to_string(),
+        supports_tools: Some(true),
+        context_window: Some(128_000),
+    }
+}
+
+#[tokio::test]
+async fn user_sets_vision_on_a_cloud_model_and_a_refresh_keeps_it() {
+    let services = create_services(Arc::new(MemoryStore::default()));
+    let cloud_id = {
+        let db = services.db_conn().unwrap();
+        db::connections::insert_connection(
+            &db,
+            ConnectionKind::OpenaiCompat,
+            "Cloud",
+            "https://api.openai.com/v1",
+            "1234",
+            1,
+        )
+        .unwrap()
+    };
+    services.set_models(cloud_id, vec![gpt4o()]).unwrap();
+    assert_eq!(services.supports_vision(cloud_id, "gpt-4o"), None);
+
+    services.set_model_vision(cloud_id, "gpt-4o".to_string(), Some(true)).unwrap();
+    assert_eq!(services.supports_vision(cloud_id, "gpt-4o"), Some(true));
+    let listed = services.chat_models().unwrap();
+    assert_eq!(listed[0].supports_vision, Some(true));
+
+    // Choose models saves the list again; the user's answer stays.
+    services.set_models(cloud_id, vec![gpt4o()]).unwrap();
+    assert_eq!(services.supports_vision(cloud_id, "gpt-4o"), Some(true));
+
+    services.set_model_vision(cloud_id, "gpt-4o".to_string(), Some(false)).unwrap();
+    assert_eq!(services.supports_vision(cloud_id, "gpt-4o"), Some(false));
+    services.set_model_vision(cloud_id, "gpt-4o".to_string(), None).unwrap();
+    assert_eq!(services.supports_vision(cloud_id, "gpt-4o"), None);
+
+    let err = services
+        .set_model_vision(cloud_id, "missing".to_string(), Some(true))
+        .unwrap_err();
+    assert!(matches!(err, AppError::NotFound));
+}
+
+#[tokio::test]
+async fn vision_of_a_local_model_comes_from_ollama_not_the_user() {
+    let server = MockServer::start().await;
+    let services =
+        create_services(Arc::new(MemoryStore::default())).with_ollama_url(server.uri());
+    let ollama_id = services.ensure_ollama_connection().unwrap();
+    services.set_models(ollama_id, vec![gpt4o()]).unwrap();
+    let err = services
+        .set_model_vision(ollama_id, "gpt-4o".to_string(), Some(true))
+        .unwrap_err();
+    assert!(matches!(err, AppError::InvalidInput { .. }));
+}

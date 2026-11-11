@@ -24,6 +24,6 @@ Decision 0027 (D5) ran the Browser checks preset with `--image-responses omit`, 
 
 ## Consequences
 
-- Cloud vision models (Claude, GPT) get text only until there is a way to mark a cloud model as vision; that is a follow-up, not part of this decision.
+- A cloud model gets images only after the user sets **Reads images** to Yes for it on the Models screen (`set_model_vision`, added 2026-11-11); until then it is unknown and gets text only. Choosing models again keeps the answer, and Ollama models keep the flag Ollama reports. Image attachments follow the same flag: No refuses them before sending.
 - An image is untrusted data like any tool result (outside-tool rule 3): text inside a screenshot never skips an approval.
 - A server added from the old preset keeps `--image-responses omit` until the user edits its command or adds it again.

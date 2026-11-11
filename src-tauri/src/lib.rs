@@ -48,6 +48,7 @@ fn specta_builder() -> Builder<tauri::Wry> {
         commands::connections::set_models,
         commands::connections::chat_models,
         commands::connections::set_default_model,
+        commands::connections::set_model_vision,
         commands::chat::send_message,
         commands::chat::stop_reply,
         commands::workspace::open_folder,

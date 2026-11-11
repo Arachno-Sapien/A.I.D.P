@@ -13,6 +13,7 @@ vi.mock("../../lib/bindings", () => ({
     availableModels: vi.fn(),
     setModels: vi.fn(),
     setDefaultModel: vi.fn(),
+    setModelVision: vi.fn(),
   },
 }));
 
@@ -341,5 +342,58 @@ describe("ModelsScreen", () => {
 
     expect(screen.getByText("Cloud OpenAI")).toBeDefined();
     expect(screen.queryByText("Ollama (local)")).toBeNull();
+  });
+
+  it("marks a cloud model as reading images", async () => {
+    const cloud = {
+      id: 1,
+      kind: "openaiCompat" as const,
+      label: "OpenRouter",
+      baseUrl: "https://openrouter.ai/api/v1",
+      keyHint: "1234",
+      lastTestedAt: 100,
+      lastTestOk: true,
+    };
+    const model = {
+      connectionId: 1,
+      connectionLabel: "OpenRouter",
+      modelId: "anthropic/claude",
+      displayName: "Claude",
+      isDefault: true,
+      supportsTools: true,
+      isLocal: false,
+      contextTokens: null,
+    };
+    useModelsStore.setState({
+      connections: [cloud],
+      chatModels: [model],
+      selected: null,
+      loaded: true,
+    });
+    vi.mocked(commands.setModelVision).mockResolvedValue({ status: "ok", data: null });
+    vi.mocked(commands.listConnections).mockResolvedValue({ status: "ok", data: [cloud] });
+    vi.mocked(commands.chatModels).mockResolvedValue({
+      status: "ok",
+      data: [{ ...model, supportsVision: true }],
+    });
+
+    render(<ModelsScreen onAddClick={vi.fn()} />);
+
+    const select = screen.getByRole("combobox", {
+      name: "Claude reads images",
+    }) as HTMLSelectElement;
+    expect(select.value).toBe("unknown");
+
+    fireEvent.change(select, { target: { value: "yes" } });
+
+    await waitFor(() => {
+      expect(commands.setModelVision).toHaveBeenCalledWith(1, "anthropic/claude", true);
+      expect(select.value).toBe("yes");
+    });
+
+    fireEvent.change(select, { target: { value: "unknown" } });
+    await waitFor(() => {
+      expect(commands.setModelVision).toHaveBeenLastCalledWith(1, "anthropic/claude", null);
+    });
   });
 });

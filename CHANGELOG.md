@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Reads images:** each chosen cloud model on the Models screen has a Yes / No / Not sure setting. Set it to Yes for a vision model (Claude, GPT-4o) and it gets Browser checks screenshots; No refuses image attachments before sending (decision 0031).
 - **Screenshots on browser cards:** a Browser checks screenshot shows on its card, and a model that reads images (a local vision model) gets it too; other models get its text only. Saved chats keep the text, not the image. Re-add the Browser checks server from the preset to get screenshots (decision 0031).
 - **Servers the agent starts:** the agent can start a dev server that keeps running (`start_server`, asked like any command), read its output and stop it, so Browser checks no longer need you to start the server (decision 0030).
 - **Always allow:** a Run card can remember that exact command for the folder, so it runs without asking next time. Settings lists them with Remove (decision 0030).

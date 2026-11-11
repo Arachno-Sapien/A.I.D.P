@@ -13,6 +13,7 @@ export const commands = {
 	setModels: (connectionId: number, models: ModelInfo_Deserialize[]) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("set_models", { connectionId, models })),
 	chatModels: () => typedError<ChatModel_Serialize[], AppError_Serialize>(__TAURI_INVOKE("chat_models")),
 	setDefaultModel: (connectionId: number, modelId: string) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("set_default_model", { connectionId, modelId })),
+	setModelVision: (connectionId: number, modelId: string, supports: boolean | null) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("set_model_vision", { connectionId, modelId, supports })),
 	sendMessage: (surface: ChatSurface, connectionId: number, modelId: string, messages: ChatInput_Deserialize[], onEvent: Channel<ChatEvent_Deserialize>) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("send_message", { surface, connectionId, modelId, messages, onEvent })),
 	stopReply: (surface: ChatSurface) => __TAURI_INVOKE<void>("stop_reply", { surface }),
 	openFolder: () => typedError<WorkspaceInfo | null, WorkspaceError>(__TAURI_INVOKE("open_folder")),
@@ -218,7 +219,7 @@ export type ChatModel_Deserialize = {
 	displayName: string,
 	isDefault: boolean,
 	supportsTools?: boolean | null,
-	/**  Known only for local models (Ollama's capabilities); absent means unknown. */
+	/**  From Ollama's capabilities for local models, set by the user for cloud ones; absent means unknown. */
 	supportsVision?: boolean | null,
 	isLocal: boolean,
 	contextTokens?: number | null,
@@ -231,7 +232,7 @@ export type ChatModel_Serialize = {
 	displayName: string,
 	isDefault: boolean,
 	supportsTools: boolean | null,
-	/**  Known only for local models (Ollama's capabilities); absent means unknown. */
+	/**  From Ollama's capabilities for local models, set by the user for cloud ones; absent means unknown. */
 	supportsVision?: boolean,
 	isLocal: boolean,
 	contextTokens: number | null,

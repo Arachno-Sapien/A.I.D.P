@@ -178,6 +178,36 @@ mod tests {
     }
 
     #[test]
+    fn set_models_preserves_supports_vision() {
+        let mut conn = open_in_memory().unwrap();
+        let id = insert_connection(
+            &conn,
+            ConnectionKind::OpenaiCompat,
+            "OpenRouter",
+            "https://openrouter.ai/api/v1",
+            "1234",
+            100,
+        )
+        .unwrap();
+        let model = |id: &str| ModelInfo {
+            id: id.to_string(),
+            display_name: id.to_string(),
+            context_window: None,
+            supports_tools: None,
+        };
+        set_models(&mut conn, id, &[model("yes"), model("no"), model("unset")]).unwrap();
+        set_supports_vision(&conn, id, "yes", Some(true)).unwrap();
+        set_supports_vision(&conn, id, "no", Some(false)).unwrap();
+
+        set_models(&mut conn, id, &[model("yes"), model("no"), model("unset")]).unwrap();
+        let rows = list_chat_models(&conn).unwrap();
+        let vision = |m: &str| rows.iter().find(|r| r.model_id == m).unwrap().supports_vision;
+        assert_eq!(vision("yes"), Some(true));
+        assert_eq!(vision("no"), Some(false));
+        assert_eq!(vision("unset"), None);
+    }
+
+    #[test]
     fn set_models_preserves_num_ctx() {
         let mut conn = open_in_memory().unwrap();
         let id = insert_connection(

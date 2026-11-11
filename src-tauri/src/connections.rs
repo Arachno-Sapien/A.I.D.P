@@ -80,7 +80,7 @@ pub struct ChatModel {
     pub display_name: String,
     pub is_default: bool,
     pub supports_tools: Option<bool>,
-    /// Known only for local models (Ollama's capabilities); absent means unknown.
+    /// From Ollama's capabilities for local models, set by the user for cloud ones; absent means unknown.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub supports_vision: Option<bool>,
     pub is_local: bool,
@@ -550,6 +550,28 @@ impl Services {
         })?;
         let ok = set_default_model(&mut db, connection_id, &model_id)?;
         if !ok {
+            return Err(AppError::NotFound);
+        }
+        Ok(())
+    }
+
+    /// The user's answer to "reads images" for a cloud model; Ollama reports its own.
+    pub fn set_model_vision(
+        &self,
+        connection_id: u32,
+        model_id: String,
+        supports: Option<bool>,
+    ) -> Result<(), AppError> {
+        let db = self.db.lock().map_err(|e| AppError::Storage {
+            message: e.to_string(),
+        })?;
+        let row = get_connection(&db, connection_id)?.ok_or(AppError::NotFound)?;
+        if row.kind == ConnectionKind::Ollama {
+            return Err(AppError::InvalidInput {
+                message: "Ollama reports whether a local model reads images.".to_string(),
+            });
+        }
+        if !crate::db::connections::set_supports_vision(&db, connection_id, &model_id, supports)? {
             return Err(AppError::NotFound);
         }
         Ok(())

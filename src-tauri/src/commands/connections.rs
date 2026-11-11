@@ -76,3 +76,14 @@ pub fn set_default_model(
     services.set_default_model(connection_id, model_id)
 }
 
+
+#[tauri::command]
+#[specta::specta]
+pub fn set_model_vision(
+    services: State<'_, Services>,
+    connection_id: u32,
+    model_id: String,
+    supports: Option<bool>,
+) -> Result<(), AppError> {
+    services.set_model_vision(connection_id, model_id, supports)
+}

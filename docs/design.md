@@ -214,7 +214,7 @@ Seven SQLite tables in one local file, read and written only by Rust. No table e
 | settings | App preferences | key, value (theme, default model, keep\_alive, recent workspaces) |
 | mcp\_servers | Outside tool (MCP) servers (migration 7) | id, name, command, enabled |
 
-Each message stores its own `model_ref` and `model_name`, so switching models in the middle of a chat keeps a correct record of who said what. A workspace's AI panel is a conversation with `workspace_path` set. Attachments (M6, decision 0019) are files under `<app data>/attachments/`, named by their SHA-256 and referred to by ID from a message's parts; `supports_vision` comes from Ollama's capabilities and stays empty for cloud models. Schema changes go through numbered migrations from day one.
+Each message stores its own `model_ref` and `model_name`, so switching models in the middle of a chat keeps a correct record of who said what. A workspace's AI panel is a conversation with `workspace_path` set. Attachments (M6, decision 0019) are files under `<app data>/attachments/`, named by their SHA-256 and referred to by ID from a message's parts; `supports_vision` comes from Ollama's capabilities for local models and from the user (Models screen, **Reads images**) for cloud models; choosing models again keeps it. Schema changes go through numbered migrations from day one.
 
 ## Screens and user flows
 

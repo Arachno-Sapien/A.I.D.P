@@ -107,6 +107,15 @@ export function ModelsScreen({
     await refresh();
   };
 
+  const handleVision = async (id: number, modelId: string, value: string) => {
+    const supports = value === "yes" ? true : value === "no" ? false : null;
+    const res = await commands.setModelVision(id, modelId, supports);
+    if (res.status === "error") {
+      setTestResult({ id, text: appErrorText(res.error), isError: true });
+    }
+    await refresh();
+  };
+
   const handleOpenChooseModels = async (id: number) => {
     setTestResult(null);
     const res = await commands.availableModels(id);
@@ -299,6 +308,48 @@ export function ModelsScreen({
                         Delete
                       </button>
                     </div>
+                  </div>
+                )}
+
+                {/* Chosen models: the user says which ones read images (decision 0031) */}
+                {chatModels.some((m) => m.connectionId === c.id) && (
+                  <div className="space-y-1.5">
+                    <div className="text-xs text-neutral-500">
+                      Screenshots and images go only to models set to Yes.
+                    </div>
+                    <ul className="space-y-1">
+                      {chatModels
+                        .filter((m) => m.connectionId === c.id)
+                        .map((m) => (
+                          <li
+                            key={m.modelId}
+                            className="flex items-center justify-between gap-3 text-xs"
+                          >
+                            <span className="text-neutral-300 truncate min-w-0" title={m.modelId}>
+                              {m.displayName}
+                            </span>
+                            <label className="flex items-center gap-2 text-neutral-400 shrink-0">
+                              Reads images
+                              <select
+                                aria-label={`${m.displayName} reads images`}
+                                value={
+                                  m.supportsVision === true
+                                    ? "yes"
+                                    : m.supportsVision === false
+                                    ? "no"
+                                    : "unknown"
+                                }
+                                onChange={(e) => handleVision(c.id, m.modelId, e.target.value)}
+                                className="bg-neutral-950 border border-neutral-800 rounded px-1.5 py-0.5 text-neutral-200 cursor-pointer"
+                              >
+                                <option value="unknown">Not sure</option>
+                                <option value="yes">Yes</option>
+                                <option value="no">No</option>
+                              </select>
+                            </label>
+                          </li>
+                        ))}
+                    </ul>
                   </div>
                 )}
 

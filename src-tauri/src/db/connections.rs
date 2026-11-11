@@ -148,18 +148,22 @@ pub fn set_models(
         |row| row.get(0),
     )?;
 
-    let mut prev_num_ctx = std::collections::HashMap::<String, Option<u32>>::new();
+    // Settings the user made per model (context length, reads images) survive a new list.
+    let mut prev_settings =
+        std::collections::HashMap::<String, (Option<u32>, Option<i64>)>::new();
     {
-        let mut prev_stmt =
-            tx.prepare("SELECT model_id, num_ctx FROM models WHERE connection_id = ?1")?;
+        let mut prev_stmt = tx.prepare(
+            "SELECT model_id, num_ctx, supports_vision FROM models WHERE connection_id = ?1",
+        )?;
         let prev_rows = prev_stmt.query_map(params![connection_id], |row| {
             let mid: String = row.get(0)?;
             let nctx: Option<u32> = row.get(1)?;
-            Ok((mid, nctx))
+            let vision: Option<i64> = row.get(2)?;
+            Ok((mid, nctx, vision))
         })?;
         for r in prev_rows {
-            let (mid, nctx) = r?;
-            prev_num_ctx.insert(mid, nctx);
+            let (mid, nctx, vision) = r?;
+            prev_settings.insert(mid, (nctx, vision));
         }
     }
 
@@ -179,12 +183,12 @@ pub fn set_models(
     };
 
     let mut stmt = tx.prepare(
-        "INSERT INTO models (connection_id, model_id, display_name, context_window, is_default, supports_tools, num_ctx) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        "INSERT INTO models (connection_id, model_id, display_name, context_window, is_default, supports_tools, num_ctx, supports_vision) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
     )?;
 
     for model in models {
         let is_default = target_default_model_id.as_deref() == Some(&model.id);
-        let num_ctx = prev_num_ctx.remove(&model.id).flatten();
+        let (num_ctx, vision) = prev_settings.remove(&model.id).unwrap_or_default();
         stmt.execute(params![
             connection_id,
             model.id,
@@ -193,6 +197,7 @@ pub fn set_models(
             if is_default { 1 } else { 0 },
             model.supports_tools.map(|b| if b { 1i64 } else { 0i64 }),
             num_ctx,
+            vision,
         ])?;
     }
     drop(stmt);
@@ -201,18 +206,18 @@ pub fn set_models(
     Ok(())
 }
 
-/// Records whether a model reads images; None when its details could not be read.
+/// Records whether a model reads images (None = unknown). False when no such model row.
 pub fn set_supports_vision(
     conn: &Connection,
     connection_id: u32,
     model_id: &str,
     supports: Option<bool>,
-) -> rusqlite::Result<()> {
-    conn.execute(
+) -> rusqlite::Result<bool> {
+    let changed = conn.execute(
         "UPDATE models SET supports_vision = ?1 WHERE connection_id = ?2 AND model_id = ?3",
         params![supports.map(i64::from), connection_id, model_id],
     )?;
-    Ok(())
+    Ok(changed > 0)
 }
 
 pub fn list_chat_models(conn: &Connection) -> rusqlite::Result<Vec<ChatModelRow>> {
