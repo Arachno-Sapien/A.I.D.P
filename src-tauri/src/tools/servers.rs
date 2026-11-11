@@ -87,8 +87,10 @@ struct Server {
 }
 
 impl Server {
-    /// Whether dropping it should kill by process id: not once the server has
-    /// ended, when that id may belong to another program.
+    /// Whether a kill by its single process id is safe: not once the server has
+    /// ended, when that id may belong to another program. (A Unix process group
+    /// id stays reserved while any member lives, so the group kill needs no check.)
+    #[cfg_attr(not(windows), allow(dead_code))]
     fn kill_wanted(&self) -> bool {
         self.pid.is_some() && lock(&self.shared).status.running
     }
@@ -96,16 +98,12 @@ impl Server {
 
 impl Drop for Server {
     /// Ends every process the server started: closing the job does it on Windows
-    /// (with `taskkill /T` when Windows refused the job), the process group elsewhere.
+    /// (with `taskkill /T` when Windows refused the job), the process group elsewhere,
+    /// which also reaches children left behind by a server that already ended.
     fn drop(&mut self) {
-        // ponytail: on Unix a server's children outlive it if it ended first;
-        // a pidfd per process would let us kill them safely.
-        if !self.kill_wanted() {
-            return;
-        }
         let Some(pid) = self.pid else { return };
         #[cfg(windows)]
-        if self.job.is_none() {
+        if self.job.is_none() && self.kill_wanted() {
             use std::os::windows::process::CommandExt;
             let _ = std::process::Command::new("taskkill")
                 .args(["/T", "/F", "/PID", &pid.to_string()])
