@@ -49,6 +49,9 @@ vi.mock("../../lib/bindings", () => ({
     terminalWrite: vi.fn().mockResolvedValue({ status: "ok", data: null }),
     terminalResize: vi.fn().mockResolvedValue({ status: "ok", data: null }),
     terminalClose: vi.fn().mockResolvedValue({ status: "ok", data: null }),
+    serverList: vi.fn().mockResolvedValue([]),
+    serverAttach: vi.fn().mockResolvedValue(true),
+    serverStop: vi.fn().mockResolvedValue(true),
   },
 }));
 
@@ -205,3 +208,37 @@ describe("TerminalPanel", () => {
     expect(await screen.findByText("No folder is currently open.")).toBeDefined();
   });
 });
+
+describe("TerminalPanel server tabs", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    channels.length = 0;
+    vi.mocked(commands.serverList).mockResolvedValue([
+      { id: 2, command: "npm run dev", running: true },
+    ]);
+    useWorkspaceStore.setState({ serverTab: 2, serversVersion: 1 });
+  });
+
+  it("shows the agent's server in its own tab", async () => {
+    render(<TerminalPanel />);
+    await waitFor(() => expect(commands.serverAttach).toHaveBeenCalledWith(2, expect.anything()));
+    expect(screen.getByRole("tab", { name: /npm run dev/ }).getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByRole("tab", { name: "Terminal" }).getAttribute("aria-selected")).toBe("false");
+    // The shell keeps running behind the server tab.
+    expect(commands.terminalClose).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Terminal" }));
+    expect(useWorkspaceStore.getState().serverTab).toBeNull();
+  });
+
+  it("stopping a server closes its tab", async () => {
+    render(<TerminalPanel />);
+    await waitFor(() => expect(screen.getByRole("tab", { name: /npm run dev/ })).toBeTruthy());
+    vi.mocked(commands.serverList).mockResolvedValue([]);
+    fireEvent.click(screen.getByRole("button", { name: "Stop npm run dev" }));
+    await waitFor(() => expect(commands.serverStop).toHaveBeenCalledWith(2));
+    await waitFor(() => expect(screen.queryByRole("tab", { name: /npm run dev/ })).toBeNull());
+    expect(useWorkspaceStore.getState().serverTab).toBeNull();
+  });
+});
+

@@ -1,8 +1,9 @@
 import { Channel } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { commands, type TerminalEvent } from "../../lib/bindings";
+import { commands, type ServerInfo, type TerminalEvent } from "../../lib/bindings";
 import { useSettingsStore } from "../settings/store";
 import { THEMES } from "../settings/themes";
+import { useWorkspaceStore } from "./store";
 import { mountTerminal, type MountedTerminal } from "./term";
 import { workspaceErrorText } from "./workspaceErrorText";
 
@@ -14,6 +15,68 @@ function inOrder<T>(call: () => Promise<T>): Promise<T> {
   const next = pending.then(call, call);
   pending = next.catch(() => undefined);
   return next;
+}
+
+function useTerminalTheme() {
+  const resolved = useSettingsStore((s) => s.resolved);
+  const cursor = useSettingsStore((s) =>
+    s.theme === "cyber" ? THEMES.cyber.vars["--color-accent"] : undefined,
+  );
+  return { resolved, cursor };
+}
+
+function shortCommand(command: string): string {
+  return command.length > 30 ? `${command.slice(0, 29)}…` : command;
+}
+
+/** A server the agent started, read-only: its kept output, then what it prints next. */
+function ServerView({ id, onExit }: { id: number; onExit: () => void }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const { resolved, cursor } = useTerminalTheme();
+  const termRef = useRef<MountedTerminal | null>(null);
+  // Read when the view mounts; later theme changes go through setTheme.
+  const themeRef = useRef({ resolved, cursor });
+
+  useEffect(() => {
+    termRef.current?.setTheme(resolved, cursor);
+  }, [resolved, cursor]);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const term = mountTerminal(containerRef.current, {
+      theme: themeRef.current.resolved,
+      cursor: themeRef.current.cursor,
+      onInput: () => {},
+      onResize: () => {},
+    });
+    termRef.current = term;
+    let live = true;
+    const channel = new Channel<TerminalEvent>();
+    channel.onmessage = (ev: TerminalEvent) => {
+      if (!live) return;
+      if (ev.event === "output") {
+        term.write(ev.data);
+      } else if (ev.event === "exit") {
+        term.write("\r\n[server exited]");
+        onExit();
+      }
+    };
+    void commands.serverAttach(id, channel);
+
+    let ro: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== "undefined" && containerRef.current) {
+      ro = new ResizeObserver(() => term.fit());
+      ro.observe(containerRef.current);
+    }
+    return () => {
+      live = false;
+      ro?.disconnect();
+      term.dispose();
+      termRef.current = null;
+    };
+  }, [id, onExit]);
+
+  return <div ref={containerRef} className="h-full w-full" />;
 }
 
 export interface TerminalPanelProps {
@@ -34,14 +97,25 @@ export function TerminalPanel({
   const [isExited, setIsExited] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const resolved = useSettingsStore((s) => s.resolved);
-  const cursor = useSettingsStore((s) =>
-    s.theme === "cyber" ? THEMES.cyber.vars["--color-accent"] : undefined,
-  );
+  const [servers, setServers] = useState<ServerInfo[]>([]);
+  const serverTab = useWorkspaceStore((s) => s.serverTab);
+  const serversVersion = useWorkspaceStore((s) => s.serversVersion);
+  const { setServerTab, refreshServers } = useWorkspaceStore.getState();
+  const { resolved, cursor } = useTerminalTheme();
 
   useEffect(() => {
     termRef.current?.setTheme(resolved, cursor);
   }, [resolved, cursor]);
+
+  useEffect(() => {
+    let live = true;
+    void commands.serverList().then((list) => {
+      if (live) setServers(list);
+    });
+    return () => {
+      live = false;
+    };
+  }, [serversVersion]);
 
   const startTerminal = useCallback(async () => {
     if (!termRef.current) return;
@@ -124,6 +198,15 @@ export function TerminalPanel({
     };
   }, [isDragging, onHeightChange]);
 
+  const showing = servers.some((s) => s.id === serverTab) ? serverTab : null;
+  const stopServer = async (id: number) => {
+    await commands.serverStop(id);
+    if (useWorkspaceStore.getState().serverTab === id) setServerTab(null);
+    refreshServers();
+  };
+  const tabClass = (selected: boolean) =>
+    `px-2 py-0.5 rounded cursor-pointer ${selected ? "bg-neutral-800 text-neutral-100" : "text-neutral-400 hover:text-neutral-200"}`;
+
   return (
     <div
       style={height ? { height } : undefined}
@@ -137,14 +220,51 @@ export function TerminalPanel({
 
       {/* Terminal header */}
       <div className="flex items-center justify-between px-3 py-1 bg-neutral-900/60 border-b border-neutral-800/80 text-xs">
-        <div className="flex items-center gap-3">
-          <span className="font-semibold text-neutral-300">Terminal</span>
+        <div className="flex items-center gap-3 min-w-0">
+          <div role="tablist" aria-label="Terminals" className="flex items-center gap-1 min-w-0 overflow-x-auto">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={showing === null}
+              onClick={() => setServerTab(null)}
+              className={`font-semibold ${tabClass(showing === null)}`}
+            >
+              Terminal
+            </button>
+            {servers.map((server) => (
+              <span key={server.id} className="flex items-center shrink-0">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={showing === server.id}
+                  title={server.command}
+                  onClick={() => setServerTab(server.id)}
+                  className={`flex items-center gap-1.5 font-mono ${tabClass(showing === server.id)}`}
+                >
+                  <span
+                    aria-hidden="true"
+                    className={`inline-block w-1.5 h-1.5 rounded-full ${server.running ? "bg-green-500" : "bg-neutral-500"}`}
+                  />
+                  {shortCommand(server.command)}
+                </button>
+                <button
+                  type="button"
+                  aria-label={`Stop ${server.command}`}
+                  title={server.running ? "Stop the server" : "Close"}
+                  onClick={() => void stopServer(server.id)}
+                  className="px-1 text-neutral-500 hover:text-neutral-200 cursor-pointer"
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
           {error && (
             <span className="text-red-400 bg-red-950/40 px-2 py-0.5 rounded border border-red-800/40 text-[11px]">
               {error}
             </span>
           )}
-          {isExited && (
+          {isExited && showing === null && (
             <div className="flex items-center gap-2 text-amber-400 bg-amber-950/40 px-2 py-0.5 rounded border border-amber-800/40 text-[11px]">
               <span>Process exited.</span>
               <button
@@ -169,8 +289,16 @@ export function TerminalPanel({
         )}
       </div>
 
-      {/* Terminal body */}
-      <div ref={containerRef} className="flex-1 p-2 overflow-hidden bg-neutral-950" />
+      {/* The shell stays mounted while a server tab is shown, so it keeps running. */}
+      <div
+        ref={containerRef}
+        className={`flex-1 p-2 overflow-hidden bg-neutral-950 ${showing === null ? "" : "hidden"}`}
+      />
+      {showing !== null && (
+        <div className="flex-1 p-2 overflow-hidden bg-neutral-950">
+          <ServerView id={showing} onExit={refreshServers} />
+        </div>
+      )}
     </div>
   );
 }

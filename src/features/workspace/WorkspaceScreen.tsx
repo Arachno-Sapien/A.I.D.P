@@ -129,6 +129,14 @@ export function WorkspaceScreen({ active = true }: WorkspaceScreenProps) {
   };
 
   const [terminalOpen, setTerminalOpen] = useState(false);
+  // A server the agent starts (decision 0030) opens the terminal on its tab.
+  const serversVersion = useWorkspaceStore((s) => s.serversVersion);
+  const seenServers = useRef(serversVersion);
+  useEffect(() => {
+    if (serversVersion === seenServers.current) return;
+    seenServers.current = serversVersion;
+    if (useWorkspaceStore.getState().serverTab !== null) setTerminalOpen(true);
+  }, [serversVersion]);
   const [terminalHeight, setTerminalHeight] = useState<number>(240);
   const [filesOpen, setFilesOpen] = useState(true);
   const [aiOpen, setAiOpen] = useState(true);

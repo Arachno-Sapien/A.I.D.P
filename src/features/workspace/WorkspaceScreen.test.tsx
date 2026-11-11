@@ -219,6 +219,17 @@ describe("WorkspaceScreen", () => {
     });
   });
 
+  it("opens the terminal when the agent starts a server", async () => {
+    useWorkspaceStore.setState({
+      info: { name: "my-app", path: "/projects/my-app", isGit: true },
+    });
+    render(<WorkspaceScreen />);
+    expect(screen.queryByTestId("terminal-panel")).toBeNull();
+
+    act(() => useWorkspaceStore.getState().showServer(1));
+    expect(await screen.findByTestId("terminal-panel")).toBeDefined();
+  });
+
   it("toggles the terminal panel", async () => {
     useWorkspaceStore.setState({
       info: { name: "my-app", path: "/projects/my-app", isGit: true },

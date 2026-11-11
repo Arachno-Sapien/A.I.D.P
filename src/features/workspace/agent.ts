@@ -27,6 +27,13 @@ export const agentHooks: ChatHooks = {
       useWorkspaceStore.setState({ proposal: null, needsGitConfirm: false });
     }
 
+    if (step.outcome?.status === "server") {
+      store.showServer(step.outcome.server);
+    } else if (step.action.tool === "stopServer" && step.outcome?.status === "ok") {
+      if (store.serverTab === step.action.server) store.setServerTab(null);
+      store.refreshServers();
+    }
+
     if (step.outcome?.status === "ok") {
       // Written without asking (review at the end): kept for the review.
       if (!step.needsAnswer) {

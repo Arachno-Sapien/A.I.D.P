@@ -71,6 +71,10 @@ export interface WorkspaceStore {
   reviewAtEnd: boolean;
   /** Commands run without asking for the next task only (decision 0030). */
   runCommands: boolean;
+  /** The agent's server shown in the terminal panel; null shows the shell (decision 0030). */
+  serverTab: number | null;
+  /** Bumped when the agent starts or stops a server, so the panel opens and re-lists them. */
+  serversVersion: number;
   /** What the agent wrote without asking, one entry per file. */
   review: ReviewFile[];
   /** The review file whose diff is shown in place of the editor. */
@@ -117,6 +121,9 @@ export interface WorkspaceStore {
 
   setReviewAtEnd(on: boolean): void;
   setRunCommands(on: boolean): void;
+  showServer(id: number): void;
+  setServerTab(id: number | null): void;
+  refreshServers(): void;
   /** Adds a write the agent made without asking to the review. */
   noteAgentWrite(path: string, before: string | null, after: string): void;
   showReviewDiff(path: string | null): void;
@@ -201,6 +208,7 @@ const folderReset = {
   // A new folder may have no git, and its warning comes before the switch is on.
   reviewAtEnd: false,
   runCommands: false,
+  serverTab: null,
   review: [],
   reviewDiff: null,
 };
@@ -221,8 +229,10 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   dirtyPrompt: null,
   selection: null,
   revision: 0,
+  serversVersion: 0,
   reviewAtEnd: false,
   runCommands: false,
+  serverTab: null,
   review: [],
   reviewDiff: null,
 
@@ -679,6 +689,9 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
 
   setReviewAtEnd: (on) => set({ reviewAtEnd: on }),
   setRunCommands: (on) => set({ runCommands: on }),
+  showServer: (id) => set((s) => ({ serverTab: id, serversVersion: s.serversVersion + 1 })),
+  setServerTab: (id) => set({ serverTab: id }),
+  refreshServers: () => set((s) => ({ serversVersion: s.serversVersion + 1 })),
 
   noteAgentWrite: (path, before, after) => {
     const review = get().review;

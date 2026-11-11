@@ -90,3 +90,30 @@ describe("agentHooks", () => {
     expect(commands.readFile).not.toHaveBeenCalled();
   });
 });
+
+describe("agentHooks servers", () => {
+  it("a started server opens its terminal tab", () => {
+    useWorkspaceStore.setState({ serverTab: null, serversVersion: 0 });
+    agentHooks.onToolResult?.({
+      id: 5,
+      action: { tool: "startServer", command: "npm run dev", folder: "/p" },
+      needsAnswer: false,
+      outcome: { status: "server", server: 3, output: "ready" },
+    });
+    expect(useWorkspaceStore.getState().serverTab).toBe(3);
+    expect(useWorkspaceStore.getState().serversVersion).toBe(1);
+  });
+
+  it("a stopped server refreshes the tabs", () => {
+    useWorkspaceStore.setState({ serverTab: 3, serversVersion: 4 });
+    agentHooks.onToolResult?.({
+      id: 6,
+      action: { tool: "stopServer", server: 3 },
+      needsAnswer: false,
+      outcome: { status: "ok", summary: "Stopped." },
+    });
+    expect(useWorkspaceStore.getState().serverTab).toBeNull();
+    expect(useWorkspaceStore.getState().serversVersion).toBe(5);
+  });
+});
+
