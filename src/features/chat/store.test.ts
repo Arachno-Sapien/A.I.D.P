@@ -241,7 +241,7 @@ describe("useChatStore", () => {
       1,
       "m1",
       [{ role: "user", content: "agent task" }],
-      false,
+      { reviewAtEnd: false, runCommands: false },
       expect.anything(),
     );
     expect(commands.sendMessage).not.toHaveBeenCalled();

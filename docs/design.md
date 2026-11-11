@@ -160,7 +160,7 @@ Once a model can read files and run commands, a mistake costs more than a leaked
 1. **One folder.** The workspace is the folder the user opened. Rust resolves every path, following symlinks, and refuses anything that lands outside it, including `..` and absolute paths.
 2. **Files and processes go through Rust.** The UI uses workspace commands only. The Tauri fs and shell plugins stay off.
 3. **Edits are proposals.** AI changes appear as a diff and reach the disk only when the user accepts them, unless the user turns on **Review at end** for the task (decision 0028): then edits and new files are written as the agent works, the text from before is kept, and the user reviews every changed file with Keep or Undo when it finishes.
-4. **Every model command is approved.** The user sees the exact command and working directory before it runs. There is no auto-approve in v1. Commands run inside the folder, with a timeout and a Stop button.
+4. **Every model command is shown, and approved unless the user says otherwise.** The user sees the exact command and working directory on a card. It waits for Run unless the user turned on **Run commands without asking** for that task, or chose **Always allow** for that exact command in this folder (decision 0030). Commands run inside the folder, with a timeout and a Stop button. A server the agent starts with `start_server` has no timeout: it runs in a terminal tab the user can see and stop, and ends when the folder closes or the app quits.
 5. **Tool output is data.** File contents and command output returned to the model are untrusted. Instructions inside them never skip an approval.
 6. **Secrets stay out of prompts.** Files that look like secrets (`.env*`, `*.pem`, `*.key`, `*.p12`, `*.pfx`, `*.jks`, `*.keystore`, `*.ppk`, `*.tfvars`, `id_rsa*`, `id_ed25519*`, `id_ecdsa*`, `id_dsa*`, `.npmrc`, `.pypirc`, `.netrc`, `_netrc`, `.git-credentials`) are skipped by `list_files`, `read_file`, and `search`; files containing a private key (a `-----BEGIN ... PRIVATE KEY-----` or `-----BEGIN ... PRIVATE KEY BLOCK-----` block, or a PuTTY key) are skipped by `read_file` and `search`. Neither is ever sent as context unless the user adds it by hand. Paths inside the `.git` folder are refused by every workspace command and tool, because its config can hold credentials and its hooks run code.
 7. **Warn without git.** If the folder isn't a git repository, warn before the first AI edit, because there is no easy undo.
@@ -168,7 +168,7 @@ Once a model can read files and run commands, a mistake costs more than a leaked
 ### Outside tool security
 
 1. **The user adds every server.** Servers are added by hand in Settings. The app never reads server settings from the opened folder, and a model can't add, change or start one that the user didn't enable.
-2. **Every call is approved.** The user sees the server, the tool and the exact arguments before each call, unless the user turns on **Run without asking** for that server in Settings (decision 0029): then each call still shows on a card and runs without asking. There is no auto-approve for model commands.
+2. **Every call is approved.** The user sees the server, the tool and the exact arguments before each call, unless the user turns on **Run without asking** for that server in Settings (decision 0029): then each call still shows on a card and runs without asking. Model commands follow workspace rule 4.
 3. **Descriptions and results are data.** Tool descriptions and results from a server are untrusted. Instructions inside them never skip an approval.
 4. **Servers run outside the folder, as the user.** The app says so when one is added. A server starts only when an agent run needs it or the user tests it, runs in its own folder under the app's data folder, and is stopped with the app, when it is turned off or removed, and after 10 idle minutes.
 5. **No tokens in commands.** A server's command line is stored in SQLite as plain text, so the UI tells the user not to put tokens in it. Servers get nothing from the keychain.
@@ -454,7 +454,7 @@ For M1 only, the key comes from a git-ignored local config file. M2 replaces it 
 
 - [x] `ChatEvent::ToolCall` and tool calling in the OpenAI-compatible and Anthropic adapters
 - [x] `list_files`, `read_file`, `search`, `edit_file`, `create_file`, and `run_command` work inside the folder
-- [x] Every edit shows a diff first; every model command asks first; no auto-approve
+- [x] Every edit shows a diff first; every model command asks first; no auto-approve (later relaxed by the user's own switches: decisions 0028, 0030)
 - [x] Secret-looking files are never read or sent unless the user adds them by hand
 - [x] The terminal panel runs the user's shell in the folder; model commands have a timeout and Stop
 - [x] Fake-provider tests: a model asking for a path outside the folder is refused, and a denied command never runs
@@ -491,7 +491,7 @@ The biggest risk is an agent-built Rust core you can't debug; the plan answers i
 | Provider API changes | An adapter breaks | Fake-server tests catch it; adapters are isolated files |
 | Small local models handle tools poorly | Agent tools don't work with them | Capability flags limit those models to the M3 workspace |
 | An AI edit damages files | User loses work | Every edit is a diff the user accepts; warning in folders without git |
-| The model runs a harmful command | Files deleted or data sent somewhere | Every model command needs approval; no auto-approve; runs inside the folder with a timeout |
+| The model runs a harmful command | Files deleted or data sent somewhere | Every model command shows on a card and needs approval unless the user turns on Run commands without asking for one task or always allows that exact command in the folder (decision 0030); runs inside the folder with a timeout |
 | A file or command output tells the model to do something (prompt injection) | The model tries to read secrets or run commands | Tool output is treated as data; approvals still apply; secret-looking files are skipped |
 | Editor and terminal push RAM up | The app competes with local models for memory | CodeMirror 6 over Monaco; lazy file tree; budgets measured in M3 and M4 |
 

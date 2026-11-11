@@ -84,6 +84,8 @@ export interface SendExtra {
   agent?: boolean;
   /** Agent edits are written without asking and reviewed at the end (decision 0028). */
   reviewAtEnd?: boolean;
+  /** Commands run without asking for this task (decision 0030). */
+  runCommands?: boolean;
 }
 
 export interface UiMessage {
@@ -426,7 +428,10 @@ export const createChatStore = (surface: ChatSurface, hooks?: ChatHooks) => {
             model.connectionId,
             model.modelId,
             history,
-            extra?.reviewAtEnd ?? false,
+            {
+              reviewAtEnd: extra?.reviewAtEnd ?? false,
+              runCommands: extra?.runCommands ?? false,
+            },
             channel,
           )
         : await commands.sendMessage(

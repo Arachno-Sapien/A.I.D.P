@@ -69,6 +69,8 @@ export interface WorkspaceStore {
   revision: number;
   /** The agent writes edits without asking; they are reviewed when it finishes. */
   reviewAtEnd: boolean;
+  /** Commands run without asking for the next task only (decision 0030). */
+  runCommands: boolean;
   /** What the agent wrote without asking, one entry per file. */
   review: ReviewFile[];
   /** The review file whose diff is shown in place of the editor. */
@@ -114,6 +116,7 @@ export interface WorkspaceStore {
   rejectProposal(): void;
 
   setReviewAtEnd(on: boolean): void;
+  setRunCommands(on: boolean): void;
   /** Adds a write the agent made without asking to the review. */
   noteAgentWrite(path: string, before: string | null, after: string): void;
   showReviewDiff(path: string | null): void;
@@ -197,6 +200,7 @@ const folderReset = {
   selection: null,
   // A new folder may have no git, and its warning comes before the switch is on.
   reviewAtEnd: false,
+  runCommands: false,
   review: [],
   reviewDiff: null,
 };
@@ -218,6 +222,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   selection: null,
   revision: 0,
   reviewAtEnd: false,
+  runCommands: false,
   review: [],
   reviewDiff: null,
 
@@ -673,6 +678,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   },
 
   setReviewAtEnd: (on) => set({ reviewAtEnd: on }),
+  setRunCommands: (on) => set({ runCommands: on }),
 
   noteAgentWrite: (path, before, after) => {
     const review = get().review;

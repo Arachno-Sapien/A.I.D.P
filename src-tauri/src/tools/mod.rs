@@ -35,6 +35,16 @@ pub enum ToolAction {
     Invalid { name: String },
 }
 
+/// What the user chose for one agent task in the workspace.
+#[derive(Serialize, Deserialize, Type, Clone, Copy, Debug, Default, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentOptions {
+    /// Edits are written as the agent works and reviewed at the end (decision 0028).
+    pub review_at_end: bool,
+    /// Commands run without asking for this task (decision 0030).
+    pub run_commands: bool,
+}
+
 #[derive(Serialize, Deserialize, Type, Clone, Debug, PartialEq)]
 #[serde(tag = "status", rename_all = "camelCase")]
 pub enum ToolOutcome {

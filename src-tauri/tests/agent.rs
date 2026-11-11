@@ -143,6 +143,7 @@ async fn outside_path_is_refused_and_never_sent() {
         local: Default::default(),
         text_limit: aidp_lib::tools::READ_LIMIT,
         review_at_end: false,
+        run_commands: false,
         mcp: None,
     })
     .await;
@@ -233,6 +234,7 @@ async fn denied_command_never_runs() {
         local: Default::default(),
         text_limit: aidp_lib::tools::READ_LIMIT,
         review_at_end: false,
+        run_commands: false,
         mcp: None,
         })
         .await
@@ -319,6 +321,7 @@ async fn approved_command_runs() {
         local: Default::default(),
         text_limit: aidp_lib::tools::READ_LIMIT,
         review_at_end: false,
+        run_commands: false,
         mcp: None,
         })
         .await
@@ -360,6 +363,61 @@ async fn approved_command_runs() {
 }
 
 #[tokio::test]
+async fn run_commands_without_asking_skips_the_card() {
+    let server = MockServer::start().await;
+    let temp_dir = TempDir::new();
+    let root = temp_dir.path();
+
+    let resp1 = sse_tool_calls(&[("call_1", "run_command", json!({"command": "echo hi"}))]);
+    let resp2 = sse_text("done");
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(QueueResponder::new(vec![resp1, resp2]))
+        .mount(&server)
+        .await;
+
+    let p = make_provider(&server);
+    let (channel, events) = capture();
+    let approvals = Approvals::new();
+    // Nobody answers: the run must finish on its own.
+    let res = tokio::time::timeout(
+        Duration::from_secs(30),
+        run(AgentRun {
+            provider: &p,
+            model: "test-model".into(),
+            messages: vec![ChatMessage {
+                role: Role::User,
+                content: "Run echo".into(),
+            }],
+            root: root.to_path_buf(),
+            approvals: &approvals,
+            out: channel,
+            cancel: CancellationToken::new(),
+            command_timeout: Duration::from_secs(5),
+            local: Default::default(),
+            text_limit: aidp_lib::tools::READ_LIMIT,
+            review_at_end: false,
+            run_commands: true,
+            mcp: None,
+        }),
+    )
+    .await
+    .expect("the run waited for an answer");
+    assert!(res.is_ok());
+
+    let evs = events.lock().unwrap().clone();
+    assert!(evs.iter().any(|e| matches!(
+        e,
+        ChatEvent::ToolCall { action: ToolAction::RunCommand { .. }, needs_answer: false, .. }
+    )));
+    assert!(evs.iter().any(|e| matches!(
+        e,
+        ChatEvent::ToolResult { outcome: ToolOutcome::Command { exit_code: Some(0), output, .. }, .. }
+            if output.contains("hi")
+    )));
+}
+
+#[tokio::test]
 async fn secret_file_is_never_sent() {
     let server = MockServer::start().await;
     let temp_dir = TempDir::new();
@@ -398,6 +456,7 @@ async fn secret_file_is_never_sent() {
         local: Default::default(),
         text_limit: aidp_lib::tools::READ_LIMIT,
         review_at_end: false,
+        run_commands: false,
         mcp: None,
     })
     .await;
@@ -461,6 +520,7 @@ async fn instructions_in_files_never_skip_approval() {
         local: Default::default(),
         text_limit: aidp_lib::tools::READ_LIMIT,
         review_at_end: false,
+        run_commands: false,
         mcp: None,
         })
         .await
@@ -539,6 +599,7 @@ async fn edit_waits_for_accept() {
         local: Default::default(),
         text_limit: aidp_lib::tools::READ_LIMIT,
         review_at_end: false,
+        run_commands: false,
         mcp: None,
         })
         .await
@@ -618,6 +679,7 @@ async fn edit_waits_for_accept() {
         local: Default::default(),
         text_limit: aidp_lib::tools::READ_LIMIT,
         review_at_end: false,
+        run_commands: false,
         mcp: None,
         })
         .await
@@ -697,6 +759,7 @@ async fn stop_while_waiting() {
         local: Default::default(),
         text_limit: aidp_lib::tools::READ_LIMIT,
         review_at_end: false,
+        run_commands: false,
         mcp: None,
         })
         .await
@@ -773,6 +836,7 @@ async fn every_call_gets_one_result() {
         local: Default::default(),
         text_limit: aidp_lib::tools::READ_LIMIT,
         review_at_end: false,
+        run_commands: false,
         mcp: None,
     })
     .await;
@@ -846,6 +910,7 @@ async fn step_limit() {
         local: Default::default(),
         text_limit: aidp_lib::tools::READ_LIMIT,
         review_at_end: false,
+        run_commands: false,
         mcp: None,
     })
     .await;
@@ -909,6 +974,7 @@ async fn small_context_cuts_reads() {
         local: Default::default(),
         text_limit: 1000,
         review_at_end: false,
+        run_commands: false,
         mcp: None,
     })
     .await;
@@ -976,6 +1042,7 @@ async fn mcp_call_waits_for_approval_and_returns_text() {
             local: Default::default(),
             text_limit: aidp_lib::tools::READ_LIMIT,
             review_at_end: false,
+        run_commands: false,
             mcp: Some(McpAccess {
                 hub: &hub_clone,
                 servers: vec![fake_config("", true)],
@@ -1108,6 +1175,7 @@ async fn run_without_asking_server_skips_the_card() {
             local: Default::default(),
             text_limit: aidp_lib::tools::READ_LIMIT,
             review_at_end: false,
+        run_commands: false,
             mcp: Some(McpAccess {
                 hub: &hub,
                 servers: vec![ServerConfig {
@@ -1182,6 +1250,7 @@ async fn declined_mcp_call_is_not_sent() {
             local: Default::default(),
             text_limit: aidp_lib::tools::READ_LIMIT,
             review_at_end: false,
+        run_commands: false,
             mcp: Some(McpAccess {
                 hub: &hub_clone,
                 servers: vec![fake_config("", true)],
@@ -1264,6 +1333,7 @@ async fn stop_during_mcp_call() {
             local: Default::default(),
             text_limit: aidp_lib::tools::READ_LIMIT,
             review_at_end: false,
+        run_commands: false,
             mcp: Some(McpAccess {
                 hub: &hub_clone,
                 servers: vec![fake_config("", true)],
@@ -1347,6 +1417,7 @@ async fn unknown_mcp_tool_is_never_put_to_the_user() {
         local: Default::default(),
         text_limit: aidp_lib::tools::READ_LIMIT,
         review_at_end: false,
+        run_commands: false,
         mcp: Some(McpAccess {
             hub: &hub,
             servers: vec![fake_config("", true)],
@@ -1406,6 +1477,7 @@ async fn mcp_names_without_access_are_unknown() {
         local: Default::default(),
         text_limit: aidp_lib::tools::READ_LIMIT,
         review_at_end: false,
+        run_commands: false,
         mcp: None,
     })
     .await;
@@ -1470,6 +1542,7 @@ async fn start_failure_shows_and_run_continues() {
         local: Default::default(),
         text_limit: aidp_lib::tools::READ_LIMIT,
         review_at_end: false,
+        run_commands: false,
         mcp: Some(McpAccess {
             hub: &hub,
             servers: vec![bad],
@@ -1538,6 +1611,7 @@ async fn disabled_server_is_not_started() {
         local: Default::default(),
         text_limit: aidp_lib::tools::READ_LIMIT,
         review_at_end: false,
+        run_commands: false,
         mcp: Some(McpAccess {
             hub: &hub,
             servers: vec![fake_config("", false)],
@@ -1598,6 +1672,7 @@ async fn mcp_result_is_cut() {
             local: Default::default(),
             text_limit: 50,
             review_at_end: false,
+        run_commands: false,
             mcp: Some(McpAccess {
                 hub: &hub_clone,
                 servers: vec![fake_config("", true)],
@@ -1683,6 +1758,7 @@ async fn review_at_end_writes_edits_without_asking() {
         local: Default::default(),
         text_limit: aidp_lib::tools::READ_LIMIT,
         review_at_end: true,
+        run_commands: false,
         mcp: None,
     })
     .await;
@@ -1751,6 +1827,7 @@ async fn review_at_end_still_asks_for_commands() {
             local: Default::default(),
             text_limit: aidp_lib::tools::READ_LIMIT,
             review_at_end: true,
+            run_commands: false,
             mcp: None,
         })
         .await

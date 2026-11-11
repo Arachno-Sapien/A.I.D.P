@@ -18,6 +18,7 @@ import {
 import { ReviewCard } from "./ReviewCard";
 import { useWorkspaceStore } from "./store";
 import { ToolStepView } from "./ToolStepView";
+import { ConfirmDialog } from "./ConfirmDialog";
 
 export interface AiPanelProps {
   onApply?: (code: string, language: string, message: UiMessage) => void;
@@ -31,18 +32,20 @@ export function textBudget(contextTokens?: number | null): number {
 }
 
 export function AiPanel({ onApply }: AiPanelProps) {
-  const { tabs, active, selection, reviewAtEnd, noGit } = useWorkspaceStore(
+  const { tabs, active, selection, reviewAtEnd, runCommands, noGit } = useWorkspaceStore(
     useShallow((s) => ({
       tabs: s.tabs,
       active: s.active,
       selection: s.selection,
       reviewAtEnd: s.reviewAtEnd,
+      runCommands: s.runCommands,
       // Asked once per folder, like the first accepted edit (workspace rule 7).
       noGit: Boolean(s.info && !s.info.isGit && !s.gitWarned),
     })),
   );
-  const { propose, setReviewAtEnd } = useWorkspaceStore.getState();
+  const { propose, setReviewAtEnd, setRunCommands } = useWorkspaceStore.getState();
   const [confirmNoGit, setConfirmNoGit] = useState(false);
+  const [confirmRunCommands, setConfirmRunCommands] = useState(false);
   const {
     messages,
     streaming,
@@ -188,9 +191,12 @@ export function AiPanel({ onApply }: AiPanelProps) {
       target,
       agent: isAgent ? true : undefined,
       reviewAtEnd: isAgent && reviewAtEnd ? true : undefined,
+      runCommands: isAgent && runCommands ? true : undefined,
     };
 
     await send(question, selected, extra);
+    // Lasts one task: the next one asks for its commands again.
+    if (extra.runCommands) setRunCommands(false);
   };
 
   // Stable across renders, so MessageList's memoized rows don't all render
@@ -254,6 +260,39 @@ export function AiPanel({ onApply }: AiPanelProps) {
               />
               <span className="font-medium">Review at end</span>
             </label>
+          )}
+
+          {isAgent && (
+            <label
+              className="flex items-center gap-1.5 text-xs select-none shrink-0 whitespace-nowrap text-neutral-300 cursor-pointer"
+              title="For the next task, commands the agent asks for run without the Run button. Each still shows on a card."
+            >
+              <input
+                type="checkbox"
+                aria-label="Run commands without asking"
+                checked={runCommands}
+                disabled={streaming}
+                onChange={(e) => {
+                  if (e.target.checked) setConfirmRunCommands(true);
+                  else setRunCommands(false);
+                }}
+                className="rounded bg-neutral-800 border-neutral-700 text-neutral-100 focus:ring-0 focus:ring-offset-0 cursor-pointer disabled:cursor-not-allowed"
+              />
+              <span className="font-medium">Run commands without asking</span>
+            </label>
+          )}
+
+          {confirmRunCommands && (
+            <ConfirmDialog
+              title="Run commands without asking?"
+              message="For the next task, commands the agent asks for run straight away, as you, inside this folder. A file or page the agent reads could steer it into a harmful command. Each one still shows on a card, and Stop ends it."
+              confirmLabel="Run without asking"
+              onConfirm={() => {
+                setConfirmRunCommands(false);
+                setRunCommands(true);
+              }}
+              onCancel={() => setConfirmRunCommands(false)}
+            />
           )}
 
           {confirmNoGit && (

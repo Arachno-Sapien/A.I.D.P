@@ -33,11 +33,18 @@ pub struct AgentRun<'a> {
     /// Edits and new files are written without asking; the UI shows them all for
     /// review when the run ends (decision 0028). Commands and outside tools still ask.
     pub review_at_end: bool,
+    /// The user let this task's commands run without asking (decision 0030).
+    pub run_commands: bool,
     pub mcp: Option<McpAccess<'a>>,
 }
 
-/// The user's answer to an edit or new file; with no receiver (review at the end)
-/// it is written unless the user already pressed Stop.
+/// Whether a command the model asked for waits for the user's answer.
+fn command_asks(run_commands: bool, _command: &str) -> bool {
+    !run_commands
+}
+
+/// The user's answer to a step; with no receiver (review at the end, a server or
+/// commands set to run without asking) it goes ahead unless the user pressed Stop.
 async fn edit_answer(
     approvals: &Approvals,
     id: u32,
@@ -636,7 +643,7 @@ pub async fn run_with_images(
                     }
                 }
                 run::ToolInput::RunCommand { command } => {
-                    let rx = args.approvals.register(id);
+                    let rx = command_asks(args.run_commands, &command).then(|| args.approvals.register(id));
                     let folder = display_path(&args.root);
                     args.out
                         .send(ChatEvent::ToolCall {
@@ -645,11 +652,11 @@ pub async fn run_with_images(
                                 command: command.clone(),
                                 folder,
                             },
-                            needs_answer: true,
+                            needs_answer: rx.is_some(),
                         })
                         .map_err(|_| ProviderError::Cancelled)?;
 
-                    let ans = args.approvals.wait(id, rx, &args.cancel).await;
+                    let ans = edit_answer(args.approvals, id, rx, &args.cancel).await;
                     match ans {
                         Answer::Yes => {
                             let cmd_res = command::run_command(

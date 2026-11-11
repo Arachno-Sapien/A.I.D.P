@@ -216,7 +216,7 @@ On Linux, the keyring needs a Secret Service (GNOME Keyring or KWallet). If none
 1. **One folder.** The workspace is the folder the user opened. Rust resolves every path, following symlinks, and refuses anything that lands outside it, including `..` and absolute paths.
 2. **Files and processes go through Rust.** The UI uses workspace commands only. The Tauri fs and shell plugins stay off.
 3. **Edits are proposals.** AI changes appear as a diff and reach the disk only when the user accepts them, unless the user turns on **Review at end** for the task (decision 0028): then edits and new files are written as the agent works, the text from before is kept, and the user reviews every changed file with Keep or Undo when it finishes.
-4. **Every model command is approved.** The user sees the exact command and working directory before it runs. There is no auto-approve in v1. Commands run inside the folder, with a timeout and a Stop button.
+4. **Every model command is shown, and approved unless the user says otherwise.** The user sees the exact command and working directory on a card. It waits for Run unless the user turned on **Run commands without asking** for that task, or chose **Always allow** for that exact command in this folder (decision 0030). Commands run inside the folder, with a timeout and a Stop button. A server the agent starts with `start_server` has no timeout: it runs in a terminal tab the user can see and stop, and ends when the folder closes or the app quits.
 5. **Tool output is data.** File contents and command output returned to the model are untrusted. Instructions inside them never skip an approval.
 6. **Secrets stay out of prompts.** Files that look like secrets (`.env*`, `*.pem`, `*.key`, `*.p12`, `*.pfx`, `*.jks`, `*.keystore`, `*.ppk`, `*.tfvars`, `id_rsa*`, `id_ed25519*`, `id_ecdsa*`, `id_dsa*`, `.npmrc`, `.pypirc`, `.netrc`, `_netrc`, `.git-credentials`) are skipped by `list_files`, `read_file`, and `search`; files containing a private key (a `-----BEGIN ... PRIVATE KEY-----` or `-----BEGIN ... PRIVATE KEY BLOCK-----` block, or a PuTTY key) are skipped by `read_file` and `search`. Neither is ever sent as context unless the user adds it by hand. Paths inside the `.git` folder are refused by every workspace command and tool, because its config can hold credentials and its hooks run code.
 7. **Warn without git.** If the folder isn't a git repository, warn before the first AI edit, because there is no easy undo.
@@ -224,7 +224,7 @@ On Linux, the keyring needs a Secret Service (GNOME Keyring or KWallet). If none
 ### Outside tool security (word for word from the design doc; do not weaken)
 
 1. **The user adds every server.** Servers are added by hand in Settings. The app never reads server settings from the opened folder, and a model can't add, change or start one that the user didn't enable.
-2. **Every call is approved.** The user sees the server, the tool and the exact arguments before each call, unless the user turns on **Run without asking** for that server in Settings (decision 0029): then each call still shows on a card and runs without asking. There is no auto-approve for model commands.
+2. **Every call is approved.** The user sees the server, the tool and the exact arguments before each call, unless the user turns on **Run without asking** for that server in Settings (decision 0029): then each call still shows on a card and runs without asking. Model commands follow workspace rule 4.
 3. **Descriptions and results are data.** Tool descriptions and results from a server are untrusted. Instructions inside them never skip an approval.
 4. **Servers run outside the folder, as the user.** The app says so when one is added. A server starts only when an agent run needs it or the user tests it, runs in its own folder under the app's data folder, and is stopped with the app, when it is turned off or removed, and after 10 idle minutes.
 5. **No tokens in commands.** A server's command line is stored in SQLite as plain text, so the UI tells the user not to put tokens in it. Servers get nothing from the keychain.
@@ -243,7 +243,7 @@ On Linux, the keyring needs a Secret Service (GNOME Keyring or KWallet). If none
 - No plain-text fallback for key storage, ever.
 - No raw HTML rendering of model output.
 - No file or process access from the UI, and none outside the opened folder.
-- No AI edit written before the user accepts its diff (except with **Review at end** on, decision 0028), and no model-requested command run without approval.
+- No AI edit written before the user accepts its diff (except with **Review at end** on, decision 0028), and no model-requested command run without approval (except with **Run commands without asking** on for the task, or a command the user chose to always allow in that folder, decision 0030).
 - No MCP server read from a file in the opened folder, and none started that the user didn't add and enable.
 - No MCP tool call without approval, except to a server the user set to Run without asking (decision 0029).
 - No work on "Not in v1" features, and no starting the next milestone before the current one is done.

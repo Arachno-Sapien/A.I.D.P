@@ -95,7 +95,7 @@ pub async fn run_agent(
     connection_id: u32,
     model_id: String,
     messages: Vec<ChatInput>,
-    review_at_end: bool,
+    options: crate::tools::AgentOptions,
     on_event: Channel<ChatEvent>,
 ) -> Result<(), AppError> {
     let root = match workspace.root() {
@@ -129,7 +129,8 @@ pub async fn run_agent(
         command_timeout: crate::tools::COMMAND_TIMEOUT,
         local,
         text_limit,
-        review_at_end,
+        review_at_end: options.review_at_end,
+        run_commands: options.run_commands,
         mcp: Some(crate::tools::agent::McpAccess {
             hub: &hub,
             servers,

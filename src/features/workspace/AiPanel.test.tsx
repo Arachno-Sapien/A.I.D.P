@@ -473,6 +473,7 @@ describe("AiPanel review at the end", () => {
       info: { name: "p", path: "/p", isGit: true },
       gitWarned: false,
       reviewAtEnd: false,
+      runCommands: false,
       review: [],
       tabs: [],
       active: null,
@@ -490,7 +491,36 @@ describe("AiPanel review at the end", () => {
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "Build it" } });
     fireEvent.click(screen.getByRole("button", { name: /send/i }));
     await vi.waitFor(() => expect(commands.runAgent).toHaveBeenCalled());
-    expect(vi.mocked(commands.runAgent).mock.calls[0][3]).toBe(true);
+    expect(vi.mocked(commands.runAgent).mock.calls[0][3]).toEqual({
+      reviewAtEnd: true,
+      runCommands: false,
+    });
+  });
+
+  it("Run commands without asking asks first and lasts one task", async () => {
+    render(<AiPanel />);
+    const box = () =>
+      screen.getByRole("checkbox", { name: "Run commands without asking" }) as HTMLInputElement;
+    expect(box().checked).toBe(false);
+
+    fireEvent.click(box());
+    expect(screen.getByRole("dialog", { name: "Run commands without asking?" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(box().checked).toBe(false);
+
+    fireEvent.click(box());
+    fireEvent.click(screen.getByRole("button", { name: "Run without asking" }));
+    expect(box().checked).toBe(true);
+
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "Test it" } });
+    fireEvent.click(screen.getByRole("button", { name: /send/i }));
+    await vi.waitFor(() => expect(commands.runAgent).toHaveBeenCalled());
+    expect(vi.mocked(commands.runAgent).mock.calls[0][3]).toEqual({
+      reviewAtEnd: false,
+      runCommands: true,
+    });
+    // The run has ended (the mock resolved): the next task asks again.
+    await vi.waitFor(() => expect(box().checked).toBe(false));
   });
 
   it("asks first in a folder without git", () => {
