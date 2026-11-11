@@ -35,12 +35,19 @@ pub struct AgentRun<'a> {
     pub review_at_end: bool,
     /// The user let this task's commands run without asking (decision 0030).
     pub run_commands: bool,
+    /// Whether the user chose to always allow this exact command in this folder
+    /// (decision 0030). Asked per call, so it applies within the same task.
+    pub command_allowed: &'a (dyn Fn(&str) -> bool + Send + Sync),
     pub mcp: Option<McpAccess<'a>>,
 }
 
 /// Whether a command the model asked for waits for the user's answer.
-fn command_asks(run_commands: bool, _command: &str) -> bool {
-    !run_commands
+fn command_asks(
+    run_commands: bool,
+    allowed: &(dyn Fn(&str) -> bool + Send + Sync),
+    command: &str,
+) -> bool {
+    !(run_commands || allowed(command))
 }
 
 /// The user's answer to a step; with no receiver (review at the end, a server or
@@ -643,7 +650,7 @@ pub async fn run_with_images(
                     }
                 }
                 run::ToolInput::RunCommand { command } => {
-                    let rx = command_asks(args.run_commands, &command).then(|| args.approvals.register(id));
+                    let rx = command_asks(args.run_commands, args.command_allowed, &command).then(|| args.approvals.register(id));
                     let folder = display_path(&args.root);
                     args.out
                         .send(ChatEvent::ToolCall {

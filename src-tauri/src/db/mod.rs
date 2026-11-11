@@ -1,4 +1,5 @@
 pub mod connections;
+pub mod commands;
 pub mod conversations;
 pub mod mcp;
 pub mod settings;
@@ -75,6 +76,13 @@ CREATE TABLE mcp_servers (
     r#"
 ALTER TABLE mcp_servers ADD COLUMN auto_approve INTEGER NOT NULL DEFAULT 0;
 "#,
+    r#"
+CREATE TABLE allowed_commands (
+  folder TEXT NOT NULL,
+  command TEXT NOT NULL,
+  PRIMARY KEY (folder, command)
+);
+"#,
 ];
 
 pub fn open(path: &Path) -> rusqlite::Result<Connection> {
@@ -117,13 +125,13 @@ mod tests {
         let version: i32 = conn
             .query_row("PRAGMA user_version;", [], |row| row.get(0))
             .unwrap();
-        assert_eq!(version, 8);
+        assert_eq!(version, 9);
 
         migrate(&mut conn).unwrap();
         let version_after: i32 = conn
             .query_row("PRAGMA user_version;", [], |row| row.get(0))
             .unwrap();
-        assert_eq!(version_after, 8);
+        assert_eq!(version_after, 9);
     }
 
     #[test]

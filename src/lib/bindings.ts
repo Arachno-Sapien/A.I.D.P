@@ -31,6 +31,10 @@ export const commands = {
 	deleteEntry: (path: string) => typedError<null, WorkspaceError>(__TAURI_INVOKE("delete_entry", { path })),
 	runAgent: (connectionId: number, modelId: string, messages: ChatInput_Deserialize[], options: AgentOptions, onEvent: Channel<ChatEvent_Deserialize>) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("run_agent", { connectionId, modelId, messages, options, onEvent })),
 	answerTool: (id: number, approve: boolean) => __TAURI_INVOKE<boolean>("answer_tool", { id, approve }),
+	/**  Always allow this exact command in the open folder (decision 0030). */
+	allowCommand: (command: string) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("allow_command", { command })),
+	listAllowedCommands: () => typedError<AllowedCommand[], AppError_Serialize>(__TAURI_INVOKE("list_allowed_commands")),
+	removeAllowedCommand: (folder: string, command: string) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("remove_allowed_command", { folder, command })),
 	terminalOpen: (cols: number, rows: number, onEvent: Channel<TerminalEvent>) => typedError<null, WorkspaceError>(__TAURI_INVOKE("terminal_open", { cols, rows, onEvent })),
 	terminalWrite: (data: string) => typedError<null, WorkspaceError>(__TAURI_INVOKE("terminal_write", { data })),
 	terminalResize: (cols: number, rows: number) => typedError<null, WorkspaceError>(__TAURI_INVOKE("terminal_resize", { cols, rows })),
@@ -100,6 +104,11 @@ export type AgentOptions = {
 	reviewAtEnd: boolean,
 	/**  Commands run without asking for this task (decision 0030). */
 	runCommands: boolean,
+};
+
+export type AllowedCommand = {
+	folder: string,
+	command: string,
 };
 
 export type AppError = AppError_Serialize | AppError_Deserialize;

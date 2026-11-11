@@ -5,11 +5,39 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { ToolStepView } from "./ToolStepView";
 import type { ToolStep } from "../chat/store";
 
+vi.mock("../../lib/bindings", () => ({
+  commands: { allowCommand: vi.fn().mockResolvedValue({ status: "ok", data: null }) },
+}));
+import { commands } from "../../lib/bindings";
+
 afterEach(() => {
   cleanup();
 });
 
 describe("ToolStepView", () => {
+  it("Always allow remembers the command, then runs it", async () => {
+    const onAnswer = vi.fn();
+    const step: ToolStep = {
+      id: 9,
+      action: { tool: "runCommand", command: "npm test", folder: "C:\p" },
+      needsAnswer: true,
+    };
+    render(<ToolStepView step={step} onAnswer={onAnswer} />);
+    fireEvent.click(screen.getByRole("button", { name: "Always allow" }));
+    await vi.waitFor(() => expect(onAnswer).toHaveBeenCalledWith(9, true));
+    expect(commands.allowCommand).toHaveBeenCalledWith("npm test");
+  });
+
+  it("an outside tool card has no Always allow", () => {
+    const step: ToolStep = {
+      id: 10,
+      action: { tool: "mcpTool", server: "browser", name: "browser_click", arguments: "{}" },
+      needsAnswer: true,
+    };
+    render(<ToolStepView step={step} onAnswer={vi.fn()} />);
+    expect(screen.queryByRole("button", { name: "Always allow" })).toBeNull();
+  });
+
   it("run card shows the exact command", () => {
     const onAnswer = vi.fn();
     const step: ToolStep = {

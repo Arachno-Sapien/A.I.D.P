@@ -14,6 +14,7 @@ vi.mock("../../lib/bindings", () => ({
     setDefaultModel: vi.fn().mockResolvedValue({ status: "ok", data: null }),
     setCheckUpdates: vi.fn().mockResolvedValue({ status: "ok", data: null }),
     listMcpServers: vi.fn().mockResolvedValue({ status: "ok", data: [] }),
+    listAllowedCommands: vi.fn().mockResolvedValue({ status: "ok", data: [] }),
     appVersion: vi.fn().mockResolvedValue("0.1.0"),
     checkUpdate: vi.fn(),
     listConnections: vi.fn().mockResolvedValue({ status: "ok", data: [] }),

@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { parseModelKey, useModelsStore } from "../models/store";
 import { useSettingsStore } from "./store";
+import { AllowedCommands } from "./AllowedCommands";
 import { OutsideTools } from "./OutsideTools";
 import { THEMES } from "./themes";
 import { useUpdatesStore } from "./updates";
@@ -279,6 +280,8 @@ export function SettingsScreen() {
 
         {/* Section 5: Outside tools (MCP) */}
         <OutsideTools />
+
+        <AllowedCommands />
       </div>
     </div>
   );

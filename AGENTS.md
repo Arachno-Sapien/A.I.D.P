@@ -136,7 +136,7 @@ pub trait ModelProvider: Send + Sync {
 - **Each message stores its own `model_ref`,** so switching models mid-chat keeps a correct record.
 - **Schema changes go through numbered migrations** from day one.
 
-Workspace scope, Ollama endpoints, data model (6 tables), and UI flows: see the design doc sections "Coding workspace", "Workspace and tool security", "Outside tool security", "Local models (Ollama)", "Data model", "Screens and user flows".
+Workspace scope, Ollama endpoints, data model (7 tables), and UI flows: see the design doc sections "Coding workspace", "Workspace and tool security", "Outside tool security", "Local models (Ollama)", "Data model", "Screens and user flows".
 
 ---
 

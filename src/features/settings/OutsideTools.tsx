@@ -153,7 +153,8 @@ export function OutsideTools() {
         <p className="text-xs text-neutral-400 mt-0.5">
           Programs that give the agent more tools, for example a browser. They
           run on your computer with your access, outside the opened folder, so
-          add only ones you trust. The agent asks before every call.
+          add only ones you trust. The agent asks before every call unless you set
+          that server to run without asking.
         </p>
       </div>
 

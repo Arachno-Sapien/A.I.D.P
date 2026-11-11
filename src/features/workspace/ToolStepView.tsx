@@ -1,4 +1,4 @@
-import type { ToolAction } from "../../lib/bindings";
+import { commands, type ToolAction } from "../../lib/bindings";
 import type { ToolStep } from "../chat/store";
 import { useWorkspaceStore } from "./store";
 
@@ -86,6 +86,19 @@ export function ToolStepView({ step, onAnswer }: ToolStepViewProps) {
               >
                 Deny
               </button>
+              {step.action.tool === "runCommand" && (
+                <button
+                  type="button"
+                  title="Run it now and from now on in this folder without asking (Settings lists these)"
+                  onClick={() => {
+                    const command = step.action.tool === "runCommand" ? step.action.command : "";
+                    void commands.allowCommand(command).then(() => onAnswer?.(step.id, true));
+                  }}
+                  className="px-2.5 py-1 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs font-semibold rounded transition-colors cursor-pointer focus-visible:ring-1 focus-visible:ring-neutral-400 focus-visible:outline-none"
+                >
+                  Always allow
+                </button>
+              )}
             </div>
           )}
         </div>

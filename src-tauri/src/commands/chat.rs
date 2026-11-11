@@ -117,6 +117,10 @@ pub async fn run_agent(
     let context = services.context_tokens(connection_id, &model_id);
     let text_limit = crate::tools::text_budget(context);
     let cancel = chat.begin(ChatSurface::Workspace);
+    let folder = crate::workspace::display_path(&root);
+    // A storage error counts as not allowed: the command then asks.
+    let command_allowed =
+        |command: &str| services.is_command_allowed(&folder, command).unwrap_or(false);
 
     let result = crate::tools::agent::run_with_images(crate::tools::agent::AgentRun {
         provider: provider.as_ref(),
@@ -131,6 +135,7 @@ pub async fn run_agent(
         text_limit,
         review_at_end: options.review_at_end,
         run_commands: options.run_commands,
+        command_allowed: &command_allowed,
         mcp: Some(crate::tools::agent::McpAccess {
             hub: &hub,
             servers,

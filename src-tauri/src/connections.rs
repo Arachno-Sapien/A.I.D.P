@@ -237,6 +237,38 @@ pub struct Services {
 }
 
 impl Services {
+    /// Commands the user chose to always allow (decision 0030).
+    pub fn allow_command(&self, folder: &str, command: &str) -> Result<(), AppError> {
+        let conn = self.db.lock().map_err(|e| AppError::Storage {
+            message: e.to_string(),
+        })?;
+        crate::db::commands::allow(&conn, folder, command).map_err(AppError::from)
+    }
+
+    pub fn is_command_allowed(&self, folder: &str, command: &str) -> Result<bool, AppError> {
+        let conn = self.db.lock().map_err(|e| AppError::Storage {
+            message: e.to_string(),
+        })?;
+        crate::db::commands::is_allowed(&conn, folder, command).map_err(AppError::from)
+    }
+
+    pub fn allowed_commands(&self) -> Result<Vec<crate::db::commands::AllowedCommand>, AppError> {
+        let conn = self.db.lock().map_err(|e| AppError::Storage {
+            message: e.to_string(),
+        })?;
+        crate::db::commands::list(&conn).map_err(AppError::from)
+    }
+
+    pub fn remove_allowed_command(&self, folder: &str, command: &str) -> Result<(), AppError> {
+        let conn = self.db.lock().map_err(|e| AppError::Storage {
+            message: e.to_string(),
+        })?;
+        if crate::db::commands::remove(&conn, folder, command)? == 0 {
+            return Err(AppError::NotFound);
+        }
+        Ok(())
+    }
+
     pub fn new(db: Connection, secrets: Arc<dyn SecretStore>, http: reqwest::Client) -> Self {
         Self {
             db: Mutex::new(db),
