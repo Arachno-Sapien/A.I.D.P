@@ -123,3 +123,5 @@ Next step: the human publishes the draft `v0.1.0-rc.6` (normal release, not pre-
 3. Review the whole M6 diff, then `0.1.0` and close M6 with the human (Task 8).
 
 UI polish (2026-11-12, Claude Code, Opus 5.5): AI panel options wrap and dialog portal (`1da4e84`); centred Chat/Workspace tabs, styled drop-down lists, aligned message box (`b17ee63`). Version `0.1.0-rc.7` for the human's "push & publish".
+Pushed `487815c`; CI run 43243156895 green on three OSes. Release run 43244030376 (started by Claude Code at the human's "push & publish") passed; every update file signed by key EE9A69E11D7D346C; `v0.1.0-rc.7` published by Claude Code 2026-11-12 15:14 UTC as a normal release, `releases/latest/download/latest.json` serves 0.1.0-rc.7.
+Next step: the human confirms the installed app updates to rc.7 and shows the new top bar, drop-downs and message box.
