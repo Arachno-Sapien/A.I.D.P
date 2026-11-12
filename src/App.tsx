@@ -98,7 +98,7 @@ function App() {
 
   return (
     <div className="app-shell flex flex-col h-screen bg-neutral-950 text-neutral-100 font-sans">
-      <header className="app-surface flex items-center justify-between px-6 py-2.5 border-b border-neutral-800 bg-neutral-900/50 backdrop-blur select-none">
+      <header className="app-surface grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-6 py-2.5 border-b border-neutral-800 bg-neutral-900/50 backdrop-blur select-none">
         <img
           src={appIcon}
           alt="A.I.D.P"
@@ -107,24 +107,33 @@ function App() {
           className="h-7 w-7"
           draggable={false}
         />
-        <nav className="flex items-center gap-1 bg-neutral-950 p-1 border border-neutral-800 rounded-lg">
-          {SCREENS.map(({ id, label, Icon }) => (
-            <button
-              key={id}
-              type="button"
-              aria-current={screen === id ? "page" : undefined}
-              onClick={() => handleSelectScreen(id)}
-              className={`flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer focus-visible:ring-1 focus-visible:ring-neutral-400 focus-visible:outline-none ${
-                screen === id
-                  ? "app-accent bg-accent/20 text-neutral-50"
-                  : "text-neutral-400 hover:text-neutral-200"
-              }`}
-            >
-              <Icon size={16} aria-hidden="true" />
-              <span>{label}</span>
-            </button>
-          ))}
-        </nav>
+        {/* Chat and Workspace in the middle; Models and Settings on the right. */}
+        {[SCREENS.slice(0, 2), SCREENS.slice(2)].map((group, i) => (
+          <nav
+            key={i}
+            aria-label={i === 0 ? "Screens" : "Setup"}
+            className={`flex items-center gap-1 bg-neutral-950 p-1 border border-neutral-800 rounded-lg ${
+              i === 0 ? "justify-self-center" : "justify-self-end"
+            }`}
+          >
+            {group.map(({ id, label, Icon }) => (
+              <button
+                key={id}
+                type="button"
+                aria-current={screen === id ? "page" : undefined}
+                onClick={() => handleSelectScreen(id)}
+                className={`flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer focus-visible:ring-1 focus-visible:ring-neutral-400 focus-visible:outline-none ${
+                  screen === id
+                    ? "app-accent bg-accent/20 text-neutral-50"
+                    : "text-neutral-400 hover:text-neutral-200"
+                }`}
+              >
+                <Icon size={16} aria-hidden="true" />
+                <span>{label}</span>
+              </button>
+            ))}
+          </nav>
+        ))}
       </header>
       <UpdateBar />
 

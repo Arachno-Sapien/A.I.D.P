@@ -39,6 +39,52 @@ select option:checked {
 }
 
 /*
+ * Where the engine supports it (Chromium 135+, so WebView2 on Windows), the
+ * open list is styled too: rounded, a hairline border, a thin scrollbar.
+ * Elsewhere the system's own list stays.
+ */
+@supports (appearance: base-select) {
+  select,
+  ::picker(select) {
+    appearance: base-select;
+  }
+  ::picker(select) {
+    margin-top: 0.25rem;
+    max-height: 20rem;
+    padding: 0.25rem;
+    border: 1px solid var(--color-neutral-800);
+    border-radius: 0.5rem;
+    background-color: var(--color-popup);
+    box-shadow: 0 10px 25px rgb(0 0 0 / 0.4);
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-neutral-700) transparent;
+  }
+  select::picker-icon {
+    color: var(--color-neutral-500);
+    font-size: 0.75em;
+  }
+  select optgroup {
+    padding-top: 0.25rem;
+    font-weight: 600;
+    color: var(--color-neutral-400);
+  }
+  select option {
+    padding: 0.3rem 0.5rem;
+    border-radius: 0.375rem;
+    font-weight: 400;
+    cursor: pointer;
+  }
+  select option:not(:checked):hover,
+  select option:not(:checked):focus-visible {
+    background-color: var(--color-neutral-800);
+    outline: none;
+  }
+  select option::checkmark {
+    display: none;
+  }
+}
+
+/*
  * Tailwind's reset strips the look of headings, lists and spacing.
  * This gives model replies (src/features/chat/Markdown.tsx) theirs back.
  */
