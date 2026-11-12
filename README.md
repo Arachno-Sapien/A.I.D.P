@@ -24,7 +24,7 @@ Get the installer for your system from the [latest release](https://github.com/A
 - macOS, Apple silicon or Intel: `A.I.D.P_<version>_universal.dmg` (not yet tested on a real Mac)
 - Linux: `A.I.D.P_<version>_amd64.AppImage`, or the `.deb` for Debian and Ubuntu
 
-The installers aren't code-signed yet, so Windows and macOS warn the first time you open the app. The [user guide](docs/user-guide.md#install) shows how to get past that. After that the app updates itself, but only when you click Install.
+The installers aren't code-signed yet (see the [code signing policy](#code-signing-policy)), so Windows and macOS warn the first time you open the app. The [user guide](docs/user-guide.md#install) shows how to get past that. After that the app updates itself, but only when you click Install.
 
 ## What v0.1 does
 
@@ -142,6 +142,20 @@ After v0.1 comes the practice area.
 ## Contributing
 
 It's early and the design is still moving, so please open an issue before starting anything large. The rules in AGENTS.md apply to people too: the four checks pass before a commit, no `unwrap()` outside tests, no new dependency without a reason, and docs change in the same commit as the code they describe.
+
+## Code signing policy
+
+Windows releases are being set up for signing through the SignPath Foundation's free program for open-source projects. Free code signing provided by [SignPath.io](https://about.signpath.io/), certificate by [SignPath Foundation](https://signpath.org/).
+
+**Status:** applied for. Until the project is accepted, the Windows installer is unsigned and Windows warns when you download and open it.
+
+- **What gets signed:** only this project's own files, built from this repository's source by the [Release workflow](.github/workflows/release.yml) on GitHub Actions. Libraries from other projects are never signed under this certificate.
+- **Team:** [Arachno-Sapien](https://github.com/Arachno-Sapien) is the project's author, reviewer and approver. Much of the code is written with AI coding agents (see [Built with AI agents](#built-with-ai-agents)), and the maintainer reviews every change before it is merged and approves every signing request by hand. Contributions from others are reviewed the same way.
+- **Privacy:** This program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it. In practice:
+  - A chat message and its attachments go only to the model provider you chose: a cloud provider, under that provider's own privacy policy, or Ollama on your own computer.
+  - Ten seconds after start the app asks GitHub Releases whether a newer version exists. Nothing about you or your work is sent, and Settings → Updates turns the check off.
+  - An outside tool server you add (such as Browser checks) runs on your computer as you, and may download its package from npm when it starts.
+- **Uninstalling:** Windows Settings → Apps → A.I.D.P → Uninstall; the [user guide](docs/user-guide.md#uninstall) covers macOS, Linux and your data.
 
 ## License
 

@@ -37,6 +37,14 @@ The app checks for a new version 10 seconds after it starts (turn that off under
 - **macOS:** the app is replaced and restarts.
 - **Linux:** an AppImage replaces itself and restarts. With the `.deb`, your system asks for your password to install the new package.
 
+### Uninstall
+
+- **Windows:** Settings → Apps → Installed apps → A.I.D.P → Uninstall. The uninstaller offers to delete the app's data too (chats, settings and attachments in `%APPDATA%\com.aidp.desktop`).
+- **macOS:** drag A.I.D.P from Applications to the Trash. Its data stays in `~/Library/Application Support/com.aidp.desktop` until you delete that folder.
+- **Linux:** delete the `.AppImage`, or remove the A.I.D.P package installed from the `.deb` with your package manager. Its data stays in `~/.local/share/com.aidp.desktop`.
+
+API keys stay in your system's keychain until you delete their connections on the Models screen first, or remove them from the keychain yourself.
+
 ### Build from source
 
 To run the app from source instead, follow the [setup guide](setup.md).

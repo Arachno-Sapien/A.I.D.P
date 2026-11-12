@@ -35,7 +35,7 @@ jobs:
             -f tag_name="$tag" \
             -f target_commitish="$GITHUB_SHA" \
             -f name="A.I.D.P $tag" \
-            -f body="See CHANGELOG.md and the user guide for install steps." \
+            -f body="See CHANGELOG.md and the user guide for install steps. Code signing policy: https://github.com/$GITHUB_REPOSITORY#code-signing-policy" \
             -F draft=true \
             -F prerelease=false \
             -q .id)

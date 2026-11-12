@@ -114,7 +114,9 @@ Reads images for cloud models done 2026-11-11 by Claude Code (Opus 5.5), the fol
 
 M6 code review fixes done 2026-11-12 by Claude Code (Opus 5.5), the human's "Fix all 10, commit, push & release new version": all 10 findings, each with a test seen failing first (details: `log/2026-11-12-m6-review-fixes.md`). Version `0.1.0-rc.6`. Gate green (rust 333, vitest 385). Not yet seen in the app.
 Pushed `59e7e3b` (with the 26 earlier unpushed commits); CI run 43232532733 green on three OSes. Release run 43233417752 (started by Claude Code at the human's request) passed: draft `v0.1.0-rc.6` with all installers (Windows exe 5.7 MB), `latest.json` 0.1.0-rc.6 for all platforms, every update file signed by key EE9A69E11D7D346C. Publishing it from the agent was refused by the permission check, so the draft waits for the human.
-Next step: the human publishes the draft `v0.1.0-rc.6` (normal release, not pre-release); then confirm the installed rc.5 updates to rc.6 and the taskbar shows the A.I.D.P icon without a manual refresh (`installer-hooks.nsh`).
+The human published `v0.1.0-rc.6` at 14:37 UTC on 2026-11-12; rc.7 followed (below). Not yet reported: whether the taskbar showed the A.I.D.P icon after updating without a manual refresh (`installer-hooks.nsh`).
+Windows signing through SignPath Foundation prepared 2026-11-12 by Claude Code (Opus 5.5), the human's "Try SignPath (free)" (decision 0032): README "Code signing policy" (attribution, team, privacy, uninstall), a link on the release page, Uninstall in the user guide. The human applies at signpath.org and turns on two-factor login for GitHub and SignPath (GitHub's API didn't say whether it is on).
+Next step: once SignPath accepts, the Windows job in `.github/workflows/release.yml` signs `aidp.exe` before NSIS packs it, then the installer, and makes the updater `.sig` only after signing (decision 0032).
 
 ## Next 3 tasks
 

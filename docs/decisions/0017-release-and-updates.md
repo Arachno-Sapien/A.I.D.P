@@ -1,7 +1,7 @@
 # Decision Record 0017: How v0.1 is packaged, signed and updated
 
 **Date:** 2026-10-31
-**Status:** Accepted (the human approved the defaults for D1 to D4 of the M6 plan on 2026-10-31)
+**Status:** Accepted (the human approved the defaults for D1 to D4 of the M6 plan on 2026-10-31). Windows signing in D2 is being replaced by decision 0032 (SignPath Foundation).
 
 ---
 
