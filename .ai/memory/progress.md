@@ -121,3 +121,5 @@ Next step: the human publishes the draft `v0.1.0-rc.6` (normal release, not pre-
 1. Task 8 live check: test Outside tools & Browser checks preset (`@playwright/mcp@0.0.85`) in `npm run tauri dev`, and measure Task Manager RAM with a server running (plus RAM with Dark/Glass and `.ts` worker).
 2. The Linux and 8 GB check, and macOS, when the human is ready (deferred by the human on 2026-10-31).
 3. Review the whole M6 diff, then `0.1.0` and close M6 with the human (Task 8).
+
+UI polish (2026-11-12, Claude Code, Opus 5.5): AI panel options wrap and dialog portal (`1da4e84`); centred Chat/Workspace tabs, styled drop-down lists, aligned message box (`b17ee63`). Version `0.1.0-rc.7` for the human's "push & publish".
