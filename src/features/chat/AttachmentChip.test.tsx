@@ -29,6 +29,37 @@ describe("AttachmentChip", () => {
     expect(commands.readAttachment).toHaveBeenCalledWith(png.id);
   });
 
+  it("an image is read once and kept only as a small thumbnail", async () => {
+    // jsdom draws no images, so decoding and the canvas are stand-ins here.
+    const decode = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, "decode");
+    Object.defineProperty(HTMLImageElement.prototype, "decode", {
+      value: () => Promise.resolve(),
+      configurable: true,
+    });
+    const drawImage = vi.fn();
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ drawImage } as never);
+    vi.spyOn(HTMLCanvasElement.prototype, "toDataURL").mockReturnValue("data:image/png;base64,SMALL");
+    try {
+      const shot = { id: "c".repeat(64), name: "shot.png", mime: "image/png", size: 2048, kind: "image" as const, warning: null };
+      const first = render(<AttachmentChip attachment={shot} />);
+      const img = await screen.findByRole("img", { name: "shot.png" });
+      await vi.waitFor(() => expect(img.getAttribute("src")).toBe("data:image/png;base64,SMALL"));
+      first.unmount();
+
+      // Shown again (scrolled back into view): nothing is read twice.
+      render(<AttachmentChip attachment={shot} />);
+      expect(screen.getByRole("img", { name: "shot.png" }).getAttribute("src")).toBe(
+        "data:image/png;base64,SMALL",
+      );
+      expect(commands.readAttachment).toHaveBeenCalledTimes(1);
+      expect(drawImage).toHaveBeenCalled();
+    } finally {
+      vi.restoreAllMocks();
+      if (decode) Object.defineProperty(HTMLImageElement.prototype, "decode", decode);
+      else delete (HTMLImageElement.prototype as { decode?: unknown }).decode;
+    }
+  });
+
   it("a file shows its name and size without being read", () => {
     const notes = { id: "b".repeat(64), name: "notes.md", mime: "text/plain", size: 5, kind: "text" as const, warning: null };
     render(<AttachmentChip attachment={notes} />);

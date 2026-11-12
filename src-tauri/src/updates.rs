@@ -41,6 +41,24 @@ pub fn may_install(guard: &CloseGuard) -> Result<(), AppError> {
     Ok(())
 }
 
+/// Runs `download`, then `install` with its bytes, checking for unsaved files before
+/// each: the editor stays open while the update downloads, and the installer closes
+/// the app, so a file edited meanwhile would be lost.
+pub async fn install_when_saved<D, I>(
+    guard: &CloseGuard,
+    download: D,
+    install: I,
+) -> Result<(), AppError>
+where
+    D: std::future::Future<Output = Result<Vec<u8>, AppError>>,
+    I: FnOnce(Vec<u8>) -> Result<(), AppError>,
+{
+    may_install(guard)?;
+    let bytes = download.await?;
+    may_install(guard)?;
+    install(bytes)
+}
+
 /// Bytes as whole kilobytes for the IPC, which takes no 64-bit integers.
 pub fn kilobytes(bytes: u64) -> u32 {
     u32::try_from(bytes / 1024).unwrap_or(u32::MAX)
@@ -75,6 +93,34 @@ mod tests {
         );
         guard.set_unsaved(false);
         assert_eq!(may_install(&guard), Ok(()));
+    }
+
+    #[tokio::test]
+    async fn edits_made_while_downloading_stop_the_install() {
+        let guard = CloseGuard::default();
+        let installed = std::cell::Cell::new(false);
+        let result = install_when_saved(
+            &guard,
+            async {
+                guard.set_unsaved(true);
+                Ok(vec![1])
+            },
+            |_| {
+                installed.set(true);
+                Ok(())
+            },
+        )
+        .await;
+        assert!(matches!(result, Err(AppError::InvalidInput { .. })), "{result:?}");
+        assert!(!installed.get());
+
+        guard.set_unsaved(false);
+        let result = install_when_saved(&guard, async { Ok(vec![7]) }, |bytes| {
+            assert_eq!(bytes, vec![7]);
+            Ok(())
+        })
+        .await;
+        assert_eq!(result, Ok(()));
     }
 
     #[test]

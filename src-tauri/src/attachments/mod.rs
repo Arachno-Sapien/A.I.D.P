@@ -16,10 +16,13 @@ use std::collections::HashSet;
 use std::fmt::Write as _;
 use std::future::Future;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, SystemTime};
 
 const MB: usize = 1024 * 1024;
-pub const MAX_IMAGE: usize = 5 * MB;
+/// 3.75 MB: images travel as base64, a third larger, and Anthropic refuses more
+/// than 5 MB of base64 (`image exceeds 5 MB maximum`).
+pub const MAX_IMAGE: usize = 5 * MB / 4 * 3;
 pub const MAX_TEXT: usize = 512 * 1024;
 pub const MAX_PDF: usize = 20 * MB;
 /// How long an attachment no message refers to is kept: it may still be waiting in a composer.
@@ -75,7 +78,7 @@ pub fn detect(bytes: &[u8]) -> Option<(AttachmentKind, &'static str)> {
 
 fn limit(kind: AttachmentKind) -> (usize, &'static str) {
     match kind {
-        AttachmentKind::Image => (MAX_IMAGE, "5 MB, the limit for images"),
+        AttachmentKind::Image => (MAX_IMAGE, "3.75 MB, the limit for images"),
         AttachmentKind::Text => (MAX_TEXT, "512 KB, the limit for text files"),
         AttachmentKind::Pdf => (MAX_PDF, "20 MB, the limit for PDFs"),
     }
@@ -109,13 +112,25 @@ fn is_id(id: &str) -> bool {
     id.len() == 64 && id.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
 }
 
+/// A file name beside `path` for something written, then renamed or removed: new on
+/// every call, so two reads of the same attachment never share one, and never an ID.
+pub(crate) fn temp_beside(path: &Path, ext: &str) -> PathBuf {
+    static NEXT: AtomicU64 = AtomicU64::new(0);
+    let mut name = path.as_os_str().to_owned();
+    name.push(format!(
+        ".{}-{}.{ext}",
+        std::process::id(),
+        NEXT.fetch_add(1, Ordering::Relaxed)
+    ));
+    PathBuf::from(name)
+}
+
 /// Writes through a `.part` file, so a crash never leaves half a file under the real name.
 fn write_new(path: &Path, bytes: &[u8]) -> Result<(), AppError> {
     if let Some(dir) = path.parent() {
         std::fs::create_dir_all(dir).map_err(storage)?;
     }
-    let mut part = path.as_os_str().to_owned();
-    part.push(".part");
+    let part = temp_beside(path, "part");
     std::fs::write(&part, bytes).map_err(storage)?;
     std::fs::rename(&part, path).map_err(storage)
 }
@@ -338,14 +353,29 @@ pub async fn add_paths(store: &AttachmentStore, paths: Vec<PathBuf>) -> Attachme
     out
 }
 
-/// After a chat is deleted: removes attachments no message refers to any more.
-pub fn remove_unused(services: &Services, store: &AttachmentStore) -> Result<u32, AppError> {
+/// Removes attachments no message refers to that are older than `grace`. After a chat
+/// is deleted that is `UNUSED_GRACE`, since a file may still wait in a composer; at
+/// start it is everything from before the start, since no composer holds one yet.
+pub fn remove_unused(
+    services: &Services,
+    store: &AttachmentStore,
+    grace: Duration,
+) -> Result<u32, AppError> {
     let ids = store.ids()?;
     if ids.is_empty() {
         return Ok(0);
     }
     let used = services.attachments_in_use(&ids)?;
-    store.remove_unreferenced(&used, UNUSED_GRACE)
+    store.remove_unreferenced(&used, grace)
+}
+
+/// Removes a file taken back out of a composer, unless a saved message refers to it.
+pub fn discard(services: &Services, store: &AttachmentStore, id: &str) -> Result<(), AppError> {
+    store.path(id)?;
+    if services.attachments_in_use(&[id.to_string()])?.is_empty() {
+        store.forget(id);
+    }
+    Ok(())
 }
 
 pub const NO_VISION: &str = "This model can't read images";
@@ -399,21 +429,24 @@ fn cut_to(text: &str, limit: usize) -> (&str, bool) {
 }
 
 /// Turns the UI's messages into what a provider gets. A text file's or a PDF's text
-/// joins its message's text as a fenced block, at most `text_limit` characters per
-/// message; each image becomes an `ImageInput` of that message. `vision` is what the
-/// model is known to support: `Some(false)` refuses any image before a request is made.
+/// joins its message's text as a fenced block, `text_limit` bytes in all for the
+/// request, newest message first; each image becomes an `ImageInput` of that message.
+/// `vision` is what the model is known to support: with `Some(false)` an image in the
+/// newest message is refused before a request is made, and an earlier one becomes a note.
 pub fn resolve(
     store: &AttachmentStore,
     inputs: Vec<ChatInput>,
     text_limit: usize,
     vision: Option<bool>,
 ) -> Result<(Vec<ChatMessage>, Vec<Vec<ImageInput>>), AppError> {
+    let newest = inputs.len().saturating_sub(1);
+    let mut budget = text_limit;
     let mut messages = Vec::with_capacity(inputs.len());
     let mut images = Vec::with_capacity(inputs.len());
-    for input in inputs {
+    // Newest first, so the message being asked about gets the budget before older ones.
+    for (i, input) in inputs.into_iter().enumerate().rev() {
         let mut blocks = Vec::new();
         let mut own_images = Vec::new();
-        let mut budget = text_limit;
         for att in &input.attachments {
             let bytes = match store.read(&att.id) {
                 Ok(bytes) => bytes,
@@ -426,7 +459,12 @@ pub fn resolve(
             let text = match detect(&bytes) {
                 Some((AttachmentKind::Image, mime)) => {
                     if vision == Some(false) {
-                        return Err(refused(NO_VISION.to_string()));
+                        if i == newest {
+                            return Err(refused(NO_VISION.to_string()));
+                        }
+                        // Sent to another model earlier: the chat goes on without it.
+                        blocks.push(format!("[{} not sent: this model can't read images]", att.name));
+                        continue;
                     }
                     own_images.push(ImageInput {
                         mime: mime.to_string(),
@@ -453,6 +491,8 @@ pub fn resolve(
         });
         images.push(own_images);
     }
+    messages.reverse();
+    images.reverse();
     Ok((messages, images))
 }
 
@@ -540,6 +580,24 @@ mod tests {
         assert!(message(store.store("empty.txt", b"").unwrap_err()).contains("empty.txt"));
         assert!(message(store.store("blob.bin", b"\x00\x01").unwrap_err()).contains("blob.bin"));
         assert!(store.ids().unwrap().is_empty());
+    }
+
+    #[test]
+    fn the_largest_image_fits_anthropics_limit_once_in_base64() {
+        // Anthropic counts its 5 MB on the base64 text, a third larger than the bytes.
+        assert!(BASE64.encode(vec![0u8; MAX_IMAGE]).len() <= 5 * MB);
+    }
+
+    #[test]
+    fn temporary_names_never_repeat_and_are_never_ids() {
+        let store = temp_store();
+        let path = store.path(&"a".repeat(64)).unwrap();
+        let (one, two) = (temp_beside(&path, "out"), temp_beside(&path, "out"));
+        assert_ne!(one, two);
+        assert_eq!(one.parent(), path.parent());
+        for name in [&one, &two] {
+            assert!(!is_id(&name.file_name().unwrap().to_string_lossy()));
+        }
     }
 
     #[test]
@@ -725,6 +783,48 @@ mod tests {
         assert_eq!(message(err), "This model can't read images");
         // Unknown means the provider decides.
         assert!(resolve(&store, vec![input("look", vec![reference(&png)])], 10_000, None).is_ok());
+    }
+
+    #[test]
+    fn an_earlier_image_for_a_model_that_cannot_see_becomes_a_note() {
+        let store = temp_store();
+        let png = store.store("p.png", PNG).unwrap();
+        // Switching a chat that already holds an image to such a model must not block it.
+        let (messages, images) = resolve(
+            &store,
+            vec![
+                input("look", vec![reference(&png)]),
+                input("and now?", vec![]),
+            ],
+            10_000,
+            Some(false),
+        )
+        .unwrap();
+        assert!(images.iter().all(Vec::is_empty));
+        assert!(messages[0].content.contains("[p.png not sent: this model can't read images]"));
+        assert_eq!(messages[1].content, "and now?");
+    }
+
+    #[test]
+    fn one_text_budget_for_the_whole_request_newest_first() {
+        let store = temp_store();
+        let old = store.store("old.txt", "o".repeat(800).as_bytes()).unwrap();
+        let new = store.store("new.txt", "n".repeat(800).as_bytes()).unwrap();
+        let (messages, _) = resolve(
+            &store,
+            vec![
+                input("first", vec![reference(&old)]),
+                input("second", vec![reference(&new)]),
+            ],
+            1000,
+            None,
+        )
+        .unwrap();
+        // The newest message keeps its file whole; the older one gets what is left.
+        assert!(messages[1].content.contains(&"n".repeat(800)));
+        assert!(!messages[1].content.contains("[cut:"));
+        assert!(messages[0].content.contains("[cut:"));
+        assert!(!messages[0].content.contains(&"o".repeat(201)));
     }
 
     #[test]

@@ -183,10 +183,11 @@ Milestone 5 introduces local model support via Ollama and persistent chat histor
 ## 12. Attachments (M6, decision 0019)
 
 - **Rust reads every attachment.** The UI never reads a file or sends a path. Rust opens the file dialog and reads files dropped on the window in its own window-event handler. Pasted data arrives as base64 bytes.
-- **Checked by content.** The kind comes from the first bytes (PNG, JPEG, GIF, WebP, PDF, or UTF-8 text without NUL), never from the name. Sizes are capped: images 5 MB, text 512 KB, PDFs 20 MB, a PDF's text 2 MB.
+- **Checked by content.** The kind comes from the first bytes (PNG, JPEG, GIF, WebP, PDF, or UTF-8 text without NUL), never from the name. Sizes are capped: images 3.75 MB (5 MB once in base64), text 512 KB, PDFs 20 MB, a PDF's text 2 MB.
 - **Stored by hash.** Files live in `<app data>/attachments/` under their SHA-256. Every command that takes an ID checks for 64 lowercase hex characters before building a path, so an ID can't climb out of that folder.
 - **PDFs are parsed in a child process.** The parser can panic or hang on a malformed file, and the release build aborts on panic. So the app runs its own executable as `aidp --pdf-text <pdf> <out>`, with no window and nothing inherited, and kills it after 20 seconds. Only that child can die.
 - **Secret-looking files** picked by hand are allowed (rule 6 covers what the user adds by hand) and carry the warning "Looks like a secret file".
+- **No copy outlives its use.** A stored file no saved message mentions is removed when it is taken back out of a composer (`discard_attachment`, unless another composer holds it) or dropped where no chat takes it, an hour after its chat is deleted, and at the next start.
 - **Thumbnails.** An attached image's thumbnail is a `data:` URL built from the bytes `read_attachment` returns, so the CSP allows `img-src 'self' data:`. Remote images stay blocked. Model replies can't use the allowance: react-markdown's URL check drops `data:` sources, which a test in `Markdown.test.tsx` pins.
 - Attachment contents are never logged.
 

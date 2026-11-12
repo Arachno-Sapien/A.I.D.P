@@ -10,6 +10,7 @@ vi.mock("./lib/bindings", () => ({
     recentFolders: vi.fn().mockResolvedValue({ status: "ok", data: [] }),
     watchClose: vi.fn().mockResolvedValue(undefined),
     watchDrops: vi.fn().mockResolvedValue(undefined),
+    discardAttachment: vi.fn().mockResolvedValue({ status: "ok", data: null }),
     quitApp: vi.fn().mockResolvedValue(undefined),
     setUnsaved: vi.fn().mockResolvedValue(undefined),
     listConversations: vi.fn().mockResolvedValue({ status: "ok", data: [] }),
@@ -238,6 +239,8 @@ describe("App", () => {
     await act(async () => drop?.({ added: [{ ...notes, id: "c".repeat(64) }], refused: [] }));
     expect(useChatStore.getState().pending).toHaveLength(1);
     expect(useWorkspaceChatStore.getState().pending).toHaveLength(0);
+    // No chat takes it, so the copy Rust stored is thrown away.
+    expect(commands.discardAttachment).toHaveBeenCalledWith("c".repeat(64));
   });
 
   it("the main surfaces carry the theme hooks", () => {

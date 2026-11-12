@@ -15,18 +15,50 @@ export interface AttachmentChipProps {
   onRemove?: () => void;
 }
 
+/** How wide a kept thumbnail is: the chip shows 32 px, twice that for sharp screens. */
+const THUMB_PX = 64;
+/** Small thumbnails by attachment ID, so a chip shown again reads nothing from Rust. */
+const thumbs = new Map<string, string>();
+
+/** `full` drawn at most THUMB_PX across, or null when it can't be drawn. */
+async function shrink(full: string): Promise<string | null> {
+  try {
+    const img = new Image();
+    img.src = full;
+    await img.decode();
+    const scale = Math.min(1, THUMB_PX / Math.max(img.naturalWidth, img.naturalHeight, 1));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
+    canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL("image/png");
+  } catch {
+    return null;
+  }
+}
+
 /** One attached file: an image's thumbnail, read from Rust, or a file's name and size. */
 export function AttachmentChip({ attachment, onRemove }: AttachmentChipProps) {
-  const [thumb, setThumb] = useState<string | null>(null);
+  const [thumb, setThumb] = useState<string | null>(() => thumbs.get(attachment.id) ?? null);
   const isImage = attachment.kind === "image";
 
   useEffect(() => {
     if (!isImage) return;
+    const kept = thumbs.get(attachment.id);
+    if (kept) {
+      setThumb(kept);
+      return;
+    }
     let cancelled = false;
-    void commands.readAttachment(attachment.id).then((res) => {
-      if (!cancelled && res.status === "ok") {
-        setThumb(`data:${attachment.mime};base64,${res.data}`);
-      }
+    void commands.readAttachment(attachment.id).then(async (res) => {
+      if (res.status !== "ok") return;
+      const full = `data:${attachment.mime};base64,${res.data}`;
+      // Only the small copy is kept; the full image is let go once drawn.
+      const small = await shrink(full);
+      if (small) thumbs.set(attachment.id, small);
+      if (!cancelled) setThumb(small ?? full);
     });
     return () => {
       cancelled = true;

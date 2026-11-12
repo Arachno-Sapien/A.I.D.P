@@ -54,8 +54,13 @@ export const commands = {
 	pickAttachments: () => typedError<Attachments_Serialize, AppError_Serialize>(__TAURI_INVOKE("pick_attachments")),
 	/**  Adds pasted data, sent as base64 so it crosses IPC as one string. */
 	attachBytes: (name: string, dataBase64: string) => typedError<Attachment_Serialize, AppError_Serialize>(__TAURI_INVOKE("attach_bytes", { name, dataBase64 })),
-	/**  An attachment's bytes as base64, for its thumbnail. */
+	/**
+	 *  An attachment's bytes as base64, for its thumbnail. Async, so reading a large
+	 *  image never holds up the window.
+	 */
 	readAttachment: (id: string) => typedError<string, AppError_Serialize>(__TAURI_INVOKE("read_attachment", { id })),
+	/**  Removes a file taken out of a composer, unless a saved message uses it. */
+	discardAttachment: (id: string) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("discard_attachment", { id })),
 	setConversationPinned: (id: number, pinned: boolean) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("set_conversation_pinned", { id, pinned })),
 	setConversationArchived: (id: number, archived: boolean) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("set_conversation_archived", { id, archived })),
 	loadMessages: (conversationId: number) => typedError<StoredMessage_Serialize[], AppError_Serialize>(__TAURI_INVOKE("load_messages", { conversationId })),
@@ -83,8 +88,9 @@ export const commands = {
 	appVersion: () => __TAURI_INVOKE<string>("app_version"),
 	checkUpdate: () => typedError<UpdateInfo_Serialize | null, AppError_Serialize>(__TAURI_INVOKE("check_update")),
 	/**
-	 *  Downloads, verifies against the public key, installs and restarts. On
-	 *  Windows the installer closes the app itself.
+	 *  Downloads, verifies against the public key, installs and restarts, unless a
+	 *  file was left unsaved before or during the download. On Windows the installer
+	 *  closes the app itself.
 	 */
 	installUpdate: (out: Channel<UpdateEvent>) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("install_update", { out })),
 	setUnsaved: (unsaved: boolean) => __TAURI_INVOKE<void>("set_unsaved", { unsaved }),

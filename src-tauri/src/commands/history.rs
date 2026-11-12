@@ -31,7 +31,11 @@ pub fn delete_conversation(
 ) -> Result<(), AppError> {
     services.delete_conversation(id)?;
     // Files no message refers to any more go too; failing that never fails the delete.
-    let _ = crate::attachments::remove_unused(&services, &store);
+    let _ = crate::attachments::remove_unused(
+        &services,
+        &store,
+        crate::attachments::UNUSED_GRACE,
+    );
     Ok(())
 }
 

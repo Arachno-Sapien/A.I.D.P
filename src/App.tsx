@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Channel } from "@tauri-apps/api/core";
 import { Boxes, FolderCode, MessageSquare, Settings } from "lucide-react";
 import { commands, type Attachments_Deserialize } from "./lib/bindings";
-import { useChatStore } from "./features/chat/store";
+import { discardUnlessPending, useChatStore } from "./features/chat/store";
 import { useWorkspaceChatStore } from "./features/workspace/chatStore";
 import { ChatScreen } from "./features/chat/ChatScreen";
 import { ModelsScreen } from "./features/models/ModelsScreen";
@@ -75,7 +75,12 @@ function App() {
           : screenRef.current === "workspace"
             ? useWorkspaceChatStore
             : null;
-      target?.getState().addAttachments(added, refused);
+      if (!target) {
+        // Models or Settings: no chat takes it, so the copy Rust stored goes.
+        for (const a of added) discardUnlessPending(a.id);
+        return;
+      }
+      target.getState().addAttachments(added, refused);
     };
     void commands.watchDrops(drops);
     return () => {

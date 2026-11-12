@@ -435,7 +435,7 @@ async fn reader_loop<R: AsyncRead + Unpin>(reader: R, weak: Weak<Client>) {
 }
 
 /// An image item's bytes, kept only when they are PNG, JPEG, GIF or WebP of at most
-/// 5 MB, as for attachments. The MIME type comes from the bytes, not the server.
+/// `MAX_IMAGE`, as for attachments. The MIME type comes from the bytes, not the server.
 fn checked_image(item: &Value) -> Option<ImageInput> {
     let data = item.get("data")?.as_str()?;
     let bytes = BASE64.decode(data).ok()?;

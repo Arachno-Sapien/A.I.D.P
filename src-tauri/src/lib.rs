@@ -81,6 +81,7 @@ fn specta_builder() -> Builder<tauri::Wry> {
         commands::attachments::pick_attachments,
         commands::attachments::attach_bytes,
         commands::attachments::read_attachment,
+        commands::attachments::discard_attachment,
         commands::history::set_conversation_pinned,
         commands::history::set_conversation_archived,
         commands::history::load_messages,
@@ -141,6 +142,18 @@ pub fn run() -> tauri::Result<()> {
             app.manage(attachments::AttachmentStore::new(
                 app_data_dir.join("attachments"),
             ));
+            // Files no message refers to (taken out of a composer, left in one at
+            // quit, or from a chat deleted within the hour) go now: every file from
+            // before this start, since no composer holds one yet.
+            let started = std::time::Instant::now();
+            let handle = app.handle().clone();
+            tauri::async_runtime::spawn_blocking(move || {
+                let _ = attachments::remove_unused(
+                    &handle.state::<connections::Services>(),
+                    &handle.state::<attachments::AttachmentStore>(),
+                    started.elapsed(),
+                );
+            });
             let hub = mcp::hub::Hub::new(app_data_dir.join("mcp"));
             app.manage(hub.clone());
             tauri::async_runtime::spawn(async move {

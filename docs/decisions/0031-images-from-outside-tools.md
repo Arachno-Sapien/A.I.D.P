@@ -16,7 +16,7 @@ Decision 0027 (D5) ran the Browser checks preset with `--image-responses omit`, 
 ## Decision
 
 - The preset uses `--image-responses allow`.
-- `mcp/client.rs` keeps an MCP `image` item only when its base64 decodes to PNG, JPEG, GIF or WebP bytes of at most 5 MB (`attachments::detect`, `MAX_IMAGE`). The type comes from the bytes, not from the server's `mimeType`. Its text keeps an `[image image/png]` line; anything else stays `[image ..., not shown]`.
+- `mcp/client.rs` keeps an MCP `image` item only when its base64 decodes to PNG, JPEG, GIF or WebP bytes of at most 3.75 MB (`attachments::detect`, `MAX_IMAGE`: 5 MB once in base64, Anthropic's limit). The type comes from the bytes, not from the server's `mimeType`. Its text keeps an `[image image/png]` line; anything else stays `[image ..., not shown]`.
 - The card (`ToolOutcome::Text.images`) always shows the images.
 - `AgentRun.vision` is true only when `supports_vision` is `Some(true)`. Then a round's images ride on `ToolRound.images`: OpenAI-compatible and Ollama get them in a user message after the round's tool messages (their tool messages take text only), Anthropic as image blocks after the `tool_result` blocks of the same user message. Otherwise the tool's text says the images were not sent.
 - Only the newest round with images keeps them in later requests; older rounds keep their text lines, so a long run doesn't resend every screenshot.

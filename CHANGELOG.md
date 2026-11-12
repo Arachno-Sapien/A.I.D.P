@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0-rc.6] - 2026-11-12
+
 ### Added
 - **Reads images:** each chosen cloud model on the Models screen has a Yes / No / Not sure setting. Set it to Yes for a vision model (Claude, GPT-4o) and it gets Browser checks screenshots; No refuses image attachments before sending (decision 0031).
 - **Screenshots on browser cards:** a Browser checks screenshot shows on its card, and a model that reads images (a local vision model) gets it too; other models get its text only. Saved chats keep the text, not the image. Re-add the Browser checks server from the preset to get screenshots (decision 0031).
@@ -22,6 +24,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Run without asking:** a switch on each outside tool server in Settings, off by default. With it on, the agent calls that server's tools (for example every browser click) without Run or Deny; each call still shows on a card. Turning it on asks first. Commands still ask every time (decision 0029).
 
 ### Fixed
+- A chat that holds an image can go on with a model that can't read images: earlier images are left out with a note, instead of every new message failing.
+- An update stops, and asks you to save, if you edited a file while it downloaded, instead of closing the app and losing the edit.
+- A file you take back out of a message, or drop on the Models or Settings screen, is deleted from the app's data folder; so is anything left over, at the next start. Before, copies (secret-looking files included) could stay indefinitely.
+- An older Ollama that doesn't report what a model can do no longer has its vision models refused images.
+- Attached text shares one budget per request, newest message first, so files across a long chat no longer overflow a small local model's context.
+- Pasting a folder, or a file over 20 MB, is refused with a message instead of failing silently or freezing the window.
+- The app no longer crashes at start when it gets an argument that isn't valid Unicode, and reads PDFs whatever the data folder's path.
+- Images over 3.75 MB are refused when attached (5 MB before). Claude counts its 5 MB limit after base64 encoding, so a larger image made every later message in that chat fail.
+- Adding the same PDF twice at once no longer loses it.
+- Image thumbnails no longer hold up the window, and are kept small, so scrolling back past them reads nothing again.
 - **AI panel options:** in a narrow panel, Agent, Review at end, Run commands without asking and the no-git note wrap onto their own row instead of covering the model picker, and the "Run commands without asking?" dialog opens over the whole window instead of clipped inside the panel.
 - **Browser checks:** the agent no longer loops trying to start a web server, which every command's end stops. With outside tools on, it now asks you to start your server in the workspace terminal and give it the address.
 - **Outside tools:** the agent is told its outside tools are already running, so asked to "install the Playwright MCP" it uses the browser tools instead of setting one up in your folder.

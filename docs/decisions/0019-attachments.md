@@ -24,7 +24,7 @@ Where to run the parser:
 
 ## Decision
 
-- Rust checks each file by its first bytes, not its name: PNG, JPEG, GIF and WebP up to 5 MB, UTF-8 text without NUL bytes up to 512 KB, and PDFs up to 20 MB. A PDF's text is kept up to 2 MB.
+- Rust checks each file by its first bytes, not its name: PNG, JPEG, GIF and WebP up to 3.75 MB, UTF-8 text without NUL bytes up to 512 KB, and PDFs up to 20 MB. A PDF's text is kept up to 2 MB. Images were 5 MB until rc.6: they travel as base64, a third larger, and Anthropic refuses more than 5 MB of base64.
 - Files are stored once under their SHA-256 in `<app data>/attachments/`, named by the hash alone. A PDF's text is kept beside it in `<hash>.txt`. IDs are checked to be 64 lowercase hex characters before any path is built.
 - Files come only from places Rust controls:
   - the file dialog, opened by Rust;
@@ -33,15 +33,15 @@ Where to run the parser:
 - Bytes cross IPC as base64 strings, because Tauri would send a `Vec<u8>` as a JSON array of numbers.
 - A file whose name or contents look secret (AGENTS.md rule 6) is allowed, since the user added it by hand, but it carries the warning "Looks like a secret file".
 - Sending: the UI sends each message's text with its attachments' IDs and names (`ChatInput`). Rust (`attachments::resolve`) handles them:
-  - A text file's or a PDF's text joins the message as a fenced block headed `File: <name>`. The fence is longer than any run of backticks inside, and the attached text is capped per message by the model's text budget (`tools::text_budget`).
+  - A text file's or a PDF's text joins the message as a fenced block headed `File: <name>`. The fence is longer than any run of backticks inside. The model's text budget (`tools::text_budget`) caps the attached text of the whole request, newest message first.
   - Images go in each provider's own shape:
     - OpenAI-compatible: `image_url` parts with a data URL.
     - Anthropic: `image` blocks before the text.
     - Ollama: the message's `images`.
   - A message without images is sent exactly as before.
   - An attachment no longer stored is named in the text, not sent.
-- Vision: migration 6 adds `models.supports_vision`, filled from Ollama's `/api/show` capabilities ("vision"). A model known not to see refuses an image with "This model can't read images" before any request; for an unknown model (every cloud model) the provider decides.
-- Deleting a chat removes stored files that no message mentions any more and that are more than an hour old. A file picked but not yet sent stays.
+- Vision: migration 6 adds `models.supports_vision`, filled from Ollama's `/api/show` capabilities ("vision"); an Ollama that reports no capabilities leaves it unknown. A model known not to see refuses an image in the new message with "This model can't read images" before any request; an image in an earlier message becomes the note `[<name> not sent: this model can't read images]`, so the chat can go on. For an unknown model the provider decides.
+- Stored files no message mentions are removed: when a file is taken back out of a composer or dropped where no chat takes it, unless another composer holds it; after a chat is deleted, once more than an hour old (a file picked but not yet sent stays); and at start, every such file from before the start.
 - New crates:
   - `pdf-extract` 0.12 (MIT). It brings `lopdf` 0.42, also used as a dev-dependency to build test PDFs.
   - `sha2` 0.10 and `base64` 0.22. Both were already in the dependency tree.

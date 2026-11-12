@@ -23,6 +23,17 @@ export type MessageAttachment = Attachment_Deserialize;
 
 export const MAX_ATTACHMENTS = 5;
 export const NO_VISION = "This model can't read images";
+/** The largest file Rust takes (a PDF's limit); a bigger paste is refused unread. */
+const MAX_FILE_BYTES = 20 * 1024 * 1024;
+
+/** Every chat's store, so a file another composer still holds isn't thrown away. */
+const allStores: Array<{ getState(): Pick<ChatStore, "pending"> }> = [];
+
+/** Lets Rust remove a file no composer holds any more (it keeps one a saved message uses). */
+export function discardUnlessPending(id: string) {
+  if (allStores.some((s) => s.getState().pending.some((a) => a.id === id))) return;
+  void commands.discardAttachment(id);
+}
 
 /** A file's bytes as base64, for `attach_bytes`. */
 async function toBase64(file: Blob): Promise<string> {
@@ -154,7 +165,7 @@ export const createChatStore = (surface: ChatSurface, hooks?: ChatHooks) => {
   // (Enter twice, with only attachments to send) would post the message twice.
   let sending = false;
 
-  return create<ChatStore>((set, get) => ({
+  const store = create<ChatStore>((set, get) => ({
     messages: [],
     streaming: false,
     conversationId: null,
@@ -181,6 +192,7 @@ export const createChatStore = (surface: ChatSurface, hooks?: ChatHooks) => {
 
     removeAttachment: (id: string) => {
       set({ pending: get().pending.filter((a) => a.id !== id), attachNotice: null });
+      discardUnlessPending(id);
     },
 
     // Rust opens the dialog and reads the files; the UI never sees a path.
@@ -198,7 +210,20 @@ export const createChatStore = (surface: ChatSurface, hooks?: ChatHooks) => {
       const refused: string[] = [];
       for (const file of files) {
         const name = file.name || "pasted-image.png";
-        const res = await commands.attachBytes(name, await toBase64(file));
+        // As for a picked file: too large is refused before anything is read.
+        if (file.size > MAX_FILE_BYTES) {
+          refused.push(`${name} is larger than 20 MB`);
+          continue;
+        }
+        let data: string;
+        try {
+          data = await toBase64(file);
+        } catch {
+          // A pasted folder, or a file gone since it was copied.
+          refused.push(`${name} couldn't be opened`);
+          continue;
+        }
+        const res = await commands.attachBytes(name, data);
         if (res.status === "ok") {
           added.push(res.data);
         } else {
@@ -581,6 +606,8 @@ export const createChatStore = (surface: ChatSurface, hooks?: ChatHooks) => {
       set({ messages: [], streaming: false });
     },
   }));
+  allStores.push(store);
+  return store;
 };
 
 export const useChatStore = createChatStore("chat");

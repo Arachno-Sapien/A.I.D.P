@@ -646,7 +646,7 @@ impl Services {
                 Some(d) => (Some(d.supports_tools), d.context_length),
                 None => (None, None),
             };
-            vision.push((tag.name.clone(), details.map(|d| d.supports_vision)));
+            vision.push((tag.name.clone(), details.and_then(|d| d.supports_vision)));
             models.push(ModelInfo {
                 id: tag.name.clone(),
                 display_name: tag.name,

@@ -111,15 +111,27 @@ async fn show_reads_tools_and_context() {
         .mount(&server)
         .await;
 
+    // An older Ollama sends no capabilities at all.
+    Mock::given(method("POST"))
+        .and(path("/api/show"))
+        .and(body_json(json!({ "model": "llava" })))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "model_info": {} })))
+        .mount(&server)
+        .await;
+
     let ollama = Ollama::new(reqwest::Client::new(), server.uri());
     let d1 = ollama.show("qwen2.5-coder:1.5b").await.expect("show qwen");
     assert!(d1.supports_tools);
-    assert!(d1.supports_vision);
+    assert_eq!(d1.supports_vision, Some(true));
     assert_eq!(d1.context_length, Some(32768));
 
     let d2 = ollama.show("basic").await.expect("show basic");
     assert!(!d2.supports_tools);
-    assert!(!d2.supports_vision);
+    assert_eq!(d2.supports_vision, Some(false));
+
+    // Not reported is unknown, not "can't see" (AGENTS.md section 4).
+    let d3 = ollama.show("llava").await.expect("show llava");
+    assert_eq!(d3.supports_vision, None);
     assert_eq!(d2.context_length, None);
 }
 

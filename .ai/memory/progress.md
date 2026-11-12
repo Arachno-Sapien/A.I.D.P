@@ -112,6 +112,9 @@ Screenshots on browser cards done 2026-11-11 by Claude Code (Opus 5.5), the huma
 
 Reads images for cloud models done 2026-11-11 by Claude Code (Opus 5.5), the follow-up of decision 0031: a Not sure / Yes / No select per chosen cloud model on the Models screen (`set_model_vision`); choosing models again keeps it. Gate green (rust 325, vitest 382). Not yet tried live. Details: `log/2026-11-11-m6-cloud-vision-flag.md`.
 
+M6 code review fixes done 2026-11-12 by Claude Code (Opus 5.5), the human's "Fix all 10, commit, push & release new version": all 10 findings, each with a test seen failing first (details: `log/2026-11-12-m6-review-fixes.md`). Version `0.1.0-rc.6`. Gate green (rust 333, vitest 385). Not yet seen in the app.
+Next step: push, CI, then the Release workflow for `v0.1.0-rc.6`; check the draft, publish, and confirm the installed rc.5 updates (and the taskbar icon refresh from `installer-hooks.nsh` runs for real).
+
 ## Next 3 tasks
 
 1. Task 8 live check: test Outside tools & Browser checks preset (`@playwright/mcp@0.0.85`) in `npm run tauri dev`, and measure Task Manager RAM with a server running (plus RAM with Dark/Glass and `.ts` worker).

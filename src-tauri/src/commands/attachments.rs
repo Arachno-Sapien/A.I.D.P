@@ -1,5 +1,5 @@
 use crate::attachments::{self, Attachment, AttachmentStore, Attachments};
-use crate::connections::AppError;
+use crate::connections::{AppError, Services};
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine as _;
 use std::sync::Mutex;
@@ -65,9 +65,24 @@ pub async fn attach_bytes(
     attachments::add(&store, &name, &bytes).await
 }
 
-/// An attachment's bytes as base64, for its thumbnail.
+/// An attachment's bytes as base64, for its thumbnail. Async, so reading a large
+/// image never holds up the window.
 #[tauri::command]
 #[specta::specta]
-pub fn read_attachment(store: State<'_, AttachmentStore>, id: String) -> Result<String, AppError> {
+pub async fn read_attachment(
+    store: State<'_, AttachmentStore>,
+    id: String,
+) -> Result<String, AppError> {
     Ok(BASE64.encode(store.read(&id)?))
+}
+
+/// Removes a file taken out of a composer, unless a saved message uses it.
+#[tauri::command]
+#[specta::specta]
+pub async fn discard_attachment(
+    services: State<'_, Services>,
+    store: State<'_, AttachmentStore>,
+    id: String,
+) -> Result<(), AppError> {
+    attachments::discard(&services, &store, &id)
 }

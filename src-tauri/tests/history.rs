@@ -1,6 +1,8 @@
 #![allow(clippy::unwrap_used)]
 
+use aidp_lib::attachments::{discard, remove_unused, AttachmentStore};
 use aidp_lib::connections::{AppError, Services};
+use std::time::Duration;
 use aidp_lib::db;
 use aidp_lib::gateway::Role;
 use aidp_lib::history::{extract_title, NewMessage};
@@ -346,6 +348,55 @@ async fn attachments_in_use_are_found_in_stored_messages() {
 
     services.delete_conversation(conv.id).unwrap();
     assert!(services.attachments_in_use(&[used]).unwrap().is_empty());
+}
+
+fn user_message(content_parts: String) -> NewMessage {
+    NewMessage {
+        role: Role::User,
+        content_parts,
+        model_ref: None,
+        model_name: None,
+        status: "complete".to_string(),
+        error_kind: None,
+        tokens_in: None,
+        tokens_out: None,
+    }
+}
+
+fn temp_attachments(name: &str) -> (AttachmentStore, std::path::PathBuf) {
+    let dir = std::env::temp_dir().join(format!("aidp-{name}-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    (AttachmentStore::new(dir.clone()), dir)
+}
+
+#[tokio::test]
+async fn a_file_taken_out_of_the_composer_goes_unless_a_message_uses_it() {
+    let services = create_services(Arc::new(MemoryStore::default()));
+    let (store, dir) = temp_attachments("discard");
+    let sent = store.store("sent.txt", b"sent").unwrap();
+    let removed = store.store("removed.txt", b"removed").unwrap();
+    let conv = services.create_conversation("c", None).unwrap();
+    let parts = format!(r#"{{"v":1,"text":"x","attachments":[{{"id":"{}"}}]}}"#, sent.id);
+    services.append_message(conv.id, user_message(parts)).unwrap();
+
+    discard(&services, &store, &sent.id).unwrap();
+    discard(&services, &store, &removed.id).unwrap();
+    assert!(store.read(&sent.id).is_ok());
+    assert!(matches!(store.read(&removed.id), Err(AppError::NotFound)));
+    assert!(discard(&services, &store, "../x").is_err());
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[tokio::test]
+async fn files_no_message_uses_go_once_old_enough() {
+    let services = create_services(Arc::new(MemoryStore::default()));
+    let (store, dir) = temp_attachments("unused");
+    store.store("left.txt", b"left behind").unwrap();
+    // After a delete a file may still wait in a composer; at start none can.
+    assert_eq!(remove_unused(&services, &store, Duration::from_secs(3600)).unwrap(), 0);
+    assert_eq!(remove_unused(&services, &store, Duration::ZERO).unwrap(), 1);
+    assert!(store.ids().unwrap().is_empty());
+    let _ = std::fs::remove_dir_all(&dir);
 }
 
 #[tokio::test]

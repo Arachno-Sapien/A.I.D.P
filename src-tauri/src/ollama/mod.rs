@@ -81,7 +81,8 @@ pub struct LocalModel {
 #[serde(rename_all = "camelCase")]
 pub struct ModelDetails {
     pub supports_tools: bool,
-    pub supports_vision: bool,
+    /// None when Ollama doesn't say (older versions send no capabilities).
+    pub supports_vision: Option<bool>,
     pub context_length: Option<u32>,
 }
 
@@ -228,12 +229,13 @@ impl Ollama {
             message: e.to_string(),
         })?;
 
+        // None when this Ollama doesn't report capabilities: unknown, not "no".
         let has = |capability: &str| {
             val.get("capabilities")
                 .and_then(|c| c.as_array())
-                .is_some_and(|arr| arr.iter().any(|v| v.as_str() == Some(capability)))
+                .map(|arr| arr.iter().any(|v| v.as_str() == Some(capability)))
         };
-        let supports_tools = has("tools");
+        let supports_tools = has("tools").unwrap_or(false);
         let supports_vision = has("vision");
 
         let context_length = val

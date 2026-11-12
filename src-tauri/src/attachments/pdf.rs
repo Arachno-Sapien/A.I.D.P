@@ -4,11 +4,24 @@
 //! file because the parser can print to standard output.
 
 use crate::connections::AppError;
-use std::path::PathBuf;
+use std::ffi::OsString;
+use std::path::{Path, PathBuf};
 use std::process::{ExitStatus, Stdio};
 use std::time::Duration;
 
 pub const PDF_TEXT_FLAG: &str = "--pdf-text";
+
+/// The `<pdf> <out>` of `aidp --pdf-text <pdf> <out>`, given the arguments after the
+/// program's name; None when this isn't the PDF child. A path that isn't Unicode is
+/// still a path, so nothing here can panic.
+pub fn child_args(mut args: impl Iterator<Item = OsString>) -> Option<(PathBuf, PathBuf)> {
+    if args.next()?.as_os_str() != PDF_TEXT_FLAG {
+        return None;
+    }
+    let pdf = PathBuf::from(args.next().unwrap_or_default());
+    let out = PathBuf::from(args.next().unwrap_or_default());
+    Some((pdf, out))
+}
 /// The most text kept from one PDF; the model's context budget cuts it further.
 const MAX_TEXT_OUT: usize = 2 * 1024 * 1024;
 const LIMIT: Duration = Duration::from_secs(20);
@@ -20,7 +33,7 @@ pub fn pdf_text(bytes: &[u8]) -> Result<String, String> {
 
 /// The child's work: reads `pdf` and writes its text, at most 2 MB, to `out`.
 /// Returns the process exit code.
-pub fn run_child(pdf: &str, out: &str) -> i32 {
+pub fn run_child(pdf: &Path, out: &Path) -> i32 {
     let Ok(bytes) = std::fs::read(pdf) else {
         return 2;
     };
@@ -42,9 +55,7 @@ pub async fn text_in_child(pdf: PathBuf) -> Result<String, AppError> {
     let exe = std::env::current_exe().map_err(|e| AppError::Storage {
         message: e.to_string(),
     })?;
-    let mut out = pdf.as_os_str().to_owned();
-    out.push(".out");
-    let out = PathBuf::from(out);
+    let out = super::temp_beside(&pdf, "out");
 
     let mut cmd = tokio::process::Command::new(exe);
     cmd.arg(PDF_TEXT_FLAG).arg(&pdf).arg(&out);
@@ -148,6 +159,31 @@ mod tests {
     }
 
     #[test]
+    fn child_args_take_any_path() {
+        use std::ffi::OsString;
+        let args = |v: &[&str]| v.iter().map(OsString::from).collect::<Vec<_>>().into_iter();
+        assert_eq!(child_args(args(&[])), None);
+        assert_eq!(child_args(args(&["--other", "a"])), None);
+        assert_eq!(
+            child_args(args(&["--pdf-text", "a.pdf", "a.out"])),
+            Some((PathBuf::from("a.pdf"), PathBuf::from("a.out")))
+        );
+        // A path that isn't Unicode is still a path, not a crash.
+        #[cfg(windows)]
+        let odd = {
+            use std::os::windows::ffi::OsStringExt;
+            OsString::from_wide(&[0x61, 0xD800])
+        };
+        #[cfg(unix)]
+        let odd = {
+            use std::os::unix::ffi::OsStringExt;
+            OsString::from_vec(vec![0x61, 0xFF])
+        };
+        let got = child_args(vec![OsString::from("--pdf-text"), odd.clone(), "o".into()].into_iter());
+        assert_eq!(got, Some((PathBuf::from(odd), PathBuf::from("o"))));
+    }
+
+    #[test]
     fn pdf_text_is_extracted() {
         let text = pdf_text(&pdf_with_text("Hello attachments")).unwrap();
         assert!(text.contains("Hello attachments"), "{text:?}");
@@ -161,15 +197,12 @@ mod tests {
         let out = dir.join("a.out");
         std::fs::write(&pdf, pdf_with_text("Child text")).unwrap();
 
-        assert_eq!(run_child(pdf.to_str().unwrap(), out.to_str().unwrap()), 0);
+        assert_eq!(run_child(&pdf, &out), 0);
         assert!(std::fs::read_to_string(&out).unwrap().contains("Child text"));
 
         let missing_out = dir.join("m.out");
         let missing = dir.join("missing.pdf");
-        assert_ne!(
-            run_child(missing.to_str().unwrap(), missing_out.to_str().unwrap()),
-            0
-        );
+        assert_ne!(run_child(&missing, &missing_out), 0);
         assert!(!missing_out.exists());
         let _ = std::fs::remove_dir_all(&dir);
     }

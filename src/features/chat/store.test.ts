@@ -18,6 +18,7 @@ vi.mock("../../lib/bindings", () => ({
     setConversationArchived: vi.fn().mockResolvedValue({ status: "ok", data: null }),
     pickAttachments: vi.fn(),
     attachBytes: vi.fn(),
+    discardAttachment: vi.fn().mockResolvedValue({ status: "ok", data: null }),
   },
 }));
 
@@ -755,6 +756,35 @@ describe("attachments", () => {
     await useChatStore.getState().pasteFiles([file]);
     expect(commands.attachBytes).toHaveBeenCalledWith("shot.png", "iVBORw==");
     expect(useChatStore.getState().pending.map((a) => a.id)).toEqual([png.id]);
+  });
+
+  it("a pasted file too large, or one that can't be read, is refused and the rest still added", async () => {
+    vi.mocked(commands.attachBytes).mockResolvedValue({ status: "ok", data: png });
+    const huge = new File(["x"], "huge.iso");
+    Object.defineProperty(huge, "size", { value: 21 * 1024 * 1024 });
+    const huge_read = vi.spyOn(huge, "arrayBuffer");
+    // A pasted folder comes as a File whose bytes can't be read.
+    const folder = new File([], "folder");
+    folder.arrayBuffer = () => Promise.reject(new Error("not readable"));
+    const shot = new File([new Uint8Array([137, 80, 78, 71])], "shot.png");
+
+    await useChatStore.getState().pasteFiles([huge, folder, shot]);
+    expect(huge_read).not.toHaveBeenCalled();
+    expect(commands.attachBytes).toHaveBeenCalledTimes(1);
+    expect(useChatStore.getState().pending.map((a) => a.id)).toEqual([png.id]);
+    const notice = useChatStore.getState().attachNotice ?? "";
+    expect(notice).toContain("huge.iso");
+    expect(notice).toContain("folder");
+  });
+
+  it("a file taken out of the composer is thrown away unless another chat still holds it", () => {
+    const side = createChatStore("workspace");
+    useChatStore.getState().addAttachments([notes]);
+    side.getState().addAttachments([notes]);
+    useChatStore.getState().removeAttachment(notes.id);
+    expect(commands.discardAttachment).not.toHaveBeenCalled();
+    side.getState().removeAttachment(notes.id);
+    expect(commands.discardAttachment).toHaveBeenCalledWith(notes.id);
   });
 
   it("Send carries the attachments and clears them", async () => {
