@@ -113,7 +113,8 @@ Screenshots on browser cards done 2026-11-11 by Claude Code (Opus 5.5), the huma
 Reads images for cloud models done 2026-11-11 by Claude Code (Opus 5.5), the follow-up of decision 0031: a Not sure / Yes / No select per chosen cloud model on the Models screen (`set_model_vision`); choosing models again keeps it. Gate green (rust 325, vitest 382). Not yet tried live. Details: `log/2026-11-11-m6-cloud-vision-flag.md`.
 
 M6 code review fixes done 2026-11-12 by Claude Code (Opus 5.5), the human's "Fix all 10, commit, push & release new version": all 10 findings, each with a test seen failing first (details: `log/2026-11-12-m6-review-fixes.md`). Version `0.1.0-rc.6`. Gate green (rust 333, vitest 385). Not yet seen in the app.
-Next step: push, CI, then the Release workflow for `v0.1.0-rc.6`; check the draft, publish, and confirm the installed rc.5 updates (and the taskbar icon refresh from `installer-hooks.nsh` runs for real).
+Pushed `59e7e3b` (with the 26 earlier unpushed commits); CI run 43232532733 green on three OSes. Release run 43233417752 (started by Claude Code at the human's request) passed: draft `v0.1.0-rc.6` with all installers (Windows exe 5.7 MB), `latest.json` 0.1.0-rc.6 for all platforms, every update file signed by key EE9A69E11D7D346C. Publishing it from the agent was refused by the permission check, so the draft waits for the human.
+Next step: the human publishes the draft `v0.1.0-rc.6` (normal release, not pre-release); then confirm the installed rc.5 updates to rc.6 and the taskbar shows the A.I.D.P icon without a manual refresh (`installer-hooks.nsh`).
 
 ## Next 3 tasks
 
