@@ -41,6 +41,11 @@ export const buffers = {
     return map.get(path)?.state.doc.toString();
   },
 
+  // O(1): for checks run on every render, where text() would copy the file.
+  length(path: string): number | undefined {
+    return map.get(path)?.state.doc.length;
+  },
+
   selection(path: string): SelectionInfo | null {
     const state = map.get(path)?.state;
     if (!state) return null;

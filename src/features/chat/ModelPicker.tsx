@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { parseModelKey, useModelsStore } from "../models/store";
 
 export interface ModelPickerProps {
@@ -7,7 +8,16 @@ export interface ModelPickerProps {
 }
 
 export function ModelPicker({ children, left }: ModelPickerProps = {}) {
-  const { chatModels, selected, loaded, select, ollama } = useModelsStore();
+  // Not the whole store: each Ollama download line replaces `pull`.
+  const { chatModels, selected, loaded, ollama } = useModelsStore(
+    useShallow((s) => ({
+      chatModels: s.chatModels,
+      selected: s.selected,
+      loaded: s.loaded,
+      ollama: s.ollama,
+    })),
+  );
+  const { select } = useModelsStore.getState();
 
   const hasModels = loaded && chatModels.length > 0;
 

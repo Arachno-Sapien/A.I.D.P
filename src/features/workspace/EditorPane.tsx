@@ -82,38 +82,45 @@ export function EditorPane() {
     <div className="flex-1 flex flex-col h-full bg-neutral-950 overflow-hidden">
       {/* Tab Strip */}
       <div className="flex items-center justify-between border-b border-neutral-800 bg-neutral-900/60 overflow-x-auto select-none">
-        <div className="flex items-center">
+        <div role="tablist" aria-label="Open files" className="flex items-center">
           {tabs.map((tab) => {
             const isActive = tab.path === active;
             return (
               <div
                 key={tab.path}
-                className={`flex items-center gap-1.5 px-3 py-1.5 border-r border-neutral-800 text-xs font-mono cursor-pointer transition-colors ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 border-r border-neutral-800 text-xs font-mono transition-colors ${
                   isActive
                     ? "bg-neutral-950 text-neutral-100 border-b-2 border-b-accent"
                     : "bg-neutral-900/40 text-neutral-400 hover:bg-neutral-800/60 hover:text-neutral-200"
                 }`}
                 title={tab.path}
-                onClick={() => setActive(tab.path)}
                 // The middle button closes a tab, as in a browser.
                 onAuxClick={(e) => {
                   if (e.button === 1) handleClose(tab.path, tab.dirty);
                 }}
               >
-                <span>{tab.name}</span>
+                {/* The name is the tab; Close stays a sibling, not inside it. */}
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={isActive}
+                  onClick={() => setActive(tab.path)}
+                  className="cursor-pointer rounded focus-visible:ring-1 focus-visible:ring-neutral-400 focus-visible:outline-none"
+                >
+                  {tab.name}
+                  {tab.dirty && <span className="sr-only"> (unsaved)</span>}
+                </button>
                 {tab.dirty && (
                   <span
                     data-testid={`dirty-dot-${tab.path}`}
+                    aria-hidden="true"
                     className="w-1.5 h-1.5 rounded-full bg-accent"
                   />
                 )}
                 <button
                   type="button"
                   aria-label={`Close ${tab.name}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleClose(tab.path, tab.dirty);
-                  }}
+                  onClick={() => handleClose(tab.path, tab.dirty)}
                   className="ml-1 text-neutral-500 hover:text-neutral-300 p-0.5 rounded hover:bg-neutral-700/60 transition-colors"
                 >
                   ×

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { create } from "zustand";
+import { useShallow } from "zustand/react/shallow";
 import { PanelLeft } from "lucide-react";
 import { Composer } from "./Composer";
 import { ConversationList, LIST_MIN, LIST_WIDTH } from "./ConversationList";
@@ -41,15 +42,20 @@ export function ChatScreen({
 }: ChatScreenProps) {
   const { listOpen, listWidth, setListOpen, setListWidth } = useChatLayout();
   const rowRef = useRef<HTMLDivElement>(null);
-  const {
-    connections,
-    chatModels,
-    selected,
-    loaded,
-    loadError,
-    ollama,
-  } = useModelsStore();
-  const { messages, streaming, send, stop, openPlace } = useChatStore();
+  // Selectors, not the whole stores: a streamed chunk or an Ollama download
+  // line must not re-render the chat list, the picker and the composer.
+  const { connections, chatModels, selected, loaded, loadError, ollama } =
+    useModelsStore(
+      useShallow((s) => ({
+        connections: s.connections,
+        chatModels: s.chatModels,
+        selected: s.selected,
+        loaded: s.loaded,
+        loadError: s.loadError,
+        ollama: s.ollama,
+      })),
+    );
+  const streaming = useChatStore((s) => s.streaming);
 
   const cloudConnections = connections.filter((c) => c.kind !== "ollama");
   const isOllamaRunning = ollama?.state === "running";
@@ -70,10 +76,11 @@ export function ChatScreen({
   // Only the first visit opens the newest chat: Chat unmounts when another
   // screen is shown, and reloading on return would drop a streaming reply.
   useEffect(() => {
-    if (!useChatStore.getState().opened) {
-      void openPlace(null);
+    const chat = useChatStore.getState();
+    if (!chat.opened) {
+      void chat.openPlace(null);
     }
-  }, [openPlace]);
+  }, []);
 
   return (
     <div className="app-shell flex flex-col h-full bg-neutral-950 text-neutral-100 font-sans">
@@ -178,17 +185,17 @@ export function ChatScreen({
               </div>
             )
           ) : (
-            <MessageList messages={messages} />
+            <ChatMessages />
           )}
 
           <Composer
             store={useChatStore}
             onSend={(text) => {
               if (selected) {
-                void send(text, selected);
+                void useChatStore.getState().send(text, selected);
               }
             }}
-            onStop={() => void stop()}
+            onStop={() => void useChatStore.getState().stop()}
             streaming={streaming}
             disabled={!selected}
           />
@@ -196,4 +203,10 @@ export function ChatScreen({
       </div>
     </div>
   );
+}
+
+// Only the messages re-render on each streamed chunk.
+function ChatMessages() {
+  const messages = useChatStore((s) => s.messages);
+  return <MessageList messages={messages} />;
 }

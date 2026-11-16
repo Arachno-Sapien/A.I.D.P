@@ -241,7 +241,7 @@ describe("AiPanel", () => {
 
     // 2. Model with supportsTools: null -> agent switch is off (unchecked)
     cleanup();
-    useWorkspaceChatStore.getState().clear();
+    useWorkspaceChatStore.getState().startNew();
     vi.mocked(useModelsStore).mockReturnValue({
       chatModels: [
         {
