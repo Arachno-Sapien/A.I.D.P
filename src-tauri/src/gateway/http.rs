@@ -39,7 +39,14 @@ fn parse_error_detail(body: &str) -> String {
 
 pub fn map_http_error(status: u16, retry_after: Option<&str>, body: &str) -> ProviderError {
     let lower = body.to_ascii_lowercase();
-    if (status == 400 || status == 404) && lower.contains("tool") && lower.contains("support") {
+    // Only known refusals: a tool schema error ("...tools[0]... not supported") keeps its detail.
+    const TOOL_REFUSALS: [&str; 4] = [
+        "not support tool",
+        "support tool use",
+        "tools is not supported",
+        "tool use is not supported",
+    ];
+    if (status == 400 || status == 404) && TOOL_REFUSALS.iter().any(|p| lower.contains(p)) {
         return ProviderError::Provider {
             message: crate::gateway::TOOLS_UNSUPPORTED.to_string(),
         };
@@ -47,6 +54,10 @@ pub fn map_http_error(status: u16, retry_after: Option<&str>, body: &str) -> Pro
 
     match status {
         401 | 403 => ProviderError::InvalidKey,
+        // OpenRouter: the model exists, but no provider takes this input (images, say).
+        404 if lower.contains("no endpoints found") => ProviderError::Provider {
+            message: format!("HTTP 404: {}", parse_error_detail(body)),
+        },
         404 => ProviderError::ModelNotFound,
         413 => ProviderError::ContextTooLong,
         429 => ProviderError::RateLimited {
@@ -197,6 +208,31 @@ mod tests {
             map_http_error(400, None, "tools is not supported with this model"),
             ProviderError::Provider {
                 message: crate::gateway::TOOLS_UNSUPPORTED.to_string()
+            }
+        );
+        assert_eq!(
+            map_http_error(400, None, "model does not support tools"),
+            ProviderError::Provider {
+                message: crate::gateway::TOOLS_UNSUPPORTED.to_string()
+            }
+        );
+        // A tool schema error is not "this model can't use tools": keep the detail.
+        let schema = "tools[0].function_declarations[7].parameters.properties[url].format: only 'enum' and 'date-time' are supported for STRING type";
+        assert_eq!(
+            map_http_error(400, None, schema),
+            ProviderError::Provider {
+                message: format!("HTTP 400: {schema}")
+            }
+        );
+        // OpenRouter's "no endpoints" 404 means the input isn't supported, not a missing model.
+        assert_eq!(
+            map_http_error(
+                404,
+                None,
+                r#"{"error":{"message":"No endpoints found that support image input"}}"#
+            ),
+            ProviderError::Provider {
+                message: "HTTP 404: No endpoints found that support image input".to_string()
             }
         );
         assert_eq!(map_http_error(404, None, "model not found"), ProviderError::ModelNotFound);

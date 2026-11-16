@@ -18,6 +18,16 @@ pub fn in_git_dir(rel: &str) -> bool {
     has_git_part(Path::new(rel))
 }
 
+/// Windows reserves these names with any extension ("con.txt" too).
+fn is_windows_device(name: &str) -> bool {
+    let stem = name.split('.').next().unwrap_or(name).trim_end().to_ascii_lowercase();
+    matches!(stem.as_str(), "con" | "prn" | "aux" | "nul" | "conin$" | "conout$")
+        || matches!(
+            stem.as_bytes(),
+            [b'c', b'o', b'm', b'1'..=b'9'] | [b'l', b'p', b't', b'1'..=b'9']
+        )
+}
+
 fn check_components(rel: &str) -> Result<Vec<Component<'_>>, WorkspaceError> {
     if rel.contains(':') || rel.contains('\0') || in_git_dir(rel) {
         return Err(WorkspaceError::OutsideFolder);
@@ -33,6 +43,13 @@ fn check_components(rel: &str) -> Result<Vec<Component<'_>>, WorkspaceError> {
             // `\\?\` (the Recycle Bin), so it is refused.
             Component::Normal(name)
                 if cfg!(windows) && name.to_string_lossy().ends_with(['.', ' ']) =>
+            {
+                return Err(WorkspaceError::OutsideFolder);
+            }
+            // A device name (aux, nul, com1...) makes an entry only `\\?\` can
+            // remove: git, Explorer and the Recycle Bin read it as the device.
+            Component::Normal(name)
+                if cfg!(windows) && is_windows_device(&name.to_string_lossy()) =>
             {
                 return Err(WorkspaceError::OutsideFolder);
             }
@@ -152,7 +169,16 @@ pub fn resolve_entry(root: &Path, rel: &str) -> Result<PathBuf, WorkspaceError> 
     let folder: PathBuf = folders.iter().collect();
     let abs = resolve(root, &folder.to_string_lossy())?.join(name);
     match std::fs::symlink_metadata(&abs) {
-        Ok(_) => Ok(abs),
+        Ok(meta) => {
+            // A second name for .git (the 8.3 alias GIT~1): canonicalize shows the real one.
+            if !meta.file_type().is_symlink()
+                && std::fs::canonicalize(&abs)
+                    .is_ok_and(|real| real.strip_prefix(root).is_ok_and(has_git_part))
+            {
+                return Err(WorkspaceError::OutsideFolder);
+            }
+            Ok(abs)
+        }
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Err(WorkspaceError::NotFound),
         Err(e) => Err(WorkspaceError::Io {
             message: e.to_string(),
