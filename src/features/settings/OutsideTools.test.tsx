@@ -68,6 +68,18 @@ describe("OutsideTools", () => {
     expect(await screen.findByText("No outside tools yet.")).toBeDefined();
   });
 
+  it("a failed list shows the error, not an empty list", async () => {
+    vi.mocked(commands.listMcpServers).mockResolvedValueOnce({
+      status: "error",
+      error: { kind: "storage", message: "locked" },
+    });
+    render(<OutsideTools />);
+    expect(
+      await screen.findByText("Couldn't read or write the local database: locked"),
+    ).toBeDefined();
+    expect(screen.queryByText("No outside tools yet.")).toBeNull();
+  });
+
   it("the preset fills the form and adds nothing", async () => {
     render(<OutsideTools />);
     await screen.findByText("No outside tools yet.");

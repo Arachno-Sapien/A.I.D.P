@@ -17,6 +17,7 @@ export function AllowedCommands() {
   async function remove(item: AllowedCommand) {
     const res = await commands.removeAllowedCommand(item.folder, item.command);
     if (res.status === "ok") {
+      setError(null);
       setItems((list) => list?.filter((i) => i !== item) ?? null);
     } else {
       setError(appErrorText(res.error));

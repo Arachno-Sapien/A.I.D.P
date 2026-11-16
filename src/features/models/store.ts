@@ -118,6 +118,8 @@ export const useModelsStore = create<ModelsStore>((set, get) => ({
   },
 
   refreshOllama: async () => {
+    // Cloud models must not wait on the Ollama probe (it can take up to 15 s).
+    const early = get().refresh();
     const statusRes = await commands.ollamaStatus();
     if (statusRes.status === "ok") {
       const ollama = statusRes.data;
@@ -131,6 +133,8 @@ export const useModelsStore = create<ModelsStore>((set, get) => ({
         set({ localModels: [] });
       }
     }
+    // The early refresh must land first, so the synced local models win.
+    await early;
     await get().refresh();
   },
 

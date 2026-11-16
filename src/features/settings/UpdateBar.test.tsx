@@ -82,6 +82,18 @@ describe("UpdateBar", () => {
     expect(screen.getByRole("button", { name: "Install and restart" })).toBeDefined();
   });
 
+  it("a long error is cut short and the buttons keep their room", () => {
+    const long = "The update failed: " + "x".repeat(200);
+    useUpdatesStore.setState({ found: { version: "0.1.1", notes: null }, error: long });
+    render(<UpdateBar />);
+    const span = screen.getByText(long);
+    expect(span.className).toContain("truncate");
+    expect(span.getAttribute("title")).toBe(long);
+    expect(span.parentElement?.className).toContain("min-w-0");
+    expect(span.parentElement?.className).not.toContain("shrink-0");
+    expect(screen.getByRole("button", { name: "Later" }).className).toContain("shrink-0");
+  });
+
   it("a quiet check that fails shows nothing", async () => {
     vi.mocked(commands.checkUpdate).mockResolvedValue({
       status: "error",

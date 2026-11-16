@@ -14,8 +14,19 @@ vi.mock("../../lib/bindings", () => ({
     setModels: vi.fn(),
     setDefaultModel: vi.fn(),
     setModelVision: vi.fn(),
+    addConnection: vi.fn(),
   },
 }));
+
+const conn = (id: number, label: string) => ({
+  id,
+  kind: "openaiCompat" as const,
+  label,
+  baseUrl: "https://api.com",
+  keyHint: "1234",
+  lastTestedAt: null,
+  lastTestOk: null,
+});
 
 import { commands } from "../../lib/bindings";
 import { useModelsStore } from "./store";
@@ -24,6 +35,7 @@ import { ModelsScreen } from "./ModelsScreen";
 describe("ModelsScreen", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    useModelsStore.setState({ loadError: null });
   });
 
   afterEach(() => {
@@ -342,6 +354,83 @@ describe("ModelsScreen", () => {
 
     expect(screen.getByText("Cloud OpenAI")).toBeDefined();
     expect(screen.queryByText("Ollama (local)")).toBeNull();
+  });
+
+  it("Cancel on Choose models after a saved add shows the new connection", async () => {
+    useModelsStore.setState({ connections: [], chatModels: [], selected: null, loaded: true, loadError: null });
+    vi.mocked(commands.addConnection).mockResolvedValue({
+      status: "ok",
+      data: { connection: conn(7, "New Conn"), available: [] },
+    });
+    vi.mocked(commands.listConnections).mockResolvedValue({ status: "ok", data: [conn(7, "New Conn")] });
+    vi.mocked(commands.chatModels).mockResolvedValue({ status: "ok", data: [] });
+
+    render(<ModelsScreen startAdding />);
+    fireEvent.change(screen.getByLabelText("Provider"), { target: { value: "openrouter" } });
+    fireEvent.change(screen.getByLabelText("API key"), { target: { value: "sk-...XXXX" } });
+    fireEvent.click(screen.getByRole("button", { name: "Test and add" }));
+    await screen.findByText(/The connection is saved/);
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(await screen.findByText("New Conn")).toBeDefined();
+  });
+
+  it("a successful key replace clears the old test error", async () => {
+    useModelsStore.setState({ connections: [conn(1, "Test Conn")], chatModels: [], selected: null, loaded: true, loadError: null });
+    vi.mocked(commands.testConnection).mockResolvedValue({
+      status: "error",
+      error: { kind: "provider", error: { kind: "invalidKey" } },
+    });
+    vi.mocked(commands.replaceKey).mockResolvedValue({ status: "ok", data: conn(1, "Test Conn") });
+    vi.mocked(commands.listConnections).mockResolvedValue({ status: "ok", data: [conn(1, "Test Conn")] });
+    vi.mocked(commands.chatModels).mockResolvedValue({ status: "ok", data: [] });
+    const errText = "The provider rejected the API key. Check the key and try again.";
+
+    render(<ModelsScreen onAddClick={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Test" }));
+    expect(await screen.findByText(errText)).toBeDefined();
+
+    fireEvent.click(screen.getByRole("button", { name: "Replace key" }));
+    fireEvent.change(screen.getByPlaceholderText("New API key (sk-...)"), { target: { value: "sk-...XXXX" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(screen.queryByText(errText)).toBeNull());
+  });
+
+  it("a finished Test does not re-enable another one still running", async () => {
+    useModelsStore.setState({ connections: [conn(1, "A"), conn(2, "B")], chatModels: [], selected: null, loaded: true, loadError: null });
+    let finishA: (v: { status: "ok"; data: null }) => void = () => {};
+    vi.mocked(commands.testConnection).mockImplementation((id) =>
+      id === 1 ? new Promise((r) => { finishA = r; }) : new Promise(() => {}),
+    );
+    vi.mocked(commands.listConnections).mockResolvedValue({ status: "ok", data: [conn(1, "A"), conn(2, "B")] });
+    vi.mocked(commands.chatModels).mockResolvedValue({ status: "ok", data: [] });
+
+    render(<ModelsScreen onAddClick={vi.fn()} />);
+    const [testA, testB] = screen.getAllByRole("button", { name: "Test" });
+    fireEvent.click(testA);
+    fireEvent.click(testB);
+    finishA({ status: "ok", data: null });
+
+    await waitFor(() => expect(commands.listConnections).toHaveBeenCalled());
+    expect(screen.getByRole("button", { name: "Testing..." })).toBeDefined();
+  });
+
+  it("a load error keeps the Ollama panel and hides the empty state", () => {
+    useModelsStore.setState({
+      connections: [],
+      chatModels: [],
+      selected: null,
+      loaded: true,
+      loadError: "Couldn't read or write the local database: locked",
+      ollama: null,
+    });
+
+    render(<ModelsScreen onAddClick={vi.fn()} />);
+
+    expect(screen.getByText("Couldn't read or write the local database: locked")).toBeDefined();
+    expect(screen.getByText("Ollama (local models)")).toBeDefined();
+    expect(screen.queryByText("No cloud models yet")).toBeNull();
   });
 
   it("marks a cloud model as reading images", async () => {

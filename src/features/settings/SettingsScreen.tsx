@@ -1,4 +1,6 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { useShallow } from "zustand/react/shallow";
+import { appErrorText } from "../chat/appErrorText";
 import { parseModelKey, useModelsStore } from "../models/store";
 import { useSettingsStore } from "./store";
 import { AllowedCommands } from "./AllowedCommands";
@@ -42,7 +44,11 @@ export function SettingsScreen() {
     setKeepAlive,
     setCheckUpdates,
   } = useSettingsStore();
-  const { chatModels, selected, refresh } = useModelsStore();
+  // Only what this screen shows, so pull progress doesn't re-render it.
+  const { chatModels, selected } = useModelsStore(
+    useShallow((s) => ({ chatModels: s.chatModels, selected: s.selected })),
+  );
+  const [defaultModelError, setDefaultModelError] = useState<string | null>(null);
   const {
     version,
     found,
@@ -113,11 +119,14 @@ export function SettingsScreen() {
               onChange={async (e) => {
                 const parsed = parseModelKey(e.target.value);
                 if (parsed) {
-                  await commands.setDefaultModel(
+                  const res = await commands.setDefaultModel(
                     parsed.connectionId,
                     parsed.modelId,
                   );
-                  await refresh();
+                  setDefaultModelError(
+                    res.status === "error" ? appErrorText(res.error) : null,
+                  );
+                  await useModelsStore.getState().refresh();
                 }
               }}
               className="w-full max-w-sm px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-xs text-neutral-200 focus:outline-none focus:border-neutral-600 cursor-pointer"
@@ -153,6 +162,11 @@ export function SettingsScreen() {
                 </optgroup>
               )}
             </select>
+          )}
+          {defaultModelError && (
+            <p role="alert" className="text-xs text-red-400">
+              {defaultModelError}
+            </p>
           )}
         </div>
 

@@ -5,6 +5,8 @@ vi.mock("../../lib/bindings", () => ({
     listConnections: vi.fn(),
     chatModels: vi.fn(),
     setDefaultModel: vi.fn(),
+    ollamaStatus: vi.fn(),
+    ollamaModels: vi.fn(),
   },
 }));
 
@@ -158,6 +160,32 @@ describe("useModelsStore", () => {
     expect(state.loaded).toBe(true);
     expect(state.loadError).toBe(
       "Couldn't read or write the local database: disk read error",
+    );
+  });
+
+  it("cloud models load without waiting for Ollama", async () => {
+    vi.mocked(commands.ollamaStatus).mockReturnValue(new Promise(() => {}));
+    vi.mocked(commands.listConnections).mockResolvedValue({ status: "ok", data: [] });
+    vi.mocked(commands.chatModels).mockResolvedValue({ status: "ok", data: [] });
+
+    void useModelsStore.getState().refreshOllama();
+
+    await vi.waitFor(() => expect(useModelsStore.getState().loaded).toBe(true));
+  });
+
+  it("refreshOllama refreshes again after the Ollama sync", async () => {
+    vi.mocked(commands.ollamaStatus).mockResolvedValue({
+      status: "ok",
+      data: { state: "notInstalled" } as never,
+    });
+    vi.mocked(commands.listConnections).mockResolvedValue({ status: "ok", data: [] });
+    vi.mocked(commands.chatModels).mockResolvedValue({ status: "ok", data: [] });
+
+    await useModelsStore.getState().refreshOllama();
+
+    expect(commands.chatModels).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(commands.chatModels).mock.invocationCallOrder[1]).toBeGreaterThan(
+      vi.mocked(commands.ollamaStatus).mock.invocationCallOrder[0],
     );
   });
 
