@@ -104,7 +104,7 @@ export interface WorkspaceStore {
   noteSelection(path: string): void;
   setActive(path: string): void;
   save(path: string, options?: { overwrite?: boolean }): Promise<void>;
-  reload(path: string): Promise<void>;
+  reload(path: string, options?: { ifClean?: boolean }): Promise<void>;
   reloadIfClean(path: string): Promise<void>;
   closeTab(path: string): void;
 
@@ -192,6 +192,8 @@ const lf = (text: string) => text.replace(/\r\n/g, "\n");
 // Saves of one file run one after another: each needs the version the one
 // before it wrote, or it looks like a change on disk.
 const saves = new Map<string, Promise<void>>();
+// True while an Accept is answering or writing: a second click does nothing.
+let accepting = false;
 
 const folderReset = {
   children: {},
@@ -498,13 +500,17 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
     }
   },
 
-  reload: async (path: string) => {
+  reload: async (path: string, options?: { ifClean?: boolean }) => {
     const tab = get().tabs.find((t) => t.path === path);
     const res = await commands.readFile(path);
     if (res.status === "ok") {
       const file = res.data;
       const filename = tab?.name ?? (path.split("/").pop() || path);
-      buffers.open(path, await editorState(path, file.text, filename));
+      const state = await editorState(path, file.text, filename);
+      // Check after the awaits: the tab may be closed, or typed in, by now.
+      const now = get().tabs.find((t) => t.path === path);
+      if (!now || (options?.ifClean && (now.dirty || buffers.isDirty(path)))) return;
+      buffers.open(path, state);
 
       const nextTabs = get().tabs.map((t) =>
         t.path === path
@@ -539,7 +545,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
     if (!tab || tab.dirty) {
       return;
     }
-    await get().reload(path);
+    await get().reload(path, { ifClean: true });
   },
 
   closeTab: (path: string) => {
@@ -624,54 +630,64 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       return;
     }
 
-    if (proposal.toolId !== undefined) {
-      await commands.answerTool(proposal.toolId, true);
-      set({ proposal: null, needsGitConfirm: false, error: null });
-      return;
-    }
+    if (accepting) return;
+    accepting = true;
+    try {
+      // Each clear below takes away only the proposal this Accept answered:
+      // the agent's next edit may already be showing.
+      const answered = (s: WorkspaceStore) =>
+        s.proposal === proposal ? { proposal: null, needsGitConfirm: false } : {};
 
-    const tab = tabs.find((t) => t.path === proposal.path);
-    if (!tab) return;
-
-    const res = await commands.writeFile({
-      path: proposal.path,
-      text: proposal.proposed,
-      lineEnding: tab.lineEnding,
-      hasBom: tab.hasBom,
-      expectedVersion: tab.version,
-    });
-
-    if (res.status === "error") {
-      if (res.error.kind === "changedOnDisk") {
-        set({ conflict: { path: proposal.path, kind: "changedOnDisk" } });
-      } else if (res.error.kind === "notFound") {
-        set({ conflict: { path: proposal.path, kind: "deleted" } });
-      } else {
-        set({ error: workspaceErrorText(res.error) });
+      if (proposal.toolId !== undefined) {
+        await commands.answerTool(proposal.toolId, true);
+        set((s) => ({ ...answered(s), error: null }));
+        return;
       }
-      return;
+
+      const tab = tabs.find((t) => t.path === proposal.path);
+      if (!tab) return;
+
+      const res = await commands.writeFile({
+        path: proposal.path,
+        text: proposal.proposed,
+        lineEnding: tab.lineEnding,
+        hasBom: tab.hasBom,
+        expectedVersion: tab.version,
+      });
+
+      if (res.status === "error") {
+        if (res.error.kind === "changedOnDisk") {
+          set({ conflict: { path: proposal.path, kind: "changedOnDisk" } });
+        } else if (res.error.kind === "notFound") {
+          set({ conflict: { path: proposal.path, kind: "deleted" } });
+        } else {
+          set({ error: workspaceErrorText(res.error) });
+        }
+        return;
+      }
+
+      const newVersion = res.data;
+      buffers.open(
+        tab.path,
+        await editorState(tab.path, proposal.proposed, tab.name),
+      );
+
+      const nextTabs = get().tabs.map((t) =>
+        t.path === proposal.path
+          ? { ...t, version: newVersion, dirty: false }
+          : t,
+      );
+      set((s) => ({
+        ...answered(s),
+        tabs: nextTabs,
+        conflict: null,
+        error: null,
+        revision: s.revision + 1,
+      }));
+      syncUnsaved(nextTabs);
+    } finally {
+      accepting = false;
     }
-
-    const newVersion = res.data;
-    buffers.open(
-      tab.path,
-      await editorState(tab.path, proposal.proposed, tab.name),
-    );
-
-    const nextTabs = get().tabs.map((t) =>
-      t.path === proposal.path
-        ? { ...t, version: newVersion, dirty: false }
-        : t,
-    );
-    set((s) => ({
-      tabs: nextTabs,
-      proposal: null,
-      needsGitConfirm: false,
-      conflict: null,
-      error: null,
-      revision: s.revision + 1,
-    }));
-    syncUnsaved(nextTabs);
   },
 
   confirmGit: async () => {

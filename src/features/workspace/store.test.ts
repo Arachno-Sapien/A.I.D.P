@@ -795,6 +795,59 @@ describe("useWorkspaceStore", () => {
     expect(useWorkspaceStore.getState().proposal).toBeNull();
   });
 
+  it("accepting a tool edit keeps the next proposal that arrives meanwhile", async () => {
+    let answered: (v: boolean) => void = () => {};
+    vi.mocked(commands.answerTool).mockReturnValueOnce(new Promise((r) => (answered = r)));
+    useWorkspaceStore.getState().showToolProposal(1, "a.ts", "a", "b");
+
+    const accepting = useWorkspaceStore.getState().acceptProposal();
+    useWorkspaceStore.getState().showToolProposal(2, "a.ts", "b", "c");
+    answered(true);
+    await accepting;
+
+    expect(useWorkspaceStore.getState().proposal?.toolId).toBe(2);
+  });
+
+  it("Accept pressed twice writes once", async () => {
+    vi.mocked(commands.writeFile).mockResolvedValue({ status: "ok", data: "v2" });
+    useWorkspaceStore.setState({
+      info: { name: "repo", path: "/repo", isGit: true },
+      tabs: [tab("a.ts", false)],
+      proposal: { path: "a.ts", original: "hello", proposed: "hello world" },
+    });
+
+    await Promise.all([
+      useWorkspaceStore.getState().acceptProposal(),
+      useWorkspaceStore.getState().acceptProposal(),
+    ]);
+
+    expect(commands.writeFile).toHaveBeenCalledTimes(1);
+  });
+
+  it("text typed while a clean tab reloads is kept", async () => {
+    vi.mocked(commands.readFile).mockResolvedValueOnce({
+      status: "ok",
+      data: { path: "a.ts", text: "one", version: "v1", lineEnding: "lf", hasBom: false, isSecret: false },
+    });
+    await useWorkspaceStore.getState().openFile("a.ts");
+    let read: (v: unknown) => void = () => {};
+    vi.mocked(commands.readFile).mockReturnValueOnce(new Promise((r) => (read = r)) as never);
+    const revision = useWorkspaceStore.getState().revision;
+
+    const reloading = useWorkspaceStore.getState().reloadIfClean("a.ts");
+    buffers.set("a.ts", createState("typed", "a.ts"));
+    useWorkspaceStore.getState().setDirty("a.ts", true);
+    read({
+      status: "ok",
+      data: { path: "a.ts", text: "from agent", version: "v2", lineEnding: "lf", hasBom: false, isSecret: false },
+    });
+    await reloading;
+
+    expect(buffers.text("a.ts")).toBe("typed");
+    expect(useWorkspaceStore.getState().tabs[0]?.dirty).toBe(true);
+    expect(useWorkspaceStore.getState().revision).toBe(revision);
+  });
+
   it("asks once without git before a tool edit", async () => {
     useWorkspaceStore.setState({
       info: { name: "no-git", path: "/test", isGit: false },
