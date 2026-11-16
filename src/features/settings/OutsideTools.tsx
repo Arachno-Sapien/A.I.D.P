@@ -164,7 +164,7 @@ export function OutsideTools() {
         </p>
       )}
 
-      {loaded && servers.length === 0 ? (
+      {loaded && !listError && servers.length === 0 ? (
         <p className="text-xs text-neutral-500 italic">No outside tools yet.</p>
       ) : (
         <ul className="space-y-2">

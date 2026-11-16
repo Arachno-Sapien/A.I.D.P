@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { commands, type ModelInfo } from "../../lib/bindings";
 import { appErrorText } from "../chat/appErrorText";
 import { AddConnectionDialog } from "./AddConnectionDialog";
@@ -17,7 +18,15 @@ export function ModelsScreen({
   startAdding = false,
   onAddFinished,
 }: ModelsScreenProps) {
-  const { connections, chatModels, loadError, refresh } = useModelsStore();
+  // Only what this screen shows, so pull progress (LocalPanel's job) doesn't re-render it.
+  const { connections, chatModels, loadError } = useModelsStore(
+    useShallow((s) => ({
+      connections: s.connections,
+      chatModels: s.chatModels,
+      loadError: s.loadError,
+    })),
+  );
+  const refresh = () => useModelsStore.getState().refresh();
   const cloudConnections = connections.filter((c) => c.kind !== "ollama");
   const [internalAdding, setInternalAdding] = useState(false);
   const [testingId, setTestingId] = useState<number | null>(null);
@@ -53,6 +62,8 @@ export function ModelsScreen({
   const handleCloseAdd = () => {
     setInternalAdding(false);
     onAddFinished?.();
+    // The connection may already be saved (Cancel on Choose models), so show it.
+    void refresh();
   };
 
   const handleTest = async (id: number) => {
@@ -60,7 +71,8 @@ export function ModelsScreen({
     setTestResult(null);
 
     const res = await commands.testConnection(id);
-    setTestingId(null);
+    // Another card's Test may have started meanwhile; leave its state alone.
+    setTestingId((cur) => (cur === id ? null : cur));
 
     if (res.status === "ok") {
       setTestResult({ id, text: "Working", isError: false });
@@ -89,6 +101,8 @@ export function ModelsScreen({
     } else {
       setNewKey("");
       setReplacingId(null);
+      // The new key was tested before it was saved, so an old failure no longer applies.
+      setTestResult((cur) => (cur?.id === id ? null : cur));
       await refresh();
     }
   };
@@ -155,22 +169,19 @@ export function ModelsScreen({
         </button>
       </div>
 
-      {loadError ? (
-        <div className="flex-1 flex flex-col items-center justify-center py-16 text-center">
-          <div className="max-w-md w-full bg-neutral-900 border border-red-900/60 rounded-xl p-8 shadow-xl">
-            <h2 className="text-base font-semibold text-red-200 mb-2">
-              Unable to load connections
-            </h2>
-            <p className="text-xs text-red-400">
-              {loadError}
-            </p>
-          </div>
+      {/* A banner, not a replacement: the Ollama panel and any loaded cards stay usable. */}
+      {loadError && (
+        <div role="alert" className="mb-6 bg-neutral-900 border border-red-900/60 rounded-xl p-4">
+          <h2 className="text-sm font-semibold text-red-200 mb-1">
+            Unable to load connections
+          </h2>
+          <p className="text-xs text-red-400">{loadError}</p>
         </div>
-      ) : (
+      )}
         <div className="space-y-6">
           <LocalPanel />
 
-          {cloudConnections.length === 0 ? (
+          {cloudConnections.length === 0 && !loadError ? (
             <div className="flex-1 flex flex-col items-center justify-center py-12 text-center bg-neutral-900/40 border border-neutral-800 rounded-xl">
               <div className="text-neutral-400 text-sm font-medium mb-3">
                 No cloud models yet
@@ -395,7 +406,6 @@ export function ModelsScreen({
             </div>
           )}
         </div>
-      )}
 
       {/* Add Connection Dialog */}
       {isAddingOpen && <AddConnectionDialog onClose={handleCloseAdd} />}

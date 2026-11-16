@@ -17,7 +17,7 @@ export interface SettingsStore {
   setCheckUpdates(enabled: boolean): Promise<void>;
 }
 
-export const useSettingsStore = create<SettingsStore>((set) => {
+export const useSettingsStore = create<SettingsStore>((set, get) => {
   setSystemChangeCallback((resolved) => {
     set({ resolved });
   });
@@ -52,20 +52,38 @@ export const useSettingsStore = create<SettingsStore>((set) => {
       }
     },
 
+    // Each setter shows the new value at once; a failed save puts the old one back and says why.
     setTheme: async (theme: Theme) => {
-      const resolved = applyTheme(theme);
-      set({ theme, resolved });
-      await commands.setTheme(theme);
+      const prev = get().theme;
+      set({ theme, resolved: applyTheme(theme) });
+      const res = await commands.setTheme(theme);
+      if (res.status === "error") {
+        set({ theme: prev, resolved: applyTheme(prev), loadError: appErrorText(res.error) });
+      } else {
+        set({ loadError: null });
+      }
     },
 
     setKeepAlive: async (keepAlive: KeepAlive) => {
+      const prev = get().keepAlive;
       set({ keepAlive });
-      await commands.setKeepAlive(keepAlive);
+      const res = await commands.setKeepAlive(keepAlive);
+      set(
+        res.status === "error"
+          ? { keepAlive: prev, loadError: appErrorText(res.error) }
+          : { loadError: null },
+      );
     },
 
     setCheckUpdates: async (enabled: boolean) => {
+      const prev = get().checkUpdatesAtStart;
       set({ checkUpdatesAtStart: enabled });
-      await commands.setCheckUpdates(enabled);
+      const res = await commands.setCheckUpdates(enabled);
+      set(
+        res.status === "error"
+          ? { checkUpdatesAtStart: prev, loadError: appErrorText(res.error) }
+          : { loadError: null },
+      );
     },
   };
 });

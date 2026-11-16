@@ -24,23 +24,28 @@ export function UpdateBar() {
       className="flex items-center justify-between gap-3 px-6 py-2 border-b border-neutral-800 bg-neutral-900 text-xs text-neutral-200 select-none"
     >
       <span className="truncate">A.I.D.P {found.version} is available.</span>
-      <div className="flex items-center gap-2 shrink-0">
-        {error && <span className="text-red-400">{error}</span>}
+      {/* Only the error gives up width, so a long one can't push the buttons off a 720 px window. */}
+      <div className="flex items-center gap-2 min-w-0">
+        {error && (
+          <span className="text-red-400 truncate" title={error}>
+            {error}
+          </span>
+        )}
         {status ? (
-          <span className="text-neutral-400">{status}</span>
+          <span className="text-neutral-400 shrink-0">{status}</span>
         ) : (
           <>
             <button
               type="button"
               onClick={() => void install()}
-              className="px-2.5 py-1 rounded-md bg-neutral-100 text-neutral-900 font-semibold hover:bg-white transition-colors cursor-pointer"
+              className="shrink-0 px-2.5 py-1 rounded-md bg-neutral-100 text-neutral-900 font-semibold hover:bg-white transition-colors cursor-pointer"
             >
               Install and restart
             </button>
             <button
               type="button"
               onClick={later}
-              className="px-2.5 py-1 rounded-md text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800 transition-colors cursor-pointer"
+              className="shrink-0 px-2.5 py-1 rounded-md text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800 transition-colors cursor-pointer"
             >
               Later
             </button>

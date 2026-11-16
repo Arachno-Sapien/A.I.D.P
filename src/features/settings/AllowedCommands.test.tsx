@@ -38,6 +38,22 @@ describe("AllowedCommands", () => {
     expect(commands.removeAllowedCommand).toHaveBeenCalledWith("C:/work/app", "npm run lint");
   });
 
+  it("a later successful Remove clears an earlier error", async () => {
+    vi.mocked(commands.removeAllowedCommand).mockResolvedValueOnce({
+      status: "error",
+      error: { kind: "storage", message: "locked" },
+    });
+    render(<AllowedCommands />);
+    await waitFor(() => expect(screen.getByText("C:/work/site")).toBeTruthy());
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove npm run lint in C:/work/app" }));
+    await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove npm run lint in C:/work/app" }));
+    await waitFor(() => expect(screen.queryByText("npm run lint")).toBeNull());
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
   it("says when there are none", async () => {
     vi.mocked(commands.listAllowedCommands).mockResolvedValue({ status: "ok", data: [] });
     render(<AllowedCommands />);

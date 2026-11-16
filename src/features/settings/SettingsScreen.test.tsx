@@ -140,6 +140,42 @@ describe("SettingsScreen", () => {
     expect(screen.queryByText("You're up to date.")).toBeNull();
   });
 
+  it("a failed default-model save says so", async () => {
+    vi.mocked(commands.setDefaultModel).mockResolvedValueOnce({
+      status: "error",
+      error: { kind: "storage", message: "locked" },
+    });
+    render(<SettingsScreen />);
+    fireEvent.change(screen.getByLabelText("Default model"), {
+      target: { value: "3:qwen2.5-coder:1.5b" },
+    });
+    expect(
+      await screen.findByText("Couldn't read or write the local database: locked"),
+    ).toBeDefined();
+  });
+
+  it("a failed theme, keep-alive or update-check save reverts and says so", async () => {
+    const err = { status: "error" as const, error: { kind: "storage" as const, message: "locked" } };
+    const text = "Couldn't read or write the local database: locked";
+    vi.mocked(commands.setTheme).mockResolvedValueOnce(err);
+    vi.mocked(commands.setKeepAlive).mockResolvedValueOnce(err);
+    vi.mocked(commands.setCheckUpdates).mockResolvedValueOnce(err);
+
+    await useSettingsStore.getState().setTheme("light");
+    expect(useSettingsStore.getState().theme).toBe("dark");
+    expect(useSettingsStore.getState().loadError).toBe(text);
+
+    await useSettingsStore.getState().setKeepAlive("oneHour");
+    expect(useSettingsStore.getState().keepAlive).toBe("ollamaDefault");
+
+    await useSettingsStore.getState().setCheckUpdates(false);
+    expect(useSettingsStore.getState().checkUpdatesAtStart).toBe(true);
+
+    await useSettingsStore.getState().setKeepAlive("oneHour");
+    expect(useSettingsStore.getState().keepAlive).toBe("oneHour");
+    expect(useSettingsStore.getState().loadError).toBeNull();
+  });
+
   it("turns the start-up update check off", () => {
     render(<SettingsScreen />);
     const box = screen.getByRole("checkbox", { name: "Check for updates at start" });
