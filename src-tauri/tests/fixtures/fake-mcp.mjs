@@ -1,7 +1,9 @@
 // A tiny MCP server for tests. argv[2] === "silent": never answers;
 // "slowinit": answers initialize after 600 ms.
 import { createInterface } from "node:readline";
+import { appendFileSync } from "node:fs";
 const mode = process.argv[2];
+appendFileSync("spawned.txt", `${process.pid}\n`); // one line per process, in its own folder
 const send = (m) => process.stdout.write(JSON.stringify(m) + "\n");
 process.stdout.write("fake server starting\n"); // junk on stdout, on purpose
 process.stderr.write("log line on stderr\n");

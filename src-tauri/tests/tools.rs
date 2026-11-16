@@ -766,6 +766,25 @@ async fn stop_ends_a_detached_process() {
     assert!(!root.join("late.txt").exists(), "the detached process kept running");
 }
 
+/// A command that finishes on its own also ends what it left running in the
+/// background, as the job object does on Windows. (There a background process
+/// inherits the output pipes, so the command can't finish before it does.)
+#[cfg(not(windows))]
+#[tokio::test]
+async fn finish_ends_a_detached_process() {
+    let dir = TempDir::new();
+    let root = dir.path();
+    let cmd = "(sleep 3; echo late > late.txt) > /dev/null 2>&1 &";
+
+    let end = run_command(root, cmd, Duration::from_secs(30), &CancellationToken::new(), OUTPUT_LIMIT)
+        .await
+        .unwrap();
+    assert!(matches!(end, CommandEnd::Finished(ref r) if !r.timed_out), "{end:?}");
+
+    tokio::time::sleep(Duration::from_secs(5)).await;
+    assert!(!root.join("late.txt").exists(), "the detached process kept running");
+}
+
 #[tokio::test]
 async fn timeout_works_with_a_background_process() {
     let dir = TempDir::new();

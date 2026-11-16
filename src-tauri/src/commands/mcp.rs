@@ -27,8 +27,11 @@ pub async fn set_mcp_server_enabled(
     id: u32,
     enabled: bool,
 ) -> Result<(), AppError> {
+    // Saved first, so an agent run either reads the change or meets it in the hub.
     services.set_mcp_server_enabled(id, enabled)?;
-    if !enabled {
+    if enabled {
+        hub.turn_on(id);
+    } else {
         hub.stop(id).await;
     }
     Ok(())

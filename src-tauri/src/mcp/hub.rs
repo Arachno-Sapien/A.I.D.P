@@ -6,14 +6,14 @@ use crate::gateway::ToolSpec;
 use crate::tools::command::{kill_tree, shell_command};
 #[cfg(windows)]
 use crate::tools::command::Job;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::process::Stdio;
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::{Duration, Instant};
 use tokio::io::AsyncReadExt;
 use tokio::process::Child;
-use tokio::sync::Mutex as AsyncMutex;
+use tokio::sync::{Mutex as AsyncMutex, OwnedMutexGuard};
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
@@ -38,6 +38,12 @@ pub struct Hub {
     /// How many times each server was stopped. A start that began before a stop
     /// (Remove or Off pressed while it starts) must not add the server afterwards.
     stops: Arc<Mutex<HashMap<u32, u64>>>,
+    /// Servers stopped (turned off or removed) and not turned on since. An agent run
+    /// read the server list before it starts each server in turn, so `start` refuses
+    /// these. Always locked after `stops`, so a start sees a stop whole or not at all.
+    off: Arc<Mutex<HashSet<u32>>>,
+    /// One start of a server at a time: a second waits and then uses the first's process.
+    starting: Arc<Mutex<HashMap<u32, Arc<AsyncMutex<()>>>>>,
     /// How many agent runs use each server. A held server is never idle: a run can
     /// spend over 10 minutes on commands and approvals between two calls.
     holds: Arc<Mutex<HashMap<u32, usize>>>,
@@ -81,6 +87,8 @@ impl Hub {
             base,
             running: Arc::new(AsyncMutex::new(HashMap::new())),
             stops: Arc::new(Mutex::new(HashMap::new())),
+            off: Arc::new(Mutex::new(HashSet::new())),
+            starting: Arc::new(Mutex::new(HashMap::new())),
             holds: Arc::new(Mutex::new(HashMap::new())),
         }
     }
@@ -90,15 +98,56 @@ impl Hub {
         guard.get(&id).copied().unwrap_or(0)
     }
 
+    /// The user turned the server on again: agent runs may start it.
+    pub fn turn_on(&self, id: u32) {
+        self.off.lock().unwrap_or_else(PoisonError::into_inner).remove(&id);
+    }
+
+    /// Waits until no other start of server `id` is in progress (or `cancel`).
+    async fn start_turn(
+        &self,
+        id: u32,
+        cancel: &CancellationToken,
+    ) -> Result<OwnedMutexGuard<()>, McpError> {
+        let lock = {
+            let mut guard = self.starting.lock().unwrap_or_else(PoisonError::into_inner);
+            Arc::clone(guard.entry(id).or_default())
+        };
+        tokio::select! {
+            turn = lock.lock_owned() => Ok(turn),
+            _ = cancel.cancelled() => Err(McpError::Stopped),
+        }
+    }
+
     /// Starts the server unless it already runs with the same command and an open stream
     /// (a different command or a closed stream stops the old one first). Returns the number
-    /// of tools it offers after `to_specs` filtering.
+    /// of tools it offers after `to_specs` filtering. A server stopped since it was last
+    /// turned on is refused with `Stopped`.
     pub async fn start(
         &self,
         config: &ServerConfig,
         cancel: &CancellationToken,
     ) -> Result<usize, McpError> {
-        let stops_before = self.stop_count(config.id);
+        let _turn = self.start_turn(config.id, cancel).await?;
+        self.start_in_turn(config, cancel, true).await.map(|(count, _)| count)
+    }
+
+    /// `start` for the caller holding the server's turn; also says whether it spawned
+    /// the process. `respect_off: false` is for Test, which works on a server that is off.
+    async fn start_in_turn(
+        &self,
+        config: &ServerConfig,
+        cancel: &CancellationToken,
+        respect_off: bool,
+    ) -> Result<(usize, bool), McpError> {
+        let stops_before = {
+            let stops = self.stops.lock().unwrap_or_else(PoisonError::into_inner);
+            let off = self.off.lock().unwrap_or_else(PoisonError::into_inner);
+            if respect_off && off.contains(&config.id) {
+                return Err(McpError::Stopped);
+            }
+            stops.get(&config.id).copied().unwrap_or(0)
+        };
         let existing = {
             let mut guard = self.running.lock().await;
             if let Some(entry) = guard.get_mut(&config.id)
@@ -106,7 +155,7 @@ impl Hub {
                 && !entry.client.is_closed()
             {
                 entry.last_used = Instant::now();
-                return Ok(to_specs(&entry.name, &entry.tools).len());
+                return Ok((to_specs(&entry.name, &entry.tools).len(), false));
             }
             guard.remove(&config.id)
         };
@@ -211,7 +260,7 @@ impl Hub {
                 if let Some(old) = displaced {
                     kill_running(old, false).await;
                 }
-                Ok(count)
+                Ok((count, true))
             }
             Err(McpError::Closed { .. }) => {
                 let tail = kill_running(entry, true).await;
@@ -227,16 +276,28 @@ impl Hub {
     /// Test in Settings: starts the server (or uses the running one) and returns its
     /// tool names. A server that is turned off is stopped again, because off means
     /// not running; one that is on stays up for the agent run that usually follows.
+    /// `config` may be stale (the user turned it on since), so Test stops only a process
+    /// it started itself and no agent run holds.
     pub async fn test(&self, config: &ServerConfig) -> Result<Vec<String>, McpError> {
-        self.start(config, &CancellationToken::new()).await?;
+        let cancel = CancellationToken::new();
+        let _turn = self.start_turn(config.id, &cancel).await?;
+        let (_, spawned) = self.start_in_turn(config, &cancel, false).await?;
         let names = self
             .specs(&[config.id])
             .await
             .iter()
             .filter_map(|s| split_name(&s.name).map(|(_, tool)| tool.to_string()))
             .collect();
-        if !config.enabled {
-            self.stop(config.id).await;
+        let held = self
+            .holds
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .contains_key(&config.id);
+        if !config.enabled && spawned && !held {
+            let entry = self.running.lock().await.remove(&config.id);
+            if let Some(r) = entry {
+                kill_running(r, false).await;
+            }
         }
         Ok(names)
     }
@@ -256,9 +317,12 @@ impl Hub {
             .collect()
     }
 
-    /// Calls `mcp__server__tool`. Unknown server or tool: `Protocol { message: "no such tool" }`.
+    /// Calls `mcp__server__tool` on server `server_id`, the one the run started (ids are
+    /// never reused, so a newer server with the same name can't answer). Unknown server
+    /// or tool: `Protocol { message: "no such tool" }`.
     pub async fn call(
         &self,
+        server_id: u32,
         full_name: &str,
         arguments: serde_json::Value,
         timeout: Duration,
@@ -270,9 +334,9 @@ impl Hub {
             });
         };
 
-        let (server_id, client) = {
+        let client = {
             let mut guard = self.running.lock().await;
-            let Some((&id, entry)) = guard.iter_mut().find(|(_, r)| r.name == server) else {
+            let Some(entry) = guard.get_mut(&server_id).filter(|r| r.name == server) else {
                 return Err(McpError::Protocol {
                     message: "no such tool".into(),
                 });
@@ -286,7 +350,7 @@ impl Hub {
                 });
             }
             entry.last_used = Instant::now();
-            (id, Arc::clone(&entry.client))
+            Arc::clone(&entry.client)
         };
 
         match client.call_tool(tool, arguments, timeout, cancel).await {
@@ -313,10 +377,13 @@ impl Hub {
         }
     }
 
+    /// Off or Remove in Settings: stops the server, and keeps agent runs from starting
+    /// it until `turn_on`.
     pub async fn stop(&self, id: u32) {
         {
             let mut stops = self.stops.lock().unwrap_or_else(PoisonError::into_inner);
             *stops.entry(id).or_insert(0) += 1;
+            self.off.lock().unwrap_or_else(PoisonError::into_inner).insert(id);
         }
         let entry = {
             let mut guard = self.running.lock().await;

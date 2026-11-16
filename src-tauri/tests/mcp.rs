@@ -57,6 +57,7 @@ async fn call_round_trip() {
     hub.start(&fake(""), &cancel).await.unwrap();
     let res = hub
         .call(
+            1,
             "mcp__fake__echo",
             json!({"text": "hello"}),
             Duration::from_secs(5),
@@ -84,11 +85,11 @@ async fn unknown_names_are_refused() {
 
     hub.start(&fake(""), &cancel).await.unwrap();
     let e1 = hub
-        .call("mcp__nope__x", json!({}), Duration::from_secs(5), &cancel)
+        .call(1, "mcp__nope__x", json!({}), Duration::from_secs(5), &cancel)
         .await
         .unwrap_err();
     let e2 = hub
-        .call("mcp__fake__nope", json!({}), Duration::from_secs(5), &cancel)
+        .call(1, "mcp__fake__nope", json!({}), Duration::from_secs(5), &cancel)
         .await
         .unwrap_err();
     assert!(matches!(e1, McpError::Protocol { .. }));
@@ -130,7 +131,7 @@ async fn server_death_fails_call_and_restarts() {
     hub.start(&fake(""), &cancel).await.unwrap();
     let err = tokio::time::timeout(
         Duration::from_secs(5),
-        hub.call("mcp__fake__die", json!({}), Duration::from_secs(5), &cancel),
+        hub.call(1, "mcp__fake__die", json!({}), Duration::from_secs(5), &cancel),
     )
     .await
     .unwrap()
@@ -149,6 +150,7 @@ async fn server_death_fails_call_and_restarts() {
     assert_eq!(count, 3);
     let echo = hub
         .call(
+            1,
             "mcp__fake__echo",
             json!({"text": "back"}),
             Duration::from_secs(5),
@@ -170,6 +172,7 @@ async fn slow_call_times_out() {
     hub.start(&fake(""), &cancel).await.unwrap();
     let err = hub
         .call(
+            1,
             "mcp__fake__slow",
             json!({}),
             Duration::from_millis(300),
@@ -182,6 +185,7 @@ async fn slow_call_times_out() {
 
     let echo = hub
         .call(
+            1,
             "mcp__fake__echo",
             json!({"text": "ok"}),
             Duration::from_secs(5),
@@ -324,7 +328,91 @@ async fn stop_during_start_wins() {
     assert_eq!(starting.await.unwrap(), Err(McpError::Stopped));
     assert!(!hub.is_running(1).await);
 
-    // A later start of the same server is not affected by the old stop.
+    // Turned on again, a later start is not affected by the old stop.
+    hub.turn_on(1);
     assert_eq!(hub.start(&fake(""), &CancellationToken::new()).await, Ok(3));
+    hub.stop_all().await;
+}
+
+/// An agent run reads the server list before it starts each server in turn, so a
+/// server turned off or removed meanwhile (stopped before its start) must not start.
+#[tokio::test]
+async fn a_server_stopped_before_its_start_does_not_start() {
+    let dir = TempDir::new();
+    let hub = Hub::new(dir.path().to_path_buf());
+    hub.stop(1).await;
+    assert_eq!(
+        hub.start(&fake(""), &CancellationToken::new()).await,
+        Err(McpError::Stopped)
+    );
+    assert!(!hub.is_running(1).await);
+
+    // Test in Settings still works on it, and leaves it stopped.
+    let off = ServerConfig { enabled: false, ..fake("") };
+    assert_eq!(hub.test(&off).await.unwrap().len(), 3);
+    assert!(!hub.is_running(1).await);
+
+    hub.turn_on(1);
+    assert_eq!(hub.start(&fake(""), &CancellationToken::new()).await, Ok(3));
+    hub.stop_all().await;
+}
+
+/// Test pressed while a run starts the same server: one process, and the second
+/// start must not kill the first one's process (a run may be using it).
+#[tokio::test]
+async fn two_starts_of_one_server_spawn_one_process() {
+    let dir = TempDir::new();
+    let hub = Hub::new(dir.path().to_path_buf());
+    let first = {
+        let hub = hub.clone();
+        tokio::spawn(async move { hub.start(&fake("slowinit"), &CancellationToken::new()).await })
+    };
+    tokio::time::sleep(Duration::from_millis(150)).await;
+    assert_eq!(hub.test(&fake("slowinit")).await.unwrap().len(), 3);
+    assert_eq!(first.await.unwrap(), Ok(3));
+    assert!(hub.is_running(1).await);
+
+    let log = std::fs::read_to_string(dir.path().join("fake").join("spawned.txt")).unwrap();
+    assert_eq!(log.lines().count(), 1, "spawned: {log}");
+    hub.stop_all().await;
+}
+
+/// Test read the server as off, but the user turned it on and a run now uses it:
+/// Test must not stop the process the run holds.
+#[tokio::test]
+async fn test_does_not_stop_a_server_a_run_holds() {
+    let dir = TempDir::new();
+    let hub = Hub::new(dir.path().to_path_buf());
+    let _hold = hub.hold(&[1]);
+    hub.start(&fake(""), &CancellationToken::new()).await.unwrap();
+
+    let stale = ServerConfig { enabled: false, ..fake("") };
+    assert_eq!(hub.test(&stale).await.unwrap().len(), 3);
+    assert!(hub.is_running(1).await);
+    hub.stop_all().await;
+}
+
+/// A call goes to the server the run started, by id: a newer server that took the
+/// same name (removed and added again) must not answer it.
+#[tokio::test]
+async fn a_call_reaches_only_the_server_the_run_started() {
+    let dir = TempDir::new();
+    let hub = Hub::new(dir.path().to_path_buf());
+    let cancel = CancellationToken::new();
+    hub.start(&fake(""), &cancel).await.unwrap();
+    hub.stop(1).await;
+    let newer = ServerConfig { id: 2, ..fake("") };
+    hub.start(&newer, &cancel).await.unwrap();
+
+    let echo = json!({"text": "x"});
+    let old = hub
+        .call(1, "mcp__fake__echo", echo.clone(), Duration::from_secs(5), &cancel)
+        .await;
+    assert!(matches!(old, Err(McpError::Protocol { .. })), "{old:?}");
+    let res = hub
+        .call(2, "mcp__fake__echo", echo, Duration::from_secs(5), &cancel)
+        .await
+        .unwrap();
+    assert_eq!(res.text, "x");
     hub.stop_all().await;
 }

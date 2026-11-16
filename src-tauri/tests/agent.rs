@@ -430,6 +430,55 @@ async fn run_commands_without_asking_skips_the_card() {
     )));
 }
 
+/// The model is told the time limit the command really had.
+#[tokio::test]
+async fn timed_out_command_reports_its_real_limit() {
+    let server = MockServer::start().await;
+    let temp_dir = TempDir::new();
+    let sleeper = if cfg!(windows) { "ping -n 6 127.0.0.1 >nul" } else { "sleep 5" };
+    let resp1 = sse_tool_calls(&[("call_1", "run_command", json!({"command": sleeper}))]);
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(QueueResponder::new(vec![resp1, sse_text("done")]))
+        .mount(&server)
+        .await;
+
+    let p = make_provider(&server);
+    let (channel, _events) = capture();
+    let approvals = Approvals::new();
+    let res = run(AgentRun {
+        provider: &p,
+        model: "test-model".into(),
+        messages: vec![ChatMessage {
+            role: Role::User,
+            content: "Wait".into(),
+        }],
+        root: temp_dir.path().to_path_buf(),
+        approvals: &approvals,
+        out: channel,
+        cancel: CancellationToken::new(),
+        command_timeout: Duration::from_secs(1),
+        local: Default::default(),
+        text_limit: aidp_lib::tools::READ_LIMIT,
+        review_at_end: false,
+        run_commands: true,
+        command_allowed: &|_| false,
+        vision: false,
+        servers: None,
+        mcp: None,
+    })
+    .await;
+    assert!(res.is_ok());
+
+    let reqs = server.received_requests().await.unwrap();
+    let second: serde_json::Value = reqs[1].body_json().unwrap();
+    let content = second["messages"].as_array().unwrap().last().unwrap()["content"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    assert!(content.starts_with("Timed out after 1 seconds"), "got: {content}");
+}
+
 #[tokio::test]
 async fn allowed_command_skips_the_card() {
     let server = MockServer::start().await;

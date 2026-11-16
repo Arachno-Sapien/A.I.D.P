@@ -36,6 +36,10 @@ struct Shared {
     status: ServerStatus,
     /// The terminal tab showing this server, if one is open.
     out: Option<Channel<TerminalEvent>>,
+    /// Its process group had no member left when it ended, so the group id may now
+    /// belong to another program and must not be killed. Unix only.
+    #[cfg_attr(windows, allow(dead_code))]
+    group_gone: bool,
 }
 
 type SharedRef = Arc<Mutex<Shared>>;
@@ -89,7 +93,7 @@ struct Server {
 impl Server {
     /// Whether a kill by its single process id is safe: not once the server has
     /// ended, when that id may belong to another program. (A Unix process group
-    /// id stays reserved while any member lives, so the group kill needs no check.)
+    /// id stays reserved only while a member lives; see `group_gone`.)
     #[cfg_attr(not(windows), allow(dead_code))]
     fn kill_wanted(&self) -> bool {
         self.pid.is_some() && lock(&self.shared).status.running
@@ -112,8 +116,10 @@ impl Drop for Server {
                 .stderr(std::process::Stdio::null())
                 .status();
         }
+        // ponytail: a child the server left behind that exits after the waiter's check
+        // frees the group id too; keeping the leader unreaped until here would close that.
         #[cfg(not(windows))]
-        {
+        if !lock(&self.shared).group_gone {
             let _ = std::process::Command::new("kill")
                 .args(["-KILL", "--", &format!("-{pid}")])
                 .stdout(std::process::Stdio::null())
@@ -172,6 +178,7 @@ impl Servers {
                 running: true,
             },
             out: None,
+            group_gone: false,
         }));
         let readers: Vec<_> = [
             child.stdout.take().map(|r| tokio::spawn(pump(r, shared.clone()))),
@@ -187,7 +194,21 @@ impl Servers {
             for reader in readers {
                 let _ = tokio::time::timeout(std::time::Duration::from_secs(2), reader).await;
             }
+            #[cfg(not(windows))]
+            let group_gone = match pid {
+                Some(pid) => !std::process::Command::new("kill")
+                    .args(["-0", "--", &format!("-{pid}")])
+                    .stdout(std::process::Stdio::null())
+                    .stderr(std::process::Stdio::null())
+                    .status()
+                    .is_ok_and(|s| s.success()),
+                None => true,
+            };
             let mut s = lock(&waiter_shared);
+            #[cfg(not(windows))]
+            {
+                s.group_gone = group_gone;
+            }
             s.status.running = false;
             s.status.exit_code = status.ok().and_then(|st| st.code());
             if let Some(out) = &s.out {
@@ -347,6 +368,15 @@ mod tests {
         let id = servers.start(&std::env::temp_dir(), "exit 0").await.unwrap();
         assert!(until(|| servers.output(id).is_some_and(|s| !s.running)).await);
         assert!(!servers.servers().get(&id).unwrap().kill_wanted());
+    }
+
+    #[cfg(not(windows))]
+    #[tokio::test]
+    async fn an_ended_group_is_not_killed() {
+        // Nothing is left in its process group, so the group id may be reused.
+        let servers = Servers::default();
+        let id = servers.start(&std::env::temp_dir(), "exit 0").await.unwrap();
+        assert!(until(|| servers.servers().get(&id).is_some_and(|s| lock(&s.shared).group_gone)).await);
     }
 
     #[tokio::test]

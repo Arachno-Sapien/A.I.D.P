@@ -90,7 +90,7 @@ pub fn server_specs() -> Vec<ToolSpec> {
     vec![
         ToolSpec {
             name: "start_server".to_string(),
-            description: "Start a command that keeps running, such as a dev server, in a terminal tab the user can see. Asks like run_command. Returns the server number and its output after up to 10 seconds (sooner once it prints an http:// address).".to_string(),
+            description: "Start a command that keeps running, such as a dev server, in a terminal tab the user can see. The user may be asked to approve it first, like run_command. Returns the server number and its output after up to 10 seconds (sooner once it prints an http:// address).".to_string(),
             schema: json!({
                 "type": "object",
                 "properties": {
@@ -114,10 +114,11 @@ pub fn server_specs() -> Vec<ToolSpec> {
 }
 
 pub fn specs() -> Vec<ToolSpec> {
+    // ponytail: "120 seconds" matches COMMAND_TIMEOUT; build it with format! if that ever varies.
     let run_command_desc: &'static str = if cfg!(windows) {
-        "Ask the user to run a shell command in the project folder, for example the tests. Runs with cmd.exe on Windows, no input, stopped after 120 seconds. The user sees the exact command and decides. Returns the exit code and the end of the output. For anything that keeps running, such as a dev server, use start_server."
+        "Run a shell command in the project folder, for example the tests. Runs with cmd.exe on Windows, no input, stopped after 120 seconds. The user sees the exact command and may be asked to approve it first. Returns the exit code and the end of the output. For anything that keeps running, such as a dev server, use start_server."
     } else {
-        "Ask the user to run a shell command in the project folder, for example the tests. Runs with sh, no input, stopped after 120 seconds. The user sees the exact command and decides. Returns the exit code and the end of the output. For anything that keeps running, such as a dev server, use start_server."
+        "Run a shell command in the project folder, for example the tests. Runs with sh, no input, stopped after 120 seconds. The user sees the exact command and may be asked to approve it first. Returns the exit code and the end of the output. For anything that keeps running, such as a dev server, use start_server."
     };
 
     vec![
@@ -340,6 +341,15 @@ mod tests {
         assert!(OUTSIDE_TOOLS_NOTE.contains("already running"));
         // Run without asking (decision 0029) means a call may not ask.
         assert!(!OUTSIDE_TOOLS_NOTE.contains("Each call asks"));
+        // Run commands without asking and Always allow (decision 0030) mean a command may not ask.
+        assert!(!EDITS_ASKED.contains("every command asks"));
+        assert!(!EDITS_AT_END.contains("Every command"));
+        let all = specs().into_iter().chain(server_specs());
+        for spec in all.filter(|s| s.name == "run_command" || s.name == "start_server") {
+            assert!(!spec.description.contains("decides"), "{}", spec.name);
+            assert!(!spec.description.starts_with("Ask the user"), "{}", spec.name);
+            assert!(spec.description.contains("may"), "{}", spec.name);
+        }
         assert!(!agent_system().contains("terminal"));
         assert!(agent_system().contains(EDITS_ASKED));
         let review = agent_system_for(false, true);

@@ -148,6 +148,12 @@ pub async fn run_with_images(
         specs_list.extend(server_specs());
     }
     let builtin_count = specs_list.len();
+    // Lives until the run ends, so the idle stop can't take a server away mid-run.
+    // Taken before the starts, so a Test in Settings sees this run and leaves them up.
+    let _hold = args.mcp.as_ref().map(|mcp| {
+        let ids: Vec<u32> = mcp.servers.iter().filter(|s| s.enabled).map(|s| s.id).collect();
+        mcp.hub.hold(&ids)
+    });
     if let Some(mcp) = &args.mcp {
         let mut enabled_ids = Vec::new();
         for server in mcp.servers.iter().filter(|s| s.enabled) {
@@ -197,11 +203,6 @@ pub async fn run_with_images(
             specs_list.extend(mcp.hub.specs(&enabled_ids).await);
         }
     }
-    // Lives until the run ends, so the idle stop can't take a server away mid-run.
-    let _hold = args.mcp.as_ref().map(|mcp| {
-        let ids: Vec<u32> = mcp.servers.iter().filter(|s| s.enabled).map(|s| s.id).collect();
-        mcp.hub.hold(&ids)
-    });
 
     let mut full_messages = vec![ChatMessage {
         role: Role::System,
@@ -253,6 +254,8 @@ pub async fn run_with_images(
                 && let Some((server, tool)) = split_name(&call.name)
                 // Only a tool a started server offered this run; anything else is an unknown tool.
                 && specs_list[builtin_count..].iter().any(|s| s.name == call.name)
+                // The server this run started, by id: a newer one may have taken its name.
+                && let Some(cfg) = mcp.servers.iter().find(|s| s.enabled && s.name == server)
             {
                 if !call.input.is_object() {
                     let err = format!(
@@ -285,10 +288,7 @@ pub async fn run_with_images(
                 }
 
                 // The user set this server to run without asking (decision 0029).
-                let ask = !mcp
-                    .servers
-                    .iter()
-                    .any(|s| s.name == server && s.auto_approve);
+                let ask = !cfg.auto_approve;
                 let rx = ask.then(|| args.approvals.register(id));
                 args.out
                     .send(ChatEvent::ToolCall {
@@ -306,7 +306,7 @@ pub async fn run_with_images(
                     Answer::Yes => {
                         match mcp
                             .hub
-                            .call(&call.name, call.input.clone(), CALL_TIMEOUT, &args.cancel)
+                            .call(cfg.id, &call.name, call.input.clone(), CALL_TIMEOUT, &args.cancel)
                             .await
                         {
                             Ok(res) => {
@@ -759,7 +759,8 @@ pub async fn run_with_images(
                                 Ok(command::CommandEnd::Finished(res)) => {
                                     let for_model = if res.timed_out {
                                         format!(
-                                            "Timed out after 120 seconds and was stopped.\n{}",
+                                            "Timed out after {} seconds and was stopped.\n{}",
+                                            args.command_timeout.as_secs(),
                                             res.output
                                         )
                                     } else {
@@ -1004,6 +1005,6 @@ pub async fn run_with_images(
     }
 
     Err(ProviderError::Provider {
-        message: "The model used 25 tool steps without finishing. Send a message to let it continue.".to_string(),
+        message: format!("The model used {MAX_STEPS} tool steps without finishing. Send a message to let it continue."),
     })
 }

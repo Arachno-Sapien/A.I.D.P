@@ -245,6 +245,10 @@ pub async fn run_command(
             let status = status.map_err(|e| WorkspaceError::Io {
                 message: e.to_string(),
             })?;
+            // End what the shell left running in its group (`cmd > /dev/null &`), as
+            // dropping the job does on Windows. Its id stays reserved while a member lives.
+            #[cfg(not(windows))]
+            kill_tree(pid).await;
             return Ok(finished(status.code(), &out, &err, false, output_limit));
         }
         _ = tokio::time::sleep(timeout) => true,
