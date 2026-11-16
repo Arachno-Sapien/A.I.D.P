@@ -50,6 +50,18 @@ fn first_in(dirs: impl IntoIterator<Item = PathBuf>, exe: &str) -> Option<PathBu
         .find(|candidate| candidate.is_file())
 }
 
+/// Starts `cmd` and waits for it on a thread of its own, so a process that exits
+/// while the app runs is not left as a zombie on macOS and Linux. The wait never
+/// kills it: `ollama serve` still outlives the app. Returns its process ID.
+fn spawn_reaped(cmd: &mut std::process::Command) -> std::io::Result<u32> {
+    let mut child = cmd.spawn()?;
+    let pid = child.id();
+    std::thread::spawn(move || {
+        let _ = child.wait();
+    });
+    Ok(pid)
+}
+
 pub fn start_serve(bin: &Path) -> std::io::Result<()> {
     let mut cmd = std::process::Command::new(bin);
     cmd.arg("serve")
@@ -64,7 +76,7 @@ pub fn start_serve(bin: &Path) -> std::io::Result<()> {
         cmd.creation_flags(CREATE_NO_WINDOW);
     }
 
-    cmd.spawn()?;
+    spawn_reaped(&mut cmd)?;
     Ok(())
 }
 
@@ -76,21 +88,21 @@ pub fn open_download_page() -> std::io::Result<()> {
         let mut cmd = std::process::Command::new("cmd");
         cmd.args(["/C", "start", "", OLLAMA_DOWNLOAD_URL]);
         cmd.creation_flags(CREATE_NO_WINDOW);
-        cmd.spawn()?;
+        spawn_reaped(&mut cmd)?;
     }
 
     #[cfg(target_os = "macos")]
     {
         let mut cmd = std::process::Command::new("open");
         cmd.arg(OLLAMA_DOWNLOAD_URL);
-        cmd.spawn()?;
+        spawn_reaped(&mut cmd)?;
     }
 
     #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
     {
         let mut cmd = std::process::Command::new("xdg-open");
         cmd.arg(OLLAMA_DOWNLOAD_URL);
-        cmd.spawn()?;
+        spawn_reaped(&mut cmd)?;
     }
 
     Ok(())
@@ -116,5 +128,18 @@ mod tests {
 
         assert_eq!(from_relative, None);
         assert_eq!(from_absolute, Some(abs.join(EXE)));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_started_process_that_exits_is_reaped() {
+        let pid = spawn_reaped(&mut std::process::Command::new("true")).unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(500));
+        let out = std::process::Command::new("ps")
+            .args(["-o", "stat=", "-p", &pid.to_string()])
+            .output()
+            .unwrap();
+        let stat = String::from_utf8_lossy(&out.stdout);
+        assert!(!stat.trim_start().starts_with('Z'), "zombie: {stat:?}");
     }
 }

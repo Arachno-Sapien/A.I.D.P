@@ -104,19 +104,43 @@ pub fn delete_conversation(conn: &Connection, id: u32) -> rusqlite::Result<bool>
     Ok(affected > 0)
 }
 
-/// The attachment IDs among `ids` that some message's stored parts mention.
+/// The attachment IDs among `ids` that some message's stored parts mention, anywhere
+/// in the text. One pass over the messages: every 64-character window of each hex run
+/// is looked up, so an ID inside a longer run still counts, as a substring search would.
 pub fn attachments_in_use(
     conn: &Connection,
     ids: &[String],
 ) -> rusqlite::Result<std::collections::HashSet<String>> {
-    let mut stmt = conn.prepare(
-        "SELECT EXISTS(SELECT 1 FROM messages WHERE instr(content_parts, ?1) > 0)",
-    )?;
+    const ID_LEN: usize = 64;
+    let wanted: std::collections::HashSet<&str> = ids.iter().map(String::as_str).collect();
     let mut used = std::collections::HashSet::new();
-    for id in ids {
-        let found: bool = stmt.query_row(params![id], |row| row.get(0))?;
-        if found {
-            used.insert(id.clone());
+    if wanted.is_empty() {
+        return Ok(used);
+    }
+    let mut stmt = conn.prepare("SELECT content_parts FROM messages")?;
+    let mut rows = stmt.query([])?;
+    while let Some(row) = rows.next()? {
+        let text: String = row.get(0)?;
+        let bytes = text.as_bytes();
+        let mut i = 0;
+        while i < bytes.len() {
+            if !bytes[i].is_ascii_hexdigit() {
+                i += 1;
+                continue;
+            }
+            let start = i;
+            while i < bytes.len() && bytes[i].is_ascii_hexdigit() {
+                i += 1;
+            }
+            // ASCII hex digits only, so every window is on a char boundary.
+            for s in start..(i + 1).saturating_sub(ID_LEN).max(start) {
+                if let Some(id) = wanted.get(&text[s..s + ID_LEN]) {
+                    used.insert((*id).to_string());
+                }
+            }
+        }
+        if used.len() == wanted.len() {
+            break;
         }
     }
     Ok(used)

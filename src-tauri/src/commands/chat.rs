@@ -56,8 +56,11 @@ pub async fn send_message(
     messages: Vec<ChatInput>,
     on_event: Channel<ChatEvent>,
 ) -> Result<(), AppError> {
-    let (messages, images) =
-        attachments::prepare(&services, &store, connection_id, &model_id, messages)?;
+    // Reads every attached file and encodes images: blocking work, moved off this
+    // runtime worker. Tauri's runtime is multi-threaded, which block_in_place needs.
+    let (messages, images) = tokio::task::block_in_place(|| {
+        attachments::prepare(&services, &store, connection_id, &model_id, messages)
+    })?;
     let cancel = chat.begin(surface);
     let result = services
         .stream(connection_id, model_id, messages, images, on_event.clone(), cancel)
@@ -109,8 +112,10 @@ pub async fn run_agent(
 
     let store = app.state::<AttachmentStore>();
     let hub = app.state::<crate::mcp::hub::Hub>();
-    let (messages, images) =
-        attachments::prepare(&services, &store, connection_id, &model_id, messages)?;
+    // Blocking file work, as in send_message.
+    let (messages, images) = tokio::task::block_in_place(|| {
+        attachments::prepare(&services, &store, connection_id, &model_id, messages)
+    })?;
     let servers = services.mcp_servers()?;
     let provider = services.provider_for(connection_id)?;
     let local = services.model_options(connection_id, &model_id);

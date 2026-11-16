@@ -29,9 +29,11 @@ impl OllamaState {
         *guard = None;
     }
 
+    /// Cancels without freeing the slot: only the pull's own finish_pull does that,
+    /// so a pull started while the cancelled one unwinds can't lose its token.
     pub fn cancel_pull(&self) {
-        let mut guard = self.pull_cancel.lock().unwrap_or_else(PoisonError::into_inner);
-        if let Some(token) = guard.take() {
+        let guard = self.pull_cancel.lock().unwrap_or_else(PoisonError::into_inner);
+        if let Some(token) = guard.as_ref() {
             token.cancel();
         }
     }
@@ -171,4 +173,24 @@ pub fn set_model_context(
     num_ctx: u32,
 ) -> Result<(), AppError> {
     services.set_model_context(&model_id, num_ctx)
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_cancelled_pull_holds_the_slot_until_it_finishes() {
+        let state = OllamaState::default();
+        let a = state.begin_pull().unwrap();
+        state.cancel_pull();
+        assert!(a.is_cancelled());
+        // Pull A is still unwinding: a second one must wait, or A's finish would drop its token.
+        assert!(state.begin_pull().is_err());
+        state.finish_pull();
+        let b = state.begin_pull().unwrap();
+        state.cancel_pull();
+        assert!(b.is_cancelled());
+    }
 }

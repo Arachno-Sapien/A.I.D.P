@@ -1,6 +1,7 @@
 use crate::close_guard::CloseGuard;
 use crate::connections::AppError;
 use crate::updates::{install_when_saved, kilobytes, UpdateEvent, UpdateInfo, UpdateState};
+use std::time::Duration;
 use tauri::ipc::Channel;
 use tauri::{AppHandle, State};
 use tauri_plugin_updater::UpdaterExt;
@@ -20,7 +21,20 @@ pub async fn check_update(
     let failed = |e: tauri_plugin_updater::Error| AppError::Update {
         message: format!("Couldn't check for updates: {e}"),
     };
-    let update = app.updater().map_err(failed)?.check().await.map_err(failed)?;
+    // A stalled connection fails instead of leaving "checking" or "downloading" up for
+    // good. The returned Update keeps this client setup, so its download gets the same
+    // limits; a read limit, not a total one, so a slow but moving download still ends.
+    let update = app
+        .updater_builder()
+        .configure_client(|c| {
+            c.connect_timeout(Duration::from_secs(10))
+                .read_timeout(Duration::from_secs(30))
+        })
+        .build()
+        .map_err(failed)?
+        .check()
+        .await
+        .map_err(failed)?;
     let info = update.as_ref().map(|u| UpdateInfo {
         version: u.version.clone(),
         notes: u.body.clone(),

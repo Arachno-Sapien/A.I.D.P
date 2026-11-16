@@ -448,33 +448,43 @@ pub fn resolve(
         let mut blocks = Vec::new();
         let mut own_images = Vec::new();
         for att in &input.attachments {
-            let bytes = match store.read(&att.id) {
-                Ok(bytes) => bytes,
-                Err(AppError::NotFound | AppError::InvalidInput { .. }) => {
-                    blocks.push(format!("[{} is no longer stored]", att.name));
-                    continue;
-                }
-                Err(e) => return Err(e),
+            let Ok(extracted) = store.text_path(&att.id) else {
+                blocks.push(format!("[{} is no longer stored]", att.name));
+                continue;
             };
-            let text = match detect(&bytes) {
-                Some((AttachmentKind::Image, mime)) => {
-                    if vision == Some(false) {
-                        if i == newest {
-                            return Err(refused(NO_VISION.to_string()));
-                        }
-                        // Sent to another model earlier: the chat goes on without it.
-                        blocks.push(format!("[{} not sent: this model can't read images]", att.name));
+            // Only a PDF has extracted text beside it: read that, not the PDF itself
+            // (up to 20 MB) on every send.
+            let text = if extracted.exists() && store.path(&att.id)?.exists() {
+                std::fs::read_to_string(&extracted).map_err(storage)?
+            } else {
+                let bytes = match store.read(&att.id) {
+                    Ok(bytes) => bytes,
+                    Err(AppError::NotFound | AppError::InvalidInput { .. }) => {
+                        blocks.push(format!("[{} is no longer stored]", att.name));
                         continue;
                     }
-                    own_images.push(ImageInput {
-                        mime: mime.to_string(),
-                        data_base64: BASE64.encode(&bytes),
-                    });
-                    continue;
+                    Err(e) => return Err(e),
+                };
+                match detect(&bytes) {
+                    Some((AttachmentKind::Image, mime)) => {
+                        if vision == Some(false) {
+                            if i == newest {
+                                return Err(refused(NO_VISION.to_string()));
+                            }
+                            // Sent to another model earlier: the chat goes on without it.
+                            blocks.push(format!("[{} not sent: this model can't read images]", att.name));
+                            continue;
+                        }
+                        own_images.push(ImageInput {
+                            mime: mime.to_string(),
+                            data_base64: BASE64.encode(&bytes),
+                        });
+                        continue;
+                    }
+                    Some((AttachmentKind::Text, _)) => String::from_utf8_lossy(&bytes).into_owned(),
+                    Some((AttachmentKind::Pdf, _)) => store.text(&att.id)?.unwrap_or_default(),
+                    None => continue,
                 }
-                Some((AttachmentKind::Text, _)) => String::from_utf8_lossy(&bytes).into_owned(),
-                Some((AttachmentKind::Pdf, _)) => store.text(&att.id)?.unwrap_or_default(),
-                None => continue,
             };
             let (text, cut) = cut_to(&text, budget);
             budget = budget.saturating_sub(text.len());
@@ -838,6 +848,27 @@ mod tests {
             resolve(&store, vec![input("q", vec![gone])], 10_000, None).unwrap();
         assert!(messages[0].content.contains("old.txt is no longer stored"));
         assert!(images[0].is_empty());
+    }
+
+    #[test]
+    fn a_pdf_resolves_from_its_text_without_reading_the_pdf() {
+        let store = temp_store();
+        let id = "d".repeat(64);
+        store.save_text(&id, "Extracted text").unwrap();
+        // A folder in the PDF's place: any read of it fails, so only the .txt may be used.
+        std::fs::create_dir_all(store.path(&id).unwrap()).unwrap();
+        let doc = AttachmentRef {
+            id: id.clone(),
+            name: "doc.pdf".to_string(),
+        };
+        let (messages, _) =
+            resolve(&store, vec![input("q", vec![doc.clone()])], 10_000, None).unwrap();
+        assert!(messages[0].content.contains("Extracted text"), "{}", messages[0].content);
+
+        // The PDF itself gone: still noted, even though its text is left over.
+        std::fs::remove_dir(store.path(&id).unwrap()).unwrap();
+        let (messages, _) = resolve(&store, vec![input("q", vec![doc])], 10_000, None).unwrap();
+        assert!(messages[0].content.contains("doc.pdf is no longer stored"));
     }
 
     #[tokio::test]
