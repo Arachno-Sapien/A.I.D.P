@@ -119,7 +119,7 @@ Windows signing through SignPath Foundation prepared 2026-11-12 by Claude Code (
 Next step: once SignPath accepts, the Windows job in `.github/workflows/release.yml` signs `aidp.exe` before NSIS packs it, then the installer, and makes the updater `.sig` only after signing (decision 0032).
 
 Whole-codebase audit done 2026-11-17 by Claude Code (Fable 5.2, then Opus 5.5), the human's request ("analyse the full codebase, fix functional, structural and security issues, optimize; check Settings: MCP and Commands that run without asking; move Updates to the bottom", then "commit & push once the fixes are done"): Updates is last in Settings; 43 confirmed audit findings fixed except the ones listed as open in `log/2026-11-17-m6-codebase-audit.md`. Gate green (rust 348, vitest 408). Not yet seen in the app; two Unix-only tests run only in CI.
-Next step: check the CI run on three OSes, then try the Settings changes and an agent run with Always allow in `npm run tauri dev`.
+Pushed `a327190`; CI run 43950682042 green on Windows, macOS and Linux (runs the two Unix-only tests). Next step: try the Settings changes and an agent run with Always allow in `npm run tauri dev`.
 
 ## Next 3 tasks
 
