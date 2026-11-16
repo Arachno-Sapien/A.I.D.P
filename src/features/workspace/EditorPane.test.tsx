@@ -54,6 +54,26 @@ describe("EditorPane", () => {
     expect(editor?.classList.contains("isolate")).toBe(true);
   });
 
+  it("open files are tabs a keyboard or screen reader can pick", () => {
+    buffers.set("a.ts", createState("a", "a.ts"));
+    buffers.set("b.ts", createState("b", "b.ts"));
+    const file = (path: string) => ({
+      path, name: path, version: "v1", lineEnding: "lf" as const, hasBom: false, isSecret: false, dirty: false,
+    });
+    useWorkspaceStore.setState({ tabs: [file("a.ts"), file("b.ts")], active: "a.ts" });
+
+    render(<EditorPane />);
+    expect(screen.getByRole("tablist", { name: "Open files" })).toBeDefined();
+    const b = screen.getByRole("tab", { name: "b.ts" });
+    expect(screen.getByRole("tab", { name: "a.ts" }).getAttribute("aria-selected")).toBe("true");
+    expect(b.getAttribute("aria-selected")).toBe("false");
+    expect(b.tagName).toBe("BUTTON");
+    expect(b.querySelector("button")).toBeNull();
+
+    fireEvent.click(b);
+    expect(useWorkspaceStore.getState().active).toBe("b.ts");
+  });
+
   it("tabs render dirty dots, clicking close on a dirty tab asks to discard", () => {
     const stateA = createState("const a = 1;", "a.ts");
     buffers.set("a.ts", stateA);

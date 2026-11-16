@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { Profiler } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../lib/bindings", () => ({
@@ -45,6 +46,20 @@ describe("ChatScreen", () => {
 
   afterEach(() => {
     cleanup();
+  });
+
+  it("a model download's progress does not re-render Chat", () => {
+    const onRender = vi.fn();
+    render(
+      <Profiler id="chat" onRender={onRender}>
+        <ChatScreen />
+      </Profiler>,
+    );
+    onRender.mockClear();
+    act(() => {
+      useModelsStore.setState({ pull: { name: "m", status: "pulling", completedMb: 1, totalMb: 9 } });
+    });
+    expect(onRender).not.toHaveBeenCalled();
   });
 
   it("the chat list shrinks before the chat does", () => {

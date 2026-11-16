@@ -52,7 +52,7 @@ export interface ChipsResult {
 }
 
 export interface BufferReader {
-  text: (path: string) => string | undefined;
+  length: (path: string) => number | undefined;
   selection: (path: string) => SelectionInfo | null;
 }
 
@@ -112,8 +112,7 @@ export function chipsFor(
     return Object.assign(empty, { file: null, selection: null });
   }
 
-  const text = buffers.text(tab.path) ?? "";
-  const isTooLarge = text.length > FILE_CHAR_LIMIT;
+  const isTooLarge = (buffers.length(tab.path) ?? 0) > FILE_CHAR_LIMIT;
 
   let fileChip: FileChip;
   if (tab.isSecret) {

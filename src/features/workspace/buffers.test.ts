@@ -15,6 +15,9 @@ describe("buffers", () => {
     // Initial state is not dirty
     expect(buffers.isDirty("a.ts")).toBe(false);
     expect(buffers.text("a.ts")).toBe(initialText);
+    // The length without building the text, counted the same way.
+    expect(buffers.length("a.ts")).toBe(initialText.length);
+    expect(buffers.length("missing.ts")).toBeUndefined();
 
     // Edit the text
     const editedState = state.update({

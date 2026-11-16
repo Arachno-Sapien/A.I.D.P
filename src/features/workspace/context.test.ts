@@ -44,7 +44,7 @@ describe("context", () => {
       dirty: false,
     };
     const mockBuffers = {
-      text: () => "SECRET=123",
+      length: () => "SECRET=123".length,
       selection: () => null,
     };
     const chips = chipsFor(envTab, mockBuffers);
@@ -66,7 +66,7 @@ describe("context", () => {
       dirty: false,
     };
     const mockBuffers = {
-      text: () => "a".repeat(FILE_CHAR_LIMIT + 1),
+      length: () => FILE_CHAR_LIMIT + 1,
       selection: () => null,
     };
     const chips = chipsFor(bigTab, mockBuffers);

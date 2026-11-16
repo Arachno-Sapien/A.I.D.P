@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { Profiler } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../lib/bindings", () => ({
@@ -41,6 +42,20 @@ describe("ModelPicker", () => {
     render(<ModelPicker left={<button type="button">Chat list</button>} />);
     expect(screen.getByRole("button", { name: "Chat list" })).toBeDefined();
     expect(screen.queryByRole("combobox", { name: "Model" })).toBeNull();
+  });
+
+  it("a model download's progress does not re-render the picker", () => {
+    const onRender = vi.fn();
+    render(
+      <Profiler id="picker" onRender={onRender}>
+        <ModelPicker left={<span>x</span>} />
+      </Profiler>,
+    );
+    onRender.mockClear();
+    act(() => {
+      useModelsStore.setState({ pull: { name: "m", status: "pulling", completedMb: 1, totalMb: 9 } });
+    });
+    expect(onRender).not.toHaveBeenCalled();
   });
 
   it("selects a local model with a colon", async () => {

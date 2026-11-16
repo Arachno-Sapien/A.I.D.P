@@ -56,7 +56,9 @@ export function AiPanel({ onApply }: AiPanelProps) {
     remove,
     startNew,
   } = useWorkspaceChatStore();
-  const { chatModels, selected } = useModelsStore();
+  const { chatModels, selected } = useModelsStore(
+    useShallow((s) => ({ chatModels: s.chatModels, selected: s.selected })),
+  );
 
   const [confirmClear, setConfirmClear] = useState(false);
   const [fileRemoved, setFileRemoved] = useState<Record<string, boolean>>({});
@@ -107,11 +109,10 @@ export function AiPanel({ onApply }: AiPanelProps) {
       : !isManuallyRemoved && !isTooLarge
     : false;
 
-  const activeDocText = activeTab ? buffers.text(activeTab.path) : undefined;
+  // The length only: this runs on every streamed chunk.
+  const activeDocLength = activeTab ? buffers.length(activeTab.path) : undefined;
   const isCut = Boolean(
-    fileEnabled &&
-      activeDocText !== undefined &&
-      activeDocText.length > budget,
+    fileEnabled && activeDocLength !== undefined && activeDocLength > budget,
   );
 
   const selInfo =
