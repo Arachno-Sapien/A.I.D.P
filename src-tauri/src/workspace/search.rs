@@ -70,6 +70,10 @@ pub fn search(
         if has_private_key(&decoded) {
             continue;
         }
+        // One lowercase copy per file; most files hold no match.
+        if !decoded.to_lowercase().contains(&query_lower) {
+            continue;
+        }
 
         let rel_path = to_rel(root, entry.path()).unwrap_or_else(|| name.to_string());
 

@@ -605,6 +605,40 @@ fn names_windows_would_change_are_refused() {
     assert!(resolve_new(root, ".env.local").is_ok());
 }
 
+/// Device names (aux, nul, com1...) make entries only a `\\?\` path can remove.
+#[cfg(windows)]
+#[test]
+fn windows_device_names_are_refused() {
+    let temp = TempDir::new();
+    let root = temp.path();
+    fs::write(root.join("notes"), "keep").unwrap();
+    for p in ["aux", "src/NUL", "Con.txt", "com1", "LPT9.js", "conin$"] {
+        assert_eq!(resolve_new(root, p), Err(WorkspaceError::OutsideFolder), "{p}");
+        assert_eq!(rename_entry(root, "notes", p), Err(WorkspaceError::OutsideFolder), "{p}");
+    }
+    for p in ["auxiliary", "console.ts", "com10", "nullable.rs"] {
+        assert!(resolve_new(root, p).is_ok(), "{p}");
+    }
+}
+
+/// An 8.3 short name (GIT~1) is a second name for .git; it is refused too.
+/// Skipped where the volume makes no short names.
+#[cfg(windows)]
+#[test]
+fn a_short_name_for_git_is_refused() {
+    let temp = TempDir::new();
+    let root = temp.path();
+    fs::create_dir(root.join(".git")).unwrap();
+    if fs::symlink_metadata(root.join("GIT~1")).is_err() {
+        eprintln!("no 8.3 names on this volume; skipped");
+        return;
+    }
+    let never = |_: &Path| -> Result<(), String> { panic!("nothing may be put away") };
+    assert_eq!(delete_entry(root, "GIT~1", never), Err(WorkspaceError::OutsideFolder));
+    assert_eq!(rename_entry(root, "GIT~1", "x"), Err(WorkspaceError::OutsideFolder));
+    assert!(root.join(".git").is_dir());
+}
+
 /// The names typed are checked, but a link can lead to a folder whose own name
 /// ends in a dot. The plain path the Recycle Bin gets would then name another
 /// folder, so `shell_path` refuses it before anything is put away.
