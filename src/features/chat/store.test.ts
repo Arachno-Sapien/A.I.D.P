@@ -710,6 +710,61 @@ describe("useChatStore", () => {
     expect(commands.deleteConversation).toHaveBeenCalledWith(3);
     expect(useChatStore.getState().conversationId).toBe(1);
   });
+
+  it("Send locks the chat before saving, and history comes from the chat it was sent in", async () => {
+    const store = createChatStore("chat");
+    store.setState({
+      messages: [{ id: "a1", role: "user", text: "from A", status: "complete" }],
+    });
+    let finishCreate: (v: unknown) => void = () => {};
+    vi.mocked(commands.createConversation).mockReturnValueOnce(
+      new Promise((r) => (finishCreate = r)) as never,
+    );
+    vi.mocked(commands.loadMessages).mockResolvedValueOnce({
+      status: "ok",
+      data: [
+        {
+          id: 1, role: "user", contentParts: JSON.stringify({ v: 1, text: "from B" }),
+          modelRef: null, modelName: null, status: "complete", errorKind: null,
+          tokensIn: null, tokensOut: null, createdAt: 1,
+        },
+      ],
+    });
+    const notes = { id: "c".repeat(64), name: "late.md", mime: "text/plain", size: 1, kind: "text" as const, warning: null };
+
+    const sent = store.getState().send("hi", { connectionId: 1, modelId: "m" });
+    // Stop shows and switching is blocked while the message is saved.
+    expect(store.getState().streaming).toBe(true);
+    // A file pasted in this window is kept for the next message.
+    store.getState().addAttachments([notes]);
+    // Another chat opened in this window is not sent as context.
+    await store.getState().load(9);
+    finishCreate({
+      status: "ok",
+      data: { id: 1, title: "hi", workspacePath: null, updatedAt: 1, pinned: false, archived: false },
+    });
+    await sent;
+
+    const history = vi.mocked(commands.sendMessage).mock.calls[0][3];
+    expect(history.map((h) => h.content)).toEqual(["from A", "hi"]);
+    expect(store.getState().pending.map((p) => p.id)).toEqual([notes.id]);
+    expect(store.getState().messages.map((m) => m.text)).toEqual(["from B"]);
+  });
+
+  it("a late end of an old reply leaves the newer reply streaming", async () => {
+    const store = createChatStore("workspace");
+    const model = { connectionId: 1, modelId: "m" };
+    await store.getState().send("one", model);
+    const first = vi.mocked(commands.sendMessage).mock.calls[0][4] as any;
+    await store.getState().load(9);
+    await store.getState().send("two", model);
+    const second = vi.mocked(commands.sendMessage).mock.calls[1][4] as any;
+
+    first.onmessage({ event: "error", data: { kind: "cancelled" } });
+    expect(store.getState().streaming).toBe(true);
+    second.onmessage({ event: "done", data: { tokensIn: 1, tokensOut: 1 } });
+    expect(store.getState().streaming).toBe(false);
+  });
 });
 
 describe("attachments", () => {

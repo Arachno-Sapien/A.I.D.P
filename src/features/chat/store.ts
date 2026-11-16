@@ -153,7 +153,6 @@ export interface ChatStore {
   stop(): Promise<void>;
   applyEvent(id: string, ev: ChatEvent, convId?: number | null): void;
   answer(id: number, approve: boolean): Promise<boolean>;
-  clear(): void;
 }
 
 export const createChatStore = (surface: ChatSurface, hooks?: ChatHooks) => {
@@ -349,6 +348,55 @@ export const createChatStore = (surface: ChatSurface, hooks?: ChatHooks) => {
       const history: ChatInput_Deserialize[] = [];
       let activeConvId = get().conversationId;
 
+      const userMessage: UiMessage = {
+        id: crypto.randomUUID(),
+        role: "user",
+        text: trimmed,
+        content: extra?.content,
+        chips: extra?.chips,
+        attachments: pending.length > 0 ? pending : undefined,
+        status: "complete",
+      };
+      const assistantPlaceholder: UiMessage = {
+        id: assistantId,
+        role: "assistant",
+        text: "",
+        target: extra?.target,
+        parts: isAgent ? [] : undefined,
+        status: "streaming",
+        modelRef,
+        modelName,
+      };
+
+      // History and the lock come before the first await: while the message is
+      // saved the user can't switch chats, and the history can't pick up another
+      // chat's messages. Only the files this message takes leave the composer.
+      if (extra?.system && !isAgent) {
+        history.push({ role: "system", content: extra.system });
+      }
+      for (const m of get().messages) {
+        if (
+          (m.status === "complete" || m.status === "stopped") &&
+          (m.text.trim() !== "" || (m.attachments?.length ?? 0) > 0)
+        ) {
+          history.push({
+            role: m.role,
+            content: m.content ?? m.text,
+            ...attachmentRefs(m.attachments),
+          });
+        }
+      }
+      history.push({
+        role: "user",
+        content: extra?.content ?? trimmed,
+        ...attachmentRefs(pending),
+      });
+      set((state) => ({
+        streaming: true,
+        pending: state.pending.filter((p) => !pending.some((q) => q.id === p.id)),
+        attachNotice: null,
+      }));
+
       sending = true;
       try {
         if (activeConvId === null) {
@@ -359,23 +407,15 @@ export const createChatStore = (surface: ChatSurface, hooks?: ChatHooks) => {
           if (createRes.status === "ok") {
             activeConvId = createRes.data.id;
             set((state) => ({
-              conversationId: activeConvId,
+              // Still on the new chat, unless another was opened meanwhile.
+              conversationId:
+                state.conversationId === null ? activeConvId : state.conversationId,
               conversations: [createRes.data, ...state.conversations],
             }));
           } else {
             set({ saveError: "Couldn't save this message." });
           }
         }
-
-        const userMessage: UiMessage = {
-          id: crypto.randomUUID(),
-          role: "user",
-          text: trimmed,
-          content: extra?.content,
-          chips: extra?.chips,
-          attachments: pending.length > 0 ? pending : undefined,
-          status: "complete",
-        };
 
         if (activeConvId !== null) {
           const appendRes = await commands.appendMessage(activeConvId, {
@@ -393,38 +433,6 @@ export const createChatStore = (surface: ChatSurface, hooks?: ChatHooks) => {
           }
         }
 
-        const assistantPlaceholder: UiMessage = {
-          id: assistantId,
-          role: "assistant",
-          text: "",
-          target: extra?.target,
-          parts: isAgent ? [] : undefined,
-          status: "streaming",
-          modelRef,
-          modelName,
-        };
-
-        if (extra?.system && !isAgent) {
-          history.push({ role: "system", content: extra.system });
-        }
-        for (const m of get().messages) {
-          if (
-            (m.status === "complete" || m.status === "stopped") &&
-            (m.text.trim() !== "" || (m.attachments?.length ?? 0) > 0)
-          ) {
-            history.push({
-              role: m.role,
-              content: m.content ?? m.text,
-              ...attachmentRefs(m.attachments),
-            });
-          }
-        }
-        history.push({
-          role: "user",
-          content: extra?.content ?? trimmed,
-          ...attachmentRefs(pending),
-        });
-
         inFlightReplies.set(assistantId, {
           message: assistantPlaceholder,
           convId: activeConvId,
@@ -434,11 +442,15 @@ export const createChatStore = (surface: ChatSurface, hooks?: ChatHooks) => {
           conversations: state.conversations.map((c) =>
             c.id === activeConvId ? { ...c, archived: false } : c,
           ),
-          messages: [...state.messages, userMessage, assistantPlaceholder],
-          streaming: true,
-          pending: [],
-          attachNotice: null,
+          // The reply is still saved to its own chat if another is open now.
+          messages:
+            state.conversationId === activeConvId
+              ? [...state.messages, userMessage, assistantPlaceholder]
+              : state.messages,
         }));
+      } catch (e) {
+        set({ streaming: inFlightReplies.size > 0 });
+        throw e;
       } finally {
         sending = false;
       }
@@ -551,7 +563,8 @@ export const createChatStore = (surface: ChatSurface, hooks?: ChatHooks) => {
             endedMsg = end(m);
             return endedMsg;
           }),
-          streaming: false,
+          // A late end of an older reply must not unlock a newer one.
+          streaming: inFlightReplies.size > 0,
         }));
         if (!endedMsg && inFlight) {
           endedMsg = end(inFlight.message);
@@ -600,10 +613,6 @@ export const createChatStore = (surface: ChatSurface, hooks?: ChatHooks) => {
 
     stop: async () => {
       await commands.stopReply(surface);
-    },
-
-    clear: () => {
-      set({ messages: [], streaming: false });
     },
   }));
   allStores.push(store);
