@@ -350,6 +350,27 @@ async fn attachments_in_use_are_found_in_stored_messages() {
     assert!(services.attachments_in_use(&[used]).unwrap().is_empty());
 }
 
+#[tokio::test]
+async fn an_attachment_id_inside_longer_text_still_counts_as_used() {
+    let services = create_services(Arc::new(MemoryStore::default()));
+    let first = format!("{}{}", "0".repeat(63), "1");
+    let second = format!("{}{}", "e".repeat(63), "f");
+    let unused = "9".repeat(64);
+    let conv = services.create_conversation("Tool output", None).unwrap();
+    // One id buried in a longer hex run, another between other words, as tool output holds them.
+    services
+        .append_message(
+            conv.id,
+            user_message(format!(r#"{{"v":1,"text":"ab{first}cd and x{second}."}}"#)),
+        )
+        .unwrap();
+
+    let found = services
+        .attachments_in_use(&[first.clone(), second.clone(), unused])
+        .unwrap();
+    assert_eq!(found, std::collections::HashSet::from([first, second]));
+}
+
 fn user_message(content_parts: String) -> NewMessage {
     NewMessage {
         role: Role::User,

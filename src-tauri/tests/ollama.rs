@@ -264,6 +264,37 @@ async fn pull_cancel() {
 }
 
 #[tokio::test]
+async fn pull_cancel_while_waiting_for_headers() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/api/pull"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_delay(std::time::Duration::from_secs(10))
+                .set_body_string("{\"status\":\"success\"}\n"),
+        )
+        .mount(&server)
+        .await;
+
+    let ollama = Ollama::new(reqwest::Client::new(), server.uri());
+    let (channel, _) = capture_pull();
+    let cancel = CancellationToken::new();
+    let stopper = cancel.clone();
+    tokio::spawn(async move {
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        stopper.cancel();
+    });
+
+    let started = std::time::Instant::now();
+    let err = ollama
+        .pull("model", channel, &cancel)
+        .await
+        .expect_err("cancelled");
+    assert_eq!(err, ProviderError::Cancelled);
+    assert!(started.elapsed() < std::time::Duration::from_secs(3));
+}
+
+#[tokio::test]
 async fn delete_missing_is_model_not_found() {
     let server = MockServer::start().await;
     Mock::given(method("DELETE"))

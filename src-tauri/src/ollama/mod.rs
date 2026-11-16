@@ -314,12 +314,16 @@ impl Ollama {
         cancel: &CancellationToken,
     ) -> Result<(), ProviderError> {
         let url = format!("{}/api/pull", self.base);
-        let resp = self
-            .client
-            .post(&url)
-            .json(&json!({ "model": name, "stream": true }))
-            .send()
+        // The request races the token too: Ollama can take a while to answer.
+        let resp = cancel
+            .run_until_cancelled(
+                self.client
+                    .post(&url)
+                    .json(&json!({ "model": name, "stream": true }))
+                    .send(),
+            )
             .await
+            .ok_or(ProviderError::Cancelled)?
             .map_err(map_reqwest_error)?;
 
         if !resp.status().is_success() {
