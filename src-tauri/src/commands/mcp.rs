@@ -1,8 +1,7 @@
 use crate::connections::{AppError, Services};
 use crate::mcp::hub::Hub;
-use crate::mcp::{split_name, ServerConfig};
+use crate::mcp::ServerConfig;
 use tauri::State;
-use tokio_util::sync::CancellationToken;
 
 #[tauri::command]
 #[specta::specta]
@@ -69,16 +68,8 @@ pub async fn test_mcp_server(
         .into_iter()
         .find(|s| s.id == id)
         .ok_or(AppError::NotFound)?;
-    let cancel = CancellationToken::new();
-    hub.start(&config, &cancel)
-        .await
-        .map_err(|e| AppError::InvalidInput {
-            message: e.to_string(),
-        })?;
-    let specs = hub.specs(&[id]).await;
-    Ok(specs
-        .into_iter()
-        .filter_map(|s| split_name(&s.name).map(|(_, tool)| tool.to_string()))
-        .collect())
+    hub.test(&config).await.map_err(|e| AppError::InvalidInput {
+        message: e.to_string(),
+    })
 }
 

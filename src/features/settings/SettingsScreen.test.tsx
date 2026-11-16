@@ -140,6 +140,30 @@ describe("SettingsScreen", () => {
     expect(screen.queryByText("You're up to date.")).toBeNull();
   });
 
+  it("shows Updates last", async () => {
+    render(<SettingsScreen />);
+    await screen.findByText("Version 0.1.0");
+    const titles = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
+    expect(titles).toEqual([
+      "Default model",
+      "Theme",
+      "Keep local models loaded",
+      "Outside tools (MCP)",
+      "Commands that run without asking",
+      "Updates",
+    ]);
+  });
+
+  it("marks the chosen keep-loaded option for screen readers", () => {
+    render(<SettingsScreen />);
+    const group = screen.getByRole("group", { name: "Keep local models loaded" });
+    const chosen = within(group).getByRole("button", { name: /Ollama default/ });
+    expect(chosen.getAttribute("aria-pressed")).toBe("true");
+    expect(
+      within(group).getByRole("button", { name: "1 hour" }).getAttribute("aria-pressed"),
+    ).toBe("false");
+  });
+
   it("turns the start-up update check off", () => {
     render(<SettingsScreen />);
     const box = screen.getByRole("checkbox", { name: "Check for updates at start" });

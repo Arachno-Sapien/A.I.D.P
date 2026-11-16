@@ -276,6 +276,13 @@ describe("OutsideTools", () => {
     ).toBeDefined();
   });
 
+  it("the preset hint says a browser window opens (the preset is not headless)", async () => {
+    render(<OutsideTools />);
+    await screen.findByText("No outside tools yet.");
+    expect(screen.getByText(/in a browser window you can watch/)).toBeDefined();
+    expect(screen.queryByText(/hidden browser/)).toBeNull();
+  });
+
   it("the preset command is pinned and local", () => {
     expect(BROWSER_PRESET.command).toMatch(/@playwright\/mcp@\d+\.\d+\.\d+ /);
     expect(BROWSER_PRESET.command).not.toContain("--headless");

@@ -90,8 +90,16 @@ pub fn split_name(full: &str) -> Option<(&str, &str)> {
     Some((server, tool))
 }
 
-/// Ok when 1–16 characters of `[a-z0-9]`.
+/// Ok when 1–16 characters of `[a-z0-9]` and not a device name Windows reserves,
+/// since the server runs in a folder named after it.
 pub fn check_server_name(name: &str) -> Result<(), String> {
+    let device = matches!(name, "con" | "prn" | "aux" | "nul")
+        || (name.len() == 4
+            && (name.starts_with("com") || name.starts_with("lpt"))
+            && matches!(name.as_bytes()[3], b'1'..=b'9'));
+    if device {
+        return Err("That name is reserved by Windows; choose another.".to_string());
+    }
     if !name.is_empty()
         && name.len() <= 16
         && name
@@ -270,6 +278,15 @@ mod tests {
         assert_eq!(check_server_name("my_server"), Err(msg.clone()));
         assert_eq!(check_server_name("a-b"), Err(msg.clone()));
         assert_eq!(check_server_name(&"a".repeat(17)), Err(msg));
+        // The server's folder is named after it, and Windows refuses these folder names.
+        for reserved in ["con", "prn", "aux", "nul", "com1", "lpt9"] {
+            assert_eq!(
+                check_server_name(reserved),
+                Err("That name is reserved by Windows; choose another.".to_string())
+            );
+        }
+        assert_eq!(check_server_name("console"), Ok(()));
+        assert_eq!(check_server_name("com0"), Ok(()));
     }
 
     #[test]

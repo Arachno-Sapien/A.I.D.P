@@ -1,4 +1,6 @@
+import { useState } from "react";
 import { commands, type ToolAction } from "../../lib/bindings";
+import { appErrorText } from "../chat/appErrorText";
 import type { ToolStep } from "../chat/store";
 import { useWorkspaceStore } from "./store";
 
@@ -44,6 +46,7 @@ export function awaitsAnswer(step: ToolStep): boolean {
 export function ToolStepView({ step, onAnswer }: ToolStepViewProps) {
   // The actions never change, so a step doesn't render with every store change.
   const { acceptProposal, rejectProposal } = useWorkspaceStore.getState();
+  const [allowError, setAllowError] = useState<string | null>(null);
   const label = stepLabel(step.action);
   const isPending = !step.outcome;
   const showApproval = awaitsAnswer(step);
@@ -106,7 +109,16 @@ export function ToolStepView({ step, onAnswer }: ToolStepViewProps) {
                   type="button"
                   title="Run it now and from now on in this folder without asking (Settings lists these)"
                   onClick={() => {
-                    void commands.allowCommand(command).then(() => onAnswer?.(step.id, true));
+                    setAllowError(null);
+                    // Runs only once it is saved; otherwise Run and Deny stay up.
+                    void commands
+                      .allowCommand(command)
+                      .then((res) =>
+                        res.status === "ok"
+                          ? onAnswer?.(step.id, true)
+                          : setAllowError(appErrorText(res.error)),
+                      )
+                      .catch((e: unknown) => setAllowError(String(e)));
                   }}
                   className="px-2.5 py-1 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs font-semibold rounded transition-colors cursor-pointer focus-visible:ring-1 focus-visible:ring-neutral-400 focus-visible:outline-none"
                 >
@@ -114,6 +126,11 @@ export function ToolStepView({ step, onAnswer }: ToolStepViewProps) {
                 </button>
               )}
             </div>
+          )}
+          {showApproval && allowError && (
+            <p role="alert" className="text-xs text-red-400">
+              Couldn&apos;t remember this command: {allowError}
+            </p>
           )}
         </div>
       )}

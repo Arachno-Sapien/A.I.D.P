@@ -176,16 +176,12 @@ export function OutsideTools() {
                 key={server.id}
                 className="p-3 rounded-lg border border-neutral-800 bg-neutral-950 space-y-2"
               >
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1 space-y-0.5">
-                    <div className="text-xs font-semibold text-neutral-100">
-                      {server.name}
-                    </div>
-                    <div className="font-mono text-xs text-neutral-400 break-words [overflow-wrap:anywhere]">
-                      {server.command}
-                    </div>
+                {/* The name and the controls share a row; the command gets the full width below. */}
+                <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+                  <div className="text-xs font-semibold text-neutral-100">
+                    {server.name}
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex flex-wrap items-center gap-2">
                     <label className="flex items-center gap-1.5 min-h-[24px] px-1 text-xs text-neutral-300 cursor-pointer select-none">
                       <input
                         type="checkbox"
@@ -232,6 +228,9 @@ export function OutsideTools() {
                       Remove
                     </button>
                   </div>
+                </div>
+                <div className="font-mono text-xs text-neutral-400 [overflow-wrap:anywhere]">
+                  {server.command}
                 </div>
                 {status && (
                   <p
@@ -322,9 +321,9 @@ export function OutsideTools() {
         </div>
 
         <p className="text-xs text-neutral-400">
-          Lets the agent open pages on localhost in a hidden browser and read
-          them. Needs Node.js 18 or newer. The first start downloads the
-          server, and may ask you to install a browser.
+          Lets the agent open pages on localhost in a browser window you can
+          watch, and read them. Needs Node.js 18 or newer. The first start
+          downloads the server, and may ask you to install a browser.
         </p>
       </form>
 

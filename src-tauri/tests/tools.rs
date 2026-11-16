@@ -490,10 +490,8 @@ fn edit_keeps_crlf_and_bom() {
     .unwrap();
     let run = apply_edit(root, &edit);
     assert!(!run.is_error);
-    assert_eq!(
-        run.for_model,
-        "The user accepted the change; crlf_bom.txt was written."
-    );
+    // Same text in both modes: under Review at end nobody has accepted it yet.
+    assert_eq!(run.for_model, "crlf_bom.txt was written.");
 
     let written = fs::read(root.join("crlf_bom.txt")).unwrap();
     assert!(written.starts_with(b"\xEF\xBB\xBF"));
@@ -537,7 +535,7 @@ fn create_file_flow() {
     // apply_create creates the file
     let run = apply_create(root, &new_file);
     assert!(!run.is_error);
-    assert_eq!(run.for_model, "The user accepted; n/new.txt was created.");
+    assert_eq!(run.for_model, "n/new.txt was created.");
     assert_eq!(
         fs::read_to_string(root.join("n/new.txt")).unwrap(),
         "line 1\nline 2"

@@ -562,7 +562,7 @@ pub fn apply_edit(root: &Path, edit: &Edit) -> ToolRun {
     };
     match files::write_file(root, req) {
         Ok(_) => ToolRun {
-            for_model: format!("The user accepted the change; {} was written.", edit.path),
+            for_model: format!("{} was written.", edit.path),
             is_error: false,
             outcome: ToolOutcome::Ok {
                 summary: "written".to_string(),
@@ -591,7 +591,7 @@ pub fn prepare_create(root: &Path, path: &str, text: &str) -> Result<NewFile, To
 pub fn apply_create(root: &Path, file: &NewFile) -> ToolRun {
     match files::create_file(root, &file.path, &file.text) {
         Ok(_) => ToolRun {
-            for_model: format!("The user accepted; {} was created.", file.path),
+            for_model: format!("{} was created.", file.path),
             is_error: false,
             outcome: ToolOutcome::Ok {
                 summary: "created".to_string(),

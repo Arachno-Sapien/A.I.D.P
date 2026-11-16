@@ -258,6 +258,29 @@ async fn stop_still_stops_a_held_server() {
     assert!(!hub.is_running(1).await);
 }
 
+/// Test in Settings works on a server that is turned off, but must not leave it
+/// running: off means stopped (outside-tool rule 4). One that is on stays up for
+/// the agent run that usually follows.
+#[tokio::test]
+async fn testing_a_turned_off_server_leaves_it_stopped() {
+    let dir = TempDir::new();
+    let hub = Hub::new(dir.path().to_path_buf());
+
+    let off = ServerConfig {
+        enabled: false,
+        ..fake("")
+    };
+    let tools = hub.test(&off).await.unwrap();
+    assert_eq!(tools, vec!["echo", "slow", "die"]);
+    assert!(!hub.is_running(1).await);
+
+    let tools = hub.test(&fake("")).await.unwrap();
+    assert_eq!(tools, vec!["echo", "slow", "die"]);
+    assert!(hub.is_running(1).await);
+
+    hub.stop_all().await;
+}
+
 #[tokio::test]
 async fn changed_command_restarts() {
     let dir = TempDir::new();

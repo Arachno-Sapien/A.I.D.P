@@ -57,7 +57,10 @@ export function AllowedCommands() {
                   key={item.command}
                   className="flex items-center justify-between gap-3 px-3 py-1.5 rounded bg-neutral-950 border border-neutral-800"
                 >
-                  <code className="text-xs text-neutral-200 break-all">{item.command}</code>
+                  {/* Breaks at spaces first, so a long command stays readable. */}
+                  <code className="min-w-0 text-xs text-neutral-200 [overflow-wrap:anywhere]">
+                    {item.command}
+                  </code>
                   <button
                     type="button"
                     aria-label={`Remove ${item.command} in ${item.folder}`}

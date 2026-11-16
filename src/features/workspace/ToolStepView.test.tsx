@@ -28,6 +28,25 @@ describe("ToolStepView", () => {
     expect(commands.allowCommand).toHaveBeenCalledWith("npm test");
   });
 
+  it("when Always allow can't be saved, says so and leaves Run and Deny to the user", async () => {
+    vi.mocked(commands.allowCommand).mockResolvedValueOnce({
+      status: "error",
+      error: { kind: "storage", message: "disk full" },
+    });
+    const onAnswer = vi.fn();
+    const step: ToolStep = {
+      id: 10,
+      action: { tool: "runCommand", command: "npm test", folder: "C:\p" },
+      needsAnswer: true,
+    };
+    render(<ToolStepView step={step} onAnswer={onAnswer} />);
+    fireEvent.click(screen.getByRole("button", { name: "Always allow" }));
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toMatch(/couldn't remember/i);
+    expect(onAnswer).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Run" })).toBeDefined();
+  });
+
   it("a start server card asks like a command and shows where it runs", async () => {
     const onAnswer = vi.fn();
     const step: ToolStep = {

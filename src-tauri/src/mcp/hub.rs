@@ -224,6 +224,23 @@ impl Hub {
         }
     }
 
+    /// Test in Settings: starts the server (or uses the running one) and returns its
+    /// tool names. A server that is turned off is stopped again, because off means
+    /// not running; one that is on stays up for the agent run that usually follows.
+    pub async fn test(&self, config: &ServerConfig) -> Result<Vec<String>, McpError> {
+        self.start(config, &CancellationToken::new()).await?;
+        let names = self
+            .specs(&[config.id])
+            .await
+            .iter()
+            .filter_map(|s| split_name(&s.name).map(|(_, tool)| tool.to_string()))
+            .collect();
+        if !config.enabled {
+            self.stop(config.id).await;
+        }
+        Ok(names)
+    }
+
     /// The tools of the running servers among `ids`, in `id` order.
     pub async fn specs(&self, ids: &[u32]) -> Vec<ToolSpec> {
         let guard = self.running.lock().await;

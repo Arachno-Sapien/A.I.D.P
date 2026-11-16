@@ -207,13 +207,18 @@ export function SettingsScreen() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <div
+            role="group"
+            aria-label="Keep local models loaded"
+            className="grid grid-cols-1 sm:grid-cols-2 gap-2"
+          >
             {KEEP_ALIVE_OPTIONS.map((k) => {
               const active = keepAlive === k.id;
               return (
                 <button
                   key={k.id}
                   type="button"
+                  aria-pressed={active}
                   onClick={() => void setKeepAlive(k.id)}
                   className={`p-2.5 rounded-lg border text-left text-xs transition-colors cursor-pointer flex items-center justify-between ${
                     active
@@ -223,7 +228,10 @@ export function SettingsScreen() {
                 >
                   <span>{k.label}</span>
                   {active && (
-                    <span className="text-[10px] text-neutral-400 font-mono">
+                    <span
+                      aria-hidden="true"
+                      className="text-[10px] text-neutral-400 font-mono"
+                    >
                       ✓
                     </span>
                   )}
@@ -233,7 +241,13 @@ export function SettingsScreen() {
           </div>
         </div>
 
-        {/* Section 4: Updates */}
+        {/* Section 4: Outside tools (MCP) */}
+        <OutsideTools />
+
+        {/* Section 5: Commands the user chose to always allow */}
+        <AllowedCommands />
+
+        {/* Section 6: Updates, last */}
         <div className="app-raised p-5 rounded-xl bg-neutral-900 border border-neutral-800 space-y-3">
           <div>
             <h2 className="text-sm font-semibold text-white">Updates</h2>
@@ -277,11 +291,6 @@ export function SettingsScreen() {
             {updateError && <span className="text-red-400">{updateError}</span>}
           </div>
         </div>
-
-        {/* Section 5: Outside tools (MCP) */}
-        <OutsideTools />
-
-        <AllowedCommands />
       </div>
     </div>
   );
