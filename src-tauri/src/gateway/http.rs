@@ -37,6 +37,24 @@ fn parse_error_detail(body: &str) -> String {
     }
 }
 
+/// The one HTTP client every provider and Ollama call uses. It follows a redirect only
+/// within the same origin (scheme, host and port): keys ride in headers such as
+/// `x-api-key`, which reqwest would otherwise send on to any host, or over plain http.
+pub fn client() -> reqwest::Result<reqwest::Client> {
+    let same_origin = reqwest::redirect::Policy::custom(|attempt| {
+        let first = attempt.previous().first().map(|u| u.origin());
+        if attempt.previous().len() >= 5 || first != Some(attempt.url().origin()) {
+            attempt.stop()
+        } else {
+            attempt.follow()
+        }
+    });
+    reqwest::Client::builder()
+        .connect_timeout(Duration::from_secs(10))
+        .redirect(same_origin)
+        .build()
+}
+
 pub fn map_http_error(status: u16, retry_after: Option<&str>, body: &str) -> ProviderError {
     let lower = body.to_ascii_lowercase();
     // Only known refusals: a tool schema error ("...tools[0]... not supported") keeps its detail.

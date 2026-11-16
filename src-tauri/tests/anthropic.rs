@@ -535,6 +535,59 @@ async fn stop_cancels_a_waiting_request() {
     );
 }
 
+/// The key rides in `x-api-key`, which reqwest's default redirect policy forwards to any
+/// host. The app's client must follow a redirect only within the same origin.
+#[tokio::test]
+async fn the_key_never_follows_a_redirect_to_another_origin() {
+    let a = MockServer::start().await;
+    let b = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/v1/models"))
+        .respond_with(
+            ResponseTemplate::new(307).insert_header("location", format!("{}/v1/models", b.uri())),
+        )
+        .mount(&a)
+        .await;
+    Mock::given(method("GET"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"data": [], "has_more": false})))
+        .expect(0)
+        .mount(&b)
+        .await;
+
+    let p = Anthropic::new(
+        aidp_lib::gateway::http::client().unwrap(),
+        format!("{}/v1", a.uri()),
+        SecretString::from("sk-ant-test".to_string()),
+    );
+    assert!(p.list_models().await.is_err());
+    b.verify().await;
+}
+
+#[tokio::test]
+async fn a_redirect_within_the_same_origin_is_still_followed() {
+    let a = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/v1/models"))
+        .respond_with(
+            ResponseTemplate::new(307).insert_header("location", format!("{}/v2/models", a.uri())),
+        )
+        .mount(&a)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/v2/models"))
+        .and(header("x-api-key", "sk-ant-test"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"data": [], "has_more": false})))
+        .mount(&a)
+        .await;
+
+    let p = Anthropic::new(
+        aidp_lib::gateway::http::client().unwrap(),
+        format!("{}/v1", a.uri()),
+        SecretString::from("sk-ant-test".to_string()),
+    );
+    assert_eq!(p.list_models().await.unwrap(), vec![]);
+}
+
 #[tokio::test]
 async fn list_models_parses_display_name_and_context() {
     let server = MockServer::start().await;

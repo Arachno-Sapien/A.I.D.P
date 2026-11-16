@@ -293,7 +293,9 @@ impl Hub {
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .contains_key(&config.id);
-        if !config.enabled && spawned && !held {
+        // Turned off in this session: no run may use it, so a hold doesn't count.
+        let off_now = self.is_off(config.id);
+        if spawned && (off_now || (!config.enabled && !held)) {
             let entry = self.running.lock().await.remove(&config.id);
             if let Some(r) = entry {
                 kill_running(r, false).await;
@@ -333,6 +335,11 @@ impl Hub {
                 message: "no such tool".into(),
             });
         };
+        if self.is_off(server_id) {
+            return Err(McpError::Protocol {
+                message: "no such tool".into(),
+            });
+        }
 
         let client = {
             let mut guard = self.running.lock().await;
@@ -375,6 +382,14 @@ impl Hub {
             }
             Err(err) => Err(err),
         }
+    }
+
+    /// Turned off or removed in Settings since it was last turned on.
+    fn is_off(&self, id: u32) -> bool {
+        self.off
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .contains(&id)
     }
 
     /// Off or Remove in Settings: stops the server, and keeps agent runs from starting

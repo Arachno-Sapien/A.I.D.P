@@ -392,6 +392,27 @@ async fn test_does_not_stop_a_server_a_run_holds() {
     hub.stop_all().await;
 }
 
+/// A run holds the server, the user turns it off (so the run's start is refused), then
+/// presses Test: Test must not leave it running for the run, which could then call it.
+#[tokio::test]
+async fn test_stops_a_turned_off_server_even_when_a_run_holds_it() {
+    let dir = TempDir::new();
+    let hub = Hub::new(dir.path().to_path_buf());
+    let cancel = CancellationToken::new();
+    let _hold = hub.hold(&[1]);
+    hub.stop(1).await;
+    assert!(matches!(hub.start(&fake(""), &cancel).await, Err(McpError::Stopped)));
+
+    let off = ServerConfig { enabled: false, ..fake("") };
+    assert_eq!(hub.test(&off).await.unwrap().len(), 3);
+    assert!(!hub.is_running(1).await);
+    let call = hub
+        .call(1, "mcp__fake__echo", json!({"text": "x"}), Duration::from_secs(5), &cancel)
+        .await;
+    assert!(matches!(call, Err(McpError::Protocol { .. })), "{call:?}");
+    hub.stop_all().await;
+}
+
 /// A call goes to the server the run started, by id: a newer server that took the
 /// same name (removed and added again) must not answer it.
 #[tokio::test]

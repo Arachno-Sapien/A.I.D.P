@@ -56,12 +56,13 @@ pub async fn send_message(
     messages: Vec<ChatInput>,
     on_event: Channel<ChatEvent>,
 ) -> Result<(), AppError> {
+    // Registered first, so a Stop pressed while attachments load cancels this reply.
+    let cancel = chat.begin(surface);
     // Reads every attached file and encodes images: blocking work, moved off this
     // runtime worker. Tauri's runtime is multi-threaded, which block_in_place needs.
     let (messages, images) = tokio::task::block_in_place(|| {
         attachments::prepare(&services, &store, connection_id, &model_id, messages)
     })?;
-    let cancel = chat.begin(surface);
     let result = services
         .stream(connection_id, model_id, messages, images, on_event.clone(), cancel)
         .await;
@@ -110,6 +111,8 @@ pub async fn run_agent(
         }
     };
 
+    // Registered first, so a Stop pressed while attachments load cancels this run.
+    let cancel = chat.begin(ChatSurface::Workspace);
     let store = app.state::<AttachmentStore>();
     let hub = app.state::<crate::mcp::hub::Hub>();
     // Blocking file work, as in send_message.
@@ -122,7 +125,6 @@ pub async fn run_agent(
     let context = services.context_tokens(connection_id, &model_id);
     let vision = services.supports_vision(connection_id, &model_id) == Some(true);
     let text_limit = crate::tools::text_budget(context);
-    let cancel = chat.begin(ChatSurface::Workspace);
     let folder = crate::workspace::display_path(&root);
     // A storage error counts as not allowed: the command then asks.
     let command_allowed =

@@ -23,4 +23,4 @@ Option 2, chosen by the human. Each server in Settings has a **Run without askin
 
 ## Why
 
-The user adds every server by hand and can see every call on its card. The browser preset is headless, uses a throwaway profile and is limited to localhost addresses (still to be checked live, plan Task 8). The risk is that a page or tool result steers the agent into calls the user didn't want; the dialog says so, and the setting is per server, so a server the user doesn't trust keeps asking.
+The user adds every server by hand and can see every call on its card. The browser preset opens a window the user can watch (decision 0030), uses a throwaway profile and is limited to localhost addresses (still to be checked live, plan Task 8). The risk is that a page or tool result steers the agent into calls the user didn't want; the dialog says so, and the setting is per server, so a server the user doesn't trust keeps asking.

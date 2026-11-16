@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Settings:** Updates is now the last section, after Outside tools and Commands that run without asking. Each outside tool shows its command on its own full-width line, and long allowed commands wrap at spaces.
+- **Faster:** cloud models appear in the picker without waiting for Ollama; the AI panel no longer copies the open file on every streamed chunk; Chat, the model picker, the AI panel, Settings and Models no longer re-render on every Ollama download progress line; workspace search lowercases each file once; deleting a chat and the start-up attachment clean-up are much faster with a long history; a chat with PDFs no longer reads each whole PDF again on every send.
+- **Editor tabs** can be reached and switched with the keyboard and are announced by screen readers.
+
+### Fixed
+- **Security:** an Anthropic key could follow a provider's redirect to another host or to plain http. Provider requests now follow redirects only within the same origin.
+- **Security:** the Windows short name `GIT~1` could rename or delete the `.git` folder from the file tree. Names Windows reserves for devices (`aux`, `nul`, `con`, `com1`…) are refused in the workspace and as outside tool names.
+- **Outside tools:** a server turned off or removed while a task was starting its servers could still start; Test on a turned-off server left it running; Test during a task could start a second copy; a server removed and added again under the same name could answer an older task's calls and inherit its Run without asking. Calls now go only to the server the task started.
+- **Always allow** now runs the command only once it is saved; if saving fails, the card says so and keeps Run and Deny.
+- **The agent** is no longer told that every command asks you first (not true with Run commands without asking or Always allow) or that you accepted an edit under Review at end. A timed-out command reports its real time limit.
+- **Stop** pressed while a reply's attachments were still loading now stops the reply.
+- **Chat:** a message sent while switching chats could land in, or take context from, the wrong chat; the end of an older workspace reply could hide Stop for a newer run.
+- **Workspace:** accepting an edit could hide the agent's next proposed edit (leaving the run waiting); a double-click on Accept showed a false "changed on disk" bar; text typed while the agent's edit reloaded the file was lost.
+- **Models:** a connection added and then cancelled on the Choose models step now shows at once; a successful key replace clears the old test error; if connections fail to load, the Ollama panel stays usable; Cancel on a download now also stops one still waiting for Ollama, and a download started right after a cancel can always be cancelled.
+- **Settings:** a setting (theme, keep-alive, update check, default model) that can't be saved now says so and puts the old value back; Outside tools no longer says "No outside tools yet." when the list failed to load; a long update install error no longer pushes Install and Later off screen.
+- **Provider errors:** a tool-schema error shows the provider's own message instead of "This model can't use tools"; OpenRouter's "No endpoints found that support…" no longer reads as an unknown model.
+- **Updates:** checking for and downloading an update gives up on a stalled connection instead of staying on "checking" or "downloading".
+- **macOS and Linux:** a command the agent runs stops what it left in the background when it finishes; an ended agent server is no longer killed by its old process group id; `ollama serve` started by the app no longer stays behind as a defunct process.
+- **CI** runs with a read-only token and pins every action to a commit hash.
+
 ## [0.1.0-rc.7] - 2026-11-12
 
 ### Changed

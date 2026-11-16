@@ -1,6 +1,6 @@
 # Progress
 
-Updated: 2026-11-10 by Antigravity (Gemini 3.1 Pro)
+Updated: 2026-11-17 by Claude Code (Opus 5.5)
 
 ## Current milestone: M6 v0.1 release
 
@@ -118,7 +118,8 @@ The human published `v0.1.0-rc.6` at 14:37 UTC on 2026-11-12; rc.7 followed (bel
 Windows signing through SignPath Foundation prepared 2026-11-12 by Claude Code (Opus 5.5), the human's "Try SignPath (free)" (decision 0032): README "Code signing policy" (attribution, team, privacy, uninstall), a link on the release page, Uninstall in the user guide. The human applies at signpath.org and turns on two-factor login for GitHub and SignPath (GitHub's API didn't say whether it is on). The human submitted the SignPath Foundation application on 2026-11-12 ("Form submitted… we'll be in touch soon"); waiting for their reply.
 Next step: once SignPath accepts, the Windows job in `.github/workflows/release.yml` signs `aidp.exe` before NSIS packs it, then the installer, and makes the updater `.sig` only after signing (decision 0032).
 
-Whole-codebase audit under way 2026-11-15 by Claude Code (Fable 5.2), the human's request ("analyse the full codebase, fix functional, structural and security issues, optimize; check Settings: MCP and Commands that run without asking; move Updates to the bottom"). Next step: fix the verified findings test-first, then move the Updates section below `AllowedCommands` in `src/features/settings/SettingsScreen.tsx`.
+Whole-codebase audit done 2026-11-17 by Claude Code (Fable 5.2, then Opus 5.5), the human's request ("analyse the full codebase, fix functional, structural and security issues, optimize; check Settings: MCP and Commands that run without asking; move Updates to the bottom", then "commit & push once the fixes are done"): Updates is last in Settings; 43 confirmed audit findings fixed except the ones listed as open in `log/2026-11-17-m6-codebase-audit.md`. Gate green (rust 348, vitest 408). Not yet seen in the app; two Unix-only tests run only in CI.
+Next step: check the CI run on three OSes, then try the Settings changes and an agent run with Always allow in `npm run tauri dev`.
 
 ## Next 3 tasks
 

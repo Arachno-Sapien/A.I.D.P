@@ -131,9 +131,7 @@ pub fn run() -> tauri::Result<()> {
             std::fs::create_dir_all(&app_data_dir)?;
             let db_path = app_data_dir.join("aidp.db");
             let db = db::open(&db_path)?;
-            let http = reqwest::Client::builder()
-                .connect_timeout(Duration::from_secs(10))
-                .build()?;
+            let http = gateway::http::client()?;
             app.manage(connections::Services::new(
                 db,
                 Arc::new(secrets::Keychain),

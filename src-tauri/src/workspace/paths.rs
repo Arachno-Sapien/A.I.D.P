@@ -171,9 +171,10 @@ pub fn resolve_entry(root: &Path, rel: &str) -> Result<PathBuf, WorkspaceError> 
     match std::fs::symlink_metadata(&abs) {
         Ok(meta) => {
             // A second name for .git (the 8.3 alias GIT~1): canonicalize shows the real one.
+            let canon_root = std::fs::canonicalize(root).unwrap_or_else(|_| root.to_path_buf());
             if !meta.file_type().is_symlink()
                 && std::fs::canonicalize(&abs)
-                    .is_ok_and(|real| real.strip_prefix(root).is_ok_and(has_git_part))
+                    .is_ok_and(|real| real.strip_prefix(&canon_root).is_ok_and(has_git_part))
             {
                 return Err(WorkspaceError::OutsideFolder);
             }

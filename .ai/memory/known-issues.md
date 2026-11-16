@@ -4,6 +4,12 @@ Bugs, gotchas, and approaches that failed. Newest first. If you hit one of the "
 
 ## Seen in this repo
 
+- **2026-11-17 · The MCP hub has an "off" set.** `Hub::stop` (Off or Remove) puts the id in it, and start and call refuse it until `Hub::turn_on`, which `set_mcp_server_enabled(true)` calls. Any new way to turn a server on must call `turn_on` too, or the server never starts again this session. Calls go by server id, not name.
+- **2026-11-17 · Some tests run only on macOS and Linux.** `finish_ends_a_detached_process` (tests/tools.rs) and `an_ended_group_is_not_killed` (tools/servers.rs) are `cfg(not(windows))`, so the Windows gate never runs them; only CI does. Check the CI run after changing `tools/command.rs` or `tools/servers.rs`.
+- **2026-11-17 · Process-kill tests fail under load.** `timeout_kills_the_whole_tree` and `stop_kills_the_command` (tests/tools.rs) failed while several cargo builds ran at once and passed on a rerun. Rerun once before debugging.
+- **2026-11-17 · Workflow worktree agents may start from an older commit.** Four of five started at `36db1f5`, not HEAD. Check `git merge-base HEAD <branch>` before merging; a three-way merge then applies only their own changes.
+- **2026-11-15 · GateGuard and batched edits.** When several Edit calls for a file not yet touched this session go out in one message, only the first is refused and the rest apply, leaving a half-made change. Send one edit to a new file alone, then the rest.
+
 - **2026-11-12 · Anthropic's 5 MB image limit is on the base64 text.** Its 400 reads `image.source.base64: image exceeds 5 MB maximum: <n> bytes > 5242880 bytes`, so raw images must stay at or under 3.75 MB (`attachments::MAX_IMAGE`). Images are sent again with every later message, so one too large breaks the rest of that chat.
 
 - **2026-11-11 · Bash heredocs mangle patch scripts on this machine.** A `python - <<'PY'` script with backslash escapes (backslash-r, backslash-w) or nested `'''` came through altered (real CR bytes written into Rust source, "unexpected EOF"). Write the patch script with the Write tool into the scratchpad and run `python -I <file>`.
