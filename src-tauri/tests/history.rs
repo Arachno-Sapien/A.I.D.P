@@ -421,6 +421,29 @@ async fn files_no_message_uses_go_once_old_enough() {
 }
 
 #[tokio::test]
+async fn a_deleted_chats_files_go_from_a_blocking_task() {
+    // delete_conversation runs the clean-up off the main thread, as here.
+    let services = Arc::new(create_services(Arc::new(MemoryStore::default())));
+    let (store, dir) = temp_attachments("delete-blocking");
+    let store = Arc::new(store);
+    let file = store.store("a.txt", b"only in the deleted chat").unwrap();
+    let conv = services.create_conversation("c", None).unwrap();
+    let parts = format!(r#"{{"v":1,"text":"x","attachments":[{{"id":"{}"}}]}}"#, file.id);
+    services.append_message(conv.id, user_message(parts)).unwrap();
+    assert_eq!(remove_unused(&services, &store, Duration::ZERO).unwrap(), 0);
+
+    services.delete_conversation(conv.id).unwrap();
+    let (s, st) = (services.clone(), store.clone());
+    let removed = tokio::task::spawn_blocking(move || remove_unused(&s, &st, Duration::ZERO))
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(removed, 1);
+    assert!(matches!(store.read(&file.id), Err(AppError::NotFound)));
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[tokio::test]
 async fn pin_or_archive_a_missing_chat() {
     let store = Arc::new(MemoryStore::default());
     let services = create_services(store);

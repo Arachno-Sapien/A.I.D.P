@@ -1,7 +1,7 @@
 use crate::attachments::AttachmentStore;
 use crate::connections::{AppError, Services};
 use crate::history::{Conversation, NewMessage, StoredMessage};
-use tauri::State;
+use tauri::{AppHandle, Manager, State};
 
 #[tauri::command]
 #[specta::specta]
@@ -24,18 +24,22 @@ pub fn create_conversation(
 
 #[tauri::command]
 #[specta::specta]
-pub fn delete_conversation(
+pub async fn delete_conversation(
+    app: AppHandle,
     services: State<'_, Services>,
-    store: State<'_, AttachmentStore>,
     id: u32,
 ) -> Result<(), AppError> {
     services.delete_conversation(id)?;
-    // Files no message refers to any more go too; failing that never fails the delete.
-    let _ = crate::attachments::remove_unused(
-        &services,
-        &store,
-        crate::attachments::UNUSED_GRACE,
-    );
+    // Files no message refers to any more go too, off the main thread (it walks the
+    // folder and scans every message); failing that never fails the delete.
+    let _ = tauri::async_runtime::spawn_blocking(move || {
+        crate::attachments::remove_unused(
+            &app.state::<Services>(),
+            &app.state::<AttachmentStore>(),
+            crate::attachments::UNUSED_GRACE,
+        )
+    })
+    .await;
     Ok(())
 }
 
