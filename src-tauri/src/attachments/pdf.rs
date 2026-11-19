@@ -4,23 +4,144 @@
 //! file because the parser can print to standard output.
 
 use crate::connections::AppError;
+use std::alloc::{GlobalAlloc, Layout, System};
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::process::{ExitStatus, Stdio};
+use std::sync::atomic::{AtomicIsize, Ordering::Relaxed};
 use std::time::Duration;
 
 pub const PDF_TEXT_FLAG: &str = "--pdf-text";
 
-/// The `<pdf> <out>` of `aidp --pdf-text <pdf> <out>`, given the arguments after the
-/// program's name; None when this isn't the PDF child. A path that isn't Unicode is
-/// still a path, so nothing here can panic.
-pub fn child_args(mut args: impl Iterator<Item = OsString>) -> Option<(PathBuf, PathBuf)> {
+/// The most heap the PDF child may use. A 20 MB PDF needs far less; a decompression
+/// bomb (a small file that unpacks to gigabytes) stops here instead of filling the
+/// machine's memory.
+pub const CHILD_MEMORY: usize = 1024 * 1024 * 1024;
+
+/// The `<pdf> <out>` and memory cap of `aidp --pdf-text <pdf> <out> [<bytes>]`, given
+/// the arguments after the program's name; None when this isn't the PDF child. A
+/// missing or unreadable cap means `CHILD_MEMORY`, never no cap. A path that isn't
+/// Unicode is still a path, so nothing here can panic.
+pub fn child_args(
+    mut args: impl Iterator<Item = OsString>,
+) -> Option<(PathBuf, PathBuf, usize)> {
     if args.next()?.as_os_str() != PDF_TEXT_FLAG {
         return None;
     }
     let pdf = PathBuf::from(args.next().unwrap_or_default());
     let out = PathBuf::from(args.next().unwrap_or_default());
-    Some((pdf, out))
+    let cap = args
+        .next()
+        .and_then(|a| a.to_str()?.parse::<usize>().ok())
+        .filter(|&c| c > 0)
+        .unwrap_or(CHILD_MEMORY);
+    Some((pdf, out, cap))
+}
+
+/// The app's allocator: the system one, plus a heap cap that only the PDF child
+/// turns on. With no cap (the app itself) each call costs one relaxed load.
+/// Past the cap an allocation fails, which aborts the child: the app then reports
+/// the PDF as unreadable. Works the same on every OS, unlike rlimits (macOS
+/// doesn't enforce RLIMIT_AS).
+pub struct CappedAlloc {
+    /// Bytes allowed; 0 = no cap.
+    limit: AtomicIsize,
+    /// Bytes counted since the cap was set. Signed: memory taken before the cap
+    /// and freed after it brings this below zero, which is harmless.
+    used: AtomicIsize,
+}
+
+impl CappedAlloc {
+    pub const fn new() -> Self {
+        CappedAlloc {
+            limit: AtomicIsize::new(0),
+            used: AtomicIsize::new(0),
+        }
+    }
+
+    /// Caps the heap at `bytes` from now on. Called once, at the child's start.
+    pub fn set_limit(&self, bytes: usize) {
+        self.limit
+            .store(isize::try_from(bytes).unwrap_or(isize::MAX), Relaxed);
+    }
+
+    /// Counts `size` more bytes; false (and nothing counted) past the cap.
+    fn take(&self, size: usize) -> bool {
+        let limit = self.limit.load(Relaxed);
+        if limit == 0 {
+            return true;
+        }
+        let size = isize::try_from(size).unwrap_or(isize::MAX);
+        if self.used.fetch_add(size, Relaxed).saturating_add(size) > limit {
+            self.used.fetch_sub(size, Relaxed);
+            return false;
+        }
+        true
+    }
+
+    fn give_back(&self, size: usize) {
+        if self.limit.load(Relaxed) != 0 {
+            self.used
+                .fetch_sub(isize::try_from(size).unwrap_or(isize::MAX), Relaxed);
+        }
+    }
+}
+
+impl Default for CappedAlloc {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// SAFETY: every call is passed to `System` unchanged; this only refuses some
+// allocations (returning null, which callers must handle) and keeps a count.
+unsafe impl GlobalAlloc for CappedAlloc {
+    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+        if !self.take(layout.size()) {
+            return std::ptr::null_mut();
+        }
+        // SAFETY: the caller's contract for `alloc` is passed on as is.
+        let ptr = unsafe { System.alloc(layout) };
+        if ptr.is_null() {
+            self.give_back(layout.size());
+        }
+        ptr
+    }
+
+    unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 {
+        if !self.take(layout.size()) {
+            return std::ptr::null_mut();
+        }
+        // SAFETY: the caller's contract for `alloc_zeroed` is passed on as is.
+        let ptr = unsafe { System.alloc_zeroed(layout) };
+        if ptr.is_null() {
+            self.give_back(layout.size());
+        }
+        ptr
+    }
+
+    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+        // SAFETY: the caller's contract for `dealloc` is passed on as is.
+        unsafe { System.dealloc(ptr, layout) };
+        self.give_back(layout.size());
+    }
+
+    unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
+        let old = layout.size();
+        if new_size > old && !self.take(new_size - old) {
+            return std::ptr::null_mut();
+        }
+        // SAFETY: the caller's contract for `realloc` is passed on as is.
+        let new = unsafe { System.realloc(ptr, layout, new_size) };
+        if new.is_null() {
+            if new_size > old {
+                self.give_back(new_size - old);
+            }
+        } else if new_size < old {
+            self.give_back(old - new_size);
+        }
+        new
+    }
 }
 /// The most text kept from one PDF; the model's context budget cuts it further.
 const MAX_TEXT_OUT: usize = 2 * 1024 * 1024;
@@ -58,7 +179,10 @@ pub async fn text_in_child(pdf: PathBuf) -> Result<String, AppError> {
     let out = super::temp_beside(&pdf, "out");
 
     let mut cmd = tokio::process::Command::new(exe);
-    cmd.arg(PDF_TEXT_FLAG).arg(&pdf).arg(&out);
+    cmd.arg(PDF_TEXT_FLAG)
+        .arg(&pdf)
+        .arg(&out)
+        .arg(CHILD_MEMORY.to_string());
     let text = match run_bounded(cmd, LIMIT).await {
         Ok(status) if status.success() => {
             std::fs::read_to_string(&out).map_err(|e| AppError::Storage {
@@ -166,8 +290,19 @@ mod tests {
         assert_eq!(child_args(args(&["--other", "a"])), None);
         assert_eq!(
             child_args(args(&["--pdf-text", "a.pdf", "a.out"])),
-            Some((PathBuf::from("a.pdf"), PathBuf::from("a.out")))
+            Some((PathBuf::from("a.pdf"), PathBuf::from("a.out"), CHILD_MEMORY))
         );
+        assert_eq!(
+            child_args(args(&["--pdf-text", "a.pdf", "a.out", "4096"])),
+            Some((PathBuf::from("a.pdf"), PathBuf::from("a.out"), 4096))
+        );
+        // A cap that isn't a positive number is the default cap, never none.
+        for bad in ["0", "-1", "lots"] {
+            assert_eq!(
+                child_args(args(&["--pdf-text", "a", "b", bad])).map(|a| a.2),
+                Some(CHILD_MEMORY)
+            );
+        }
         // A path that isn't Unicode is still a path, not a crash.
         #[cfg(windows)]
         let odd = {
@@ -180,7 +315,38 @@ mod tests {
             OsString::from_vec(vec![0x61, 0xFF])
         };
         let got = child_args(vec![OsString::from("--pdf-text"), odd.clone(), "o".into()].into_iter());
-        assert_eq!(got, Some((PathBuf::from(odd), PathBuf::from("o"))));
+        assert_eq!(got, Some((PathBuf::from(odd), PathBuf::from("o"), CHILD_MEMORY)));
+    }
+
+    #[test]
+    fn the_allocator_refuses_past_its_cap_and_counts_frees() {
+        let a = CappedAlloc::new();
+        let kb = Layout::from_size_align(1024, 8).unwrap();
+        // SAFETY (test): each pointer is freed once, with the layout it was made with.
+        unsafe {
+            // No cap: anything goes and nothing is counted.
+            let p = a.alloc(kb);
+            assert!(!p.is_null());
+            a.dealloc(p, kb);
+
+            a.set_limit(2048);
+            let p1 = a.alloc(kb);
+            let p2 = a.alloc_zeroed(kb);
+            assert!(!p1.is_null() && !p2.is_null());
+            assert!(a.alloc(kb).is_null(), "a third KB fits under a 2 KB cap");
+            a.dealloc(p2, kb);
+            // Growing past the cap fails and leaves the block as it was.
+            assert!(a.realloc(p1, kb, 4096).is_null());
+            let p3 = a.realloc(p1, kb, 2048);
+            assert!(!p3.is_null(), "growing to exactly the cap is refused");
+            let two_kb = Layout::from_size_align(2048, 8).unwrap();
+            let p4 = a.realloc(p3, two_kb, 512);
+            assert!(!p4.is_null());
+            let p5 = a.alloc(Layout::from_size_align(1536, 8).unwrap());
+            assert!(!p5.is_null(), "shrinking didn't give the space back");
+            a.dealloc(p5, Layout::from_size_align(1536, 8).unwrap());
+            a.dealloc(p4, Layout::from_size_align(512, 8).unwrap());
+        }
     }
 
     #[test]

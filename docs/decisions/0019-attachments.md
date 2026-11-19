@@ -20,7 +20,7 @@ How to read a PDF:
 Where to run the parser:
 
 1. **In the app.** Simplest, but `pdf-extract` and `lopdf` have dozens of `unwrap`, `expect` and `panic!` paths, and the release build uses `panic = "abort"`, so one malformed PDF would close the app. A parser that loops forever would also hold a thread forever.
-2. **In a child process (chosen):** the app starts its own executable as `aidp --pdf-text <pdf> <out>`. A panic or a hang ends only the child, which is killed after 20 seconds. The child writes the text to a file, because `pdf-extract` can print to standard output.
+2. **In a child process (chosen):** the app starts its own executable as `aidp --pdf-text <pdf> <out>`. A panic or a hang ends only the child, which is killed after 20 seconds. Its heap is capped at 1 GB by the app's own allocator (added 2026-11-19 against decompression bombs; OS limits were rejected because macOS does not enforce `RLIMIT_AS`). The child writes the text to a file, because `pdf-extract` can print to standard output.
 
 ## Decision
 

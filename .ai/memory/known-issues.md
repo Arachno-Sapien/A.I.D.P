@@ -4,6 +4,7 @@ Bugs, gotchas, and approaches that failed. Newest first. If you hit one of the "
 
 ## Seen in this repo
 
+- **2026-11-19 · The app has a custom global allocator.** `main.rs` installs `attachments::pdf::CappedAlloc`; it is the system allocator with no cap except in the `--pdf-text` child, which caps its heap at `CHILD_MEMORY` (1 GB). `setrlimit` was not used: macOS ignores `RLIMIT_AS`, and it needed `libc`. tests/pdf_child.rs runs the real child with a 16 MB cap on a 48 MB bomb.
 - **2026-11-19 · A Settings Test of an MCP server has its own cancel token.** `Hub::test` registers a numbered token per server id (`cancel_mcp_test` and `Hub::stop` cancel it); a guard removes it only if the number is still its own. Off and Remove stay disabled during a Test.
 - **2026-11-19 · OpenAI-compatible requests send `stream_options`.** Every OpenAI-compatible kind is one `ConnectionKind`, so the adapter cannot skip it per provider; it retries once without the field only on a 400/422 that names `stream_options`. Don't widen that rule: retrying every 400 hides real errors.
 - **2026-11-17 · The MCP hub has an "off" set.** `Hub::stop` (Off or Remove) puts the id in it, and start and call refuse it until `Hub::turn_on`, which `set_mcp_server_enabled(true)` calls. Any new way to turn a server on must call `turn_on` too, or the server never starts again this session. Calls go by server id, not name.

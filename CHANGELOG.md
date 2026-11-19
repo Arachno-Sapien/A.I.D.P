@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Model picker:** a failed save of your model choice now shows an error and goes back to the previous model.
 - **Model downloads:** after Cancel, Download stays off and Cancel reads "Cancelling…" until the download has really stopped.
 - **Deleting a chat** no longer briefly freezes the app while unused attachment files are cleared.
+- **Security:** a booby-trapped PDF (a small file that unpacks to gigabytes) could fill the computer's memory while its text was read. The PDF reader now stops at 1 GB and the chat says the PDF couldn't be read.
 
 ### Added
 - **Token counts for OpenAI-compatible connections:** replies now record tokens in and out. A server that refuses the usage option gets one retry without it.
