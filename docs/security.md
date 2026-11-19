@@ -63,6 +63,7 @@ The database file contains **no secret keys**. Even if the database file is extr
 - **HTTPS required for cloud endpoints:** All cloud providers must use `https://`.
 - **Local HTTP exception:** Plain `http://` is allowed only for `localhost`, loopback addresses (`127.0.0.1`, `::1`), and private LAN IP ranges (e.g., `192.168.x.x`, `10.x.x.x`, `172.16-31.x.x`) to support local inference engines like Ollama or LM Studio. Any public unencrypted URL is rejected upfront with `AppError::InsecureUrl` before any network request is initiated.
 - **Redirects stay on one origin:** the shared HTTP client follows a redirect only to the same scheme, host and port, so a key header (`Authorization`, `x-api-key`) never reaches another host or travels over plain http.
+- **One retry for usage counts:** OpenAI-compatible streaming requests ask for token usage (`stream_options.include_usage`). A server that answers 400/422 naming `stream_options` gets the same request once more without it, to the same provider only.
 - **Update check:** the only call that isn't to a provider or Ollama goes to `github.com` over HTTPS, for the release's `latest.json` and, after you click Install, the installer (see section 11).
 
 ---

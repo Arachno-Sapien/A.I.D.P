@@ -4,6 +4,8 @@ Bugs, gotchas, and approaches that failed. Newest first. If you hit one of the "
 
 ## Seen in this repo
 
+- **2026-11-19 · A Settings Test of an MCP server has its own cancel token.** `Hub::test` registers a numbered token per server id (`cancel_mcp_test` and `Hub::stop` cancel it); a guard removes it only if the number is still its own. Off and Remove stay disabled during a Test.
+- **2026-11-19 · OpenAI-compatible requests send `stream_options`.** Every OpenAI-compatible kind is one `ConnectionKind`, so the adapter cannot skip it per provider; it retries once without the field only on a 400/422 that names `stream_options`. Don't widen that rule: retrying every 400 hides real errors.
 - **2026-11-17 · The MCP hub has an "off" set.** `Hub::stop` (Off or Remove) puts the id in it, and start and call refuse it until `Hub::turn_on`, which `set_mcp_server_enabled(true)` calls. Any new way to turn a server on must call `turn_on` too, or the server never starts again this session. Calls go by server id, not name.
 - **2026-11-17 · Some tests run only on macOS and Linux.** `finish_ends_a_detached_process` (tests/tools.rs) and `an_ended_group_is_not_killed` (tools/servers.rs) are `cfg(not(windows))`, so the Windows gate never runs them; only CI does. Check the CI run after changing `tools/command.rs` or `tools/servers.rs`.
 - **2026-11-17 · Process-kill tests fail under load.** `timeout_kills_the_whole_tree` and `stop_kills_the_command` (tests/tools.rs) failed while several cargo builds ran at once and passed on a rerun. Rerun once before debugging.

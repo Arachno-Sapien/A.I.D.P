@@ -29,6 +29,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Updates:** checking for and downloading an update gives up on a stalled connection instead of staying on "checking" or "downloading".
 - **macOS and Linux:** a command the agent runs stops what it left in the background when it finishes; an ended agent server is no longer killed by its old process group id; `ollama serve` started by the app no longer stays behind as a defunct process.
 - **CI** runs with a read-only token and pins every action to a commit hash.
+- **Model picker:** a failed save of your model choice now shows an error and goes back to the previous model.
+- **Model downloads:** after Cancel, Download stays off and Cancel reads "Cancelling…" until the download has really stopped.
+- **Deleting a chat** no longer briefly freezes the app while unused attachment files are cleared.
+
+### Added
+- **Token counts for OpenAI-compatible connections:** replies now record tokens in and out. A server that refuses the usage option gets one retry without it.
+- **Cancel a Test:** while an outside tool server is being tested in Settings, Test becomes Cancel; cancelling (or turning the server off) stops it at once and shows "Test cancelled."
 
 ## [0.1.0-rc.7] - 2026-11-12
 

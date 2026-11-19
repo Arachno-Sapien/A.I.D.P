@@ -121,6 +121,8 @@ Next step: once SignPath accepts, the Windows job in `.github/workflows/release.
 Whole-codebase audit done 2026-11-17 by Claude Code (Fable 5.2, then Opus 5.5), the human's request ("analyse the full codebase, fix functional, structural and security issues, optimize; check Settings: MCP and Commands that run without asking; move Updates to the bottom", then "commit & push once the fixes are done"): Updates is last in Settings; 43 confirmed audit findings fixed except the ones listed as open in `log/2026-11-17-m6-codebase-audit.md`. Gate green (rust 348, vitest 408). Not yet seen in the app; two Unix-only tests run only in CI.
 Pushed `a327190`; CI run 43950682042 green on Windows, macOS and Linux (runs the two Unix-only tests). Next step: try the Settings changes and an agent run with Always allow in `npm run tauri dev`.
 
+Audit follow-ups 1-5 done 2026-11-19 by Claude Code (Opus 5.5), the human's "Yea, go ahead": picker save error, Download kept off until a cancelled pull ends, chat-delete clean-up off the main thread, OpenAI usage counts (one retry without the option), cancellable MCP Test (`cancel_mcp_test`). Gate green (rust 356, vitest 413). Details: `log/2026-11-19-m6-audit-followups.md`. Not yet seen in the app. Next step: item 6 (PDF child memory cap) once the human says whether a `libc` dependency is fine; then items 7-9.
+
 ## Next 3 tasks
 
 1. Task 8 live check: test Outside tools & Browser checks preset (`@playwright/mcp@0.0.85`) in `npm run tauri dev`, and measure Task Manager RAM with a server running (plus RAM with Dark/Glass and `.ts` worker).
