@@ -102,6 +102,69 @@ async fn first_output(
     }
 }
 
+/// Shows a call's result on its card and keeps it for the model.
+fn finish(
+    out: &Channel<ChatEvent>,
+    results: &mut Vec<ToolOutput>,
+    id: u32,
+    call_id: String,
+    tool_run: run::ToolRun,
+) -> Result<(), ProviderError> {
+    out.send(ChatEvent::ToolResult {
+        id,
+        outcome: tool_run.outcome,
+    })
+    .map_err(|_| ProviderError::Cancelled)?;
+    results.push(ToolOutput {
+        call_id,
+        content: tool_run.for_model,
+        is_error: tool_run.is_error,
+    });
+    Ok(())
+}
+
+/// A card that needs no answer, then its result.
+fn card_with_result(
+    out: &Channel<ChatEvent>,
+    results: &mut Vec<ToolOutput>,
+    id: u32,
+    call_id: String,
+    action: ToolAction,
+    tool_run: run::ToolRun,
+) -> Result<(), ProviderError> {
+    out.send(ChatEvent::ToolCall {
+        id,
+        action,
+        needs_answer: false,
+    })
+    .map_err(|_| ProviderError::Cancelled)?;
+    finish(out, results, id, call_id, tool_run)
+}
+
+/// A result the model gets as an error, shown as an error on the card.
+fn error_run(message: String) -> run::ToolRun {
+    run::ToolRun {
+        for_model: message.clone(),
+        is_error: true,
+        outcome: ToolOutcome::Error { message },
+    }
+}
+
+/// A call with an invalid name or arguments: an Invalid card and the error.
+fn invalid(
+    out: &Channel<ChatEvent>,
+    results: &mut Vec<ToolOutput>,
+    id: u32,
+    name: &str,
+    call_id: String,
+    err: String,
+) -> Result<(), ProviderError> {
+    let action = ToolAction::Invalid {
+        name: name.to_string(),
+    };
+    card_with_result(out, results, id, call_id, action, error_run(err))
+}
+
 /// A server tool called when this surface has none: the same as any unknown tool.
 fn unknown_tool(
     out: &Channel<ChatEvent>,
@@ -110,28 +173,7 @@ fn unknown_tool(
     call_id: String,
     results: &mut Vec<ToolOutput>,
 ) -> Result<(), ProviderError> {
-    let err = format!("There is no tool named {name}.");
-    out.send(ChatEvent::ToolCall {
-        id,
-        action: ToolAction::Invalid {
-            name: name.to_string(),
-        },
-        needs_answer: false,
-    })
-    .map_err(|_| ProviderError::Cancelled)?;
-    out.send(ChatEvent::ToolResult {
-        id,
-        outcome: ToolOutcome::Error {
-            message: err.clone(),
-        },
-    })
-    .map_err(|_| ProviderError::Cancelled)?;
-    results.push(ToolOutput {
-        call_id,
-        content: err,
-        is_error: true,
-    });
-    Ok(())
+    invalid(out, results, id, name, call_id, format!("There is no tool named {name}."))
 }
 
 pub async fn run(args: AgentRun<'_>) -> Result<Usage, ProviderError> {
@@ -262,28 +304,7 @@ pub async fn run_with_images(
                         "Invalid arguments for {}: they were not valid JSON.",
                         call.name
                     );
-                    args.out
-                        .send(ChatEvent::ToolCall {
-                            id,
-                            action: ToolAction::Invalid {
-                                name: call.name.clone(),
-                            },
-                            needs_answer: false,
-                        })
-                        .map_err(|_| ProviderError::Cancelled)?;
-                    args.out
-                        .send(ChatEvent::ToolResult {
-                            id,
-                            outcome: ToolOutcome::Error {
-                                message: err.clone(),
-                            },
-                        })
-                        .map_err(|_| ProviderError::Cancelled)?;
-                    results.push(ToolOutput {
-                        call_id: call.id,
-                        content: err,
-                        is_error: true,
-                    });
+                    invalid(&args.out, &mut results, id, &call.name, call.id, err)?;
                     continue;
                 }
 
@@ -330,14 +351,12 @@ pub async fn run_with_images(
                                         images: res.images,
                                     }
                                 };
-                                args.out
-                                    .send(ChatEvent::ToolResult { id, outcome })
-                                    .map_err(|_| ProviderError::Cancelled)?;
-                                results.push(ToolOutput {
-                                    call_id: call.id,
-                                    content: for_model,
+                                let tool_run = run::ToolRun {
+                                    for_model,
                                     is_error: res.is_error,
-                                });
+                                    outcome,
+                                };
+                                finish(&args.out, &mut results, id, call.id, tool_run)?;
                             }
                             Err(McpError::Stopped) => {
                                 let _ = args.out.send(ChatEvent::ToolResult {
@@ -351,35 +370,12 @@ pub async fn run_with_images(
                                     &e.to_string(),
                                     crate::tools::OUTPUT_LIMIT.min(args.text_limit),
                                 );
-                                args.out
-                                    .send(ChatEvent::ToolResult {
-                                        id,
-                                        outcome: ToolOutcome::Error {
-                                            message: msg.clone(),
-                                        },
-                                    })
-                                    .map_err(|_| ProviderError::Cancelled)?;
-                                results.push(ToolOutput {
-                                    call_id: call.id,
-                                    content: msg,
-                                    is_error: true,
-                                });
+                                finish(&args.out, &mut results, id, call.id, error_run(msg))?;
                             }
                         }
                     }
                     Answer::No => {
-                        let tool_run = run::declined(true);
-                        args.out
-                            .send(ChatEvent::ToolResult {
-                                id,
-                                outcome: tool_run.outcome,
-                            })
-                            .map_err(|_| ProviderError::Cancelled)?;
-                        results.push(ToolOutput {
-                            call_id: call.id,
-                            content: tool_run.for_model,
-                            is_error: tool_run.is_error,
-                        });
+                        finish(&args.out, &mut results, id, call.id, run::declined(true))?;
                     }
                     Answer::Stopped => {
                         let _ = args.out.send(ChatEvent::ToolResult {
@@ -397,28 +393,7 @@ pub async fn run_with_images(
             let tool_input = match parsed {
                 Ok(input) => input,
                 Err(err) => {
-                    args.out
-                        .send(ChatEvent::ToolCall {
-                            id,
-                            action: ToolAction::Invalid {
-                                name: call.name.clone(),
-                            },
-                            needs_answer: false,
-                        })
-                        .map_err(|_| ProviderError::Cancelled)?;
-                    args.out
-                        .send(ChatEvent::ToolResult {
-                            id,
-                            outcome: ToolOutcome::Error {
-                                message: err.clone(),
-                            },
-                        })
-                        .map_err(|_| ProviderError::Cancelled)?;
-                    results.push(ToolOutput {
-                        call_id: call.id,
-                        content: err,
-                        is_error: true,
-                    });
+                    invalid(&args.out, &mut results, id, &call.name, call.id, err)?;
                     continue;
                 }
             };
@@ -441,18 +416,7 @@ pub async fn run_with_images(
                         .await
                         .map_err(|_| ProviderError::Cancelled)?;
 
-                    args.out
-                        .send(ChatEvent::ToolResult {
-                            id,
-                            outcome: tool_run.outcome,
-                        })
-                        .map_err(|_| ProviderError::Cancelled)?;
-
-                    results.push(ToolOutput {
-                        call_id: call.id,
-                        content: tool_run.for_model,
-                        is_error: tool_run.is_error,
-                    });
+                    finish(&args.out, &mut results, id, call.id, tool_run)?;
                 }
                 run::ToolInput::ReadFile {
                     path,
@@ -478,18 +442,7 @@ pub async fn run_with_images(
                     .await
                     .map_err(|_| ProviderError::Cancelled)?;
 
-                    args.out
-                        .send(ChatEvent::ToolResult {
-                            id,
-                            outcome: tool_run.outcome,
-                        })
-                        .map_err(|_| ProviderError::Cancelled)?;
-
-                    results.push(ToolOutput {
-                        call_id: call.id,
-                        content: tool_run.for_model,
-                        is_error: tool_run.is_error,
-                    });
+                    finish(&args.out, &mut results, id, call.id, tool_run)?;
                 }
                 run::ToolInput::Search { query, path } => {
                     args.out
@@ -511,18 +464,7 @@ pub async fn run_with_images(
                             .await
                             .map_err(|_| ProviderError::Cancelled)?;
 
-                    args.out
-                        .send(ChatEvent::ToolResult {
-                            id,
-                            outcome: tool_run.outcome,
-                        })
-                        .map_err(|_| ProviderError::Cancelled)?;
-
-                    results.push(ToolOutput {
-                        call_id: call.id,
-                        content: tool_run.for_model,
-                        is_error: tool_run.is_error,
-                    });
+                    finish(&args.out, &mut results, id, call.id, tool_run)?;
                 }
                 run::ToolInput::EditFile {
                     path,
@@ -541,30 +483,12 @@ pub async fn run_with_images(
 
                     match prep {
                         Err(err_run) => {
-                            args.out
-                                .send(ChatEvent::ToolCall {
-                                    id,
-                                    action: ToolAction::EditFile {
-                                        path: path.clone(),
-                                        before: String::new(),
-                                        after: String::new(),
-                                    },
-                                    needs_answer: false,
-                                })
-                                .map_err(|_| ProviderError::Cancelled)?;
-
-                            args.out
-                                .send(ChatEvent::ToolResult {
-                                    id,
-                                    outcome: err_run.outcome,
-                                })
-                                .map_err(|_| ProviderError::Cancelled)?;
-
-                            results.push(ToolOutput {
-                                call_id: call.id,
-                                content: err_run.for_model,
-                                is_error: err_run.is_error,
-                            });
+                            let action = ToolAction::EditFile {
+                                path: path.clone(),
+                                before: String::new(),
+                                after: String::new(),
+                            };
+                            card_with_result(&args.out, &mut results, id, call.id, action, err_run)?;
                         }
                         Ok(edit) => {
                             let rx = (!args.review_at_end).then(|| args.approvals.register(id));
@@ -591,33 +515,11 @@ pub async fn run_with_images(
                                     .await
                                     .map_err(|_| ProviderError::Cancelled)?;
 
-                                    args.out
-                                        .send(ChatEvent::ToolResult {
-                                            id,
-                                            outcome: tool_run.outcome,
-                                        })
-                                        .map_err(|_| ProviderError::Cancelled)?;
-
-                                    results.push(ToolOutput {
-                                        call_id: call.id,
-                                        content: tool_run.for_model,
-                                        is_error: tool_run.is_error,
-                                    });
+                                    finish(&args.out, &mut results, id, call.id, tool_run)?;
                                 }
                                 Answer::No => {
                                     let tool_run = run::declined(false);
-                                    args.out
-                                        .send(ChatEvent::ToolResult {
-                                            id,
-                                            outcome: tool_run.outcome,
-                                        })
-                                        .map_err(|_| ProviderError::Cancelled)?;
-
-                                    results.push(ToolOutput {
-                                        call_id: call.id,
-                                        content: tool_run.for_model,
-                                        is_error: tool_run.is_error,
-                                    });
+                                    finish(&args.out, &mut results, id, call.id, tool_run)?;
                                 }
                                 Answer::Stopped => {
                                     let _ = args.out.send(ChatEvent::ToolResult {
@@ -642,29 +544,11 @@ pub async fn run_with_images(
 
                     match prep {
                         Err(err_run) => {
-                            args.out
-                                .send(ChatEvent::ToolCall {
-                                    id,
-                                    action: ToolAction::CreateFile {
-                                        path: path.clone(),
-                                        text: text.clone(),
-                                    },
-                                    needs_answer: false,
-                                })
-                                .map_err(|_| ProviderError::Cancelled)?;
-
-                            args.out
-                                .send(ChatEvent::ToolResult {
-                                    id,
-                                    outcome: err_run.outcome,
-                                })
-                                .map_err(|_| ProviderError::Cancelled)?;
-
-                            results.push(ToolOutput {
-                                call_id: call.id,
-                                content: err_run.for_model,
-                                is_error: err_run.is_error,
-                            });
+                            let action = ToolAction::CreateFile {
+                                path: path.clone(),
+                                text: text.clone(),
+                            };
+                            card_with_result(&args.out, &mut results, id, call.id, action, err_run)?;
                         }
                         Ok(new_file) => {
                             let rx = (!args.review_at_end).then(|| args.approvals.register(id));
@@ -690,33 +574,11 @@ pub async fn run_with_images(
                                     .await
                                     .map_err(|_| ProviderError::Cancelled)?;
 
-                                    args.out
-                                        .send(ChatEvent::ToolResult {
-                                            id,
-                                            outcome: tool_run.outcome,
-                                        })
-                                        .map_err(|_| ProviderError::Cancelled)?;
-
-                                    results.push(ToolOutput {
-                                        call_id: call.id,
-                                        content: tool_run.for_model,
-                                        is_error: tool_run.is_error,
-                                    });
+                                    finish(&args.out, &mut results, id, call.id, tool_run)?;
                                 }
                                 Answer::No => {
                                     let tool_run = run::declined(false);
-                                    args.out
-                                        .send(ChatEvent::ToolResult {
-                                            id,
-                                            outcome: tool_run.outcome,
-                                        })
-                                        .map_err(|_| ProviderError::Cancelled)?;
-
-                                    results.push(ToolOutput {
-                                        call_id: call.id,
-                                        content: tool_run.for_model,
-                                        is_error: tool_run.is_error,
-                                    });
+                                    finish(&args.out, &mut results, id, call.id, tool_run)?;
                                 }
                                 Answer::Stopped => {
                                     let _ = args.out.send(ChatEvent::ToolResult {
@@ -777,15 +639,12 @@ pub async fn run_with_images(
                                         timed_out: res.timed_out,
                                     };
 
-                                    args.out
-                                        .send(ChatEvent::ToolResult { id, outcome })
-                                        .map_err(|_| ProviderError::Cancelled)?;
-
-                                    results.push(ToolOutput {
-                                        call_id: call.id,
-                                        content: for_model,
+                                    let tool_run = run::ToolRun {
+                                        for_model,
                                         is_error: false,
-                                    });
+                                        outcome,
+                                    };
+                                    finish(&args.out, &mut results, id, call.id, tool_run)?;
                                 }
                                 Ok(command::CommandEnd::Stopped) => {
                                     let _ = args.out.send(ChatEvent::ToolResult {
@@ -795,36 +654,16 @@ pub async fn run_with_images(
                                     return Err(ProviderError::Cancelled);
                                 }
                                 Err(err) => {
-                                    let err_run = run::refused(&err, "");
-                                    args.out
-                                        .send(ChatEvent::ToolResult {
-                                            id,
-                                            outcome: err_run.outcome,
-                                        })
-                                        .map_err(|_| ProviderError::Cancelled)?;
-
-                                    results.push(ToolOutput {
-                                        call_id: call.id,
-                                        content: err_run.for_model,
+                                    let err_run = run::ToolRun {
                                         is_error: true,
-                                    });
+                                        ..run::refused(&err, "")
+                                    };
+                                    finish(&args.out, &mut results, id, call.id, err_run)?;
                                 }
                             }
                         }
                         Answer::No => {
-                            let tool_run = run::declined(true);
-                            args.out
-                                .send(ChatEvent::ToolResult {
-                                    id,
-                                    outcome: tool_run.outcome,
-                                })
-                                .map_err(|_| ProviderError::Cancelled)?;
-
-                            results.push(ToolOutput {
-                                call_id: call.id,
-                                content: tool_run.for_model,
-                                is_error: tool_run.is_error,
-                            });
+                            finish(&args.out, &mut results, id, call.id, run::declined(true))?;
                         }
                         Answer::Stopped => {
                             let _ = args.out.send(ChatEvent::ToolResult {
@@ -882,46 +721,23 @@ pub async fn run_with_images(
                                         .unwrap_or_else(|| "none".to_string());
                                     format!("Server {server} exited with code {code}.\n{output}")
                                 };
-                                args.out
-                                    .send(ChatEvent::ToolResult {
-                                        id,
-                                        outcome: ToolOutcome::Server { server, output },
-                                    })
-                                    .map_err(|_| ProviderError::Cancelled)?;
-                                results.push(ToolOutput {
-                                    call_id: call.id,
-                                    content: for_model,
+                                let tool_run = run::ToolRun {
+                                    for_model,
                                     is_error: !status.running,
-                                });
+                                    outcome: ToolOutcome::Server { server, output },
+                                };
+                                finish(&args.out, &mut results, id, call.id, tool_run)?;
                             }
                             Err(err) => {
-                                let err_run = run::refused(&err, "");
-                                args.out
-                                    .send(ChatEvent::ToolResult {
-                                        id,
-                                        outcome: err_run.outcome,
-                                    })
-                                    .map_err(|_| ProviderError::Cancelled)?;
-                                results.push(ToolOutput {
-                                    call_id: call.id,
-                                    content: err_run.for_model,
+                                let err_run = run::ToolRun {
                                     is_error: true,
-                                });
+                                    ..run::refused(&err, "")
+                                };
+                                finish(&args.out, &mut results, id, call.id, err_run)?;
                             }
                         },
                         Answer::No => {
-                            let tool_run = run::declined(true);
-                            args.out
-                                .send(ChatEvent::ToolResult {
-                                    id,
-                                    outcome: tool_run.outcome,
-                                })
-                                .map_err(|_| ProviderError::Cancelled)?;
-                            results.push(ToolOutput {
-                                call_id: call.id,
-                                content: tool_run.for_model,
-                                is_error: tool_run.is_error,
-                            });
+                            finish(&args.out, &mut results, id, call.id, run::declined(true))?;
                         }
                         Answer::Stopped => {
                             let _ = args.out.send(ChatEvent::ToolResult {
@@ -966,26 +782,22 @@ pub async fn run_with_images(
                             format!("{state}\n{}", command::tail(&st.output, limit))
                         })
                     };
-                    let (outcome, content, is_error) = match found {
-                        Some(text) if stop => (ToolOutcome::Ok { summary: text.clone() }, text, false),
-                        Some(text) => (
-                            ToolOutcome::Text { output: text.clone(), images: Vec::new() },
-                            text,
-                            false,
-                        ),
-                        None => {
-                            let message = format!("There is no server {server}. Start one with start_server.");
-                            (ToolOutcome::Error { message: message.clone() }, message, true)
-                        }
+                    let tool_run = match found {
+                        Some(text) if stop => run::ToolRun {
+                            outcome: ToolOutcome::Ok { summary: text.clone() },
+                            for_model: text,
+                            is_error: false,
+                        },
+                        Some(text) => run::ToolRun {
+                            outcome: ToolOutcome::Text { output: text.clone(), images: Vec::new() },
+                            for_model: text,
+                            is_error: false,
+                        },
+                        None => error_run(format!(
+                            "There is no server {server}. Start one with start_server."
+                        )),
                     };
-                    args.out
-                        .send(ChatEvent::ToolResult { id, outcome })
-                        .map_err(|_| ProviderError::Cancelled)?;
-                    results.push(ToolOutput {
-                        call_id: call.id,
-                        content,
-                        is_error,
-                    });
+                    finish(&args.out, &mut results, id, call.id, tool_run)?;
                 }
             }
         }
