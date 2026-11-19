@@ -825,3 +825,116 @@ async fn round_images_follow_the_tool_results() {
         })
     );
 }
+
+#[tokio::test]
+async fn asks_for_usage_in_the_stream() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .and(body_partial_json(json!({
+            "stream_options": { "include_usage": true }
+        })))
+        .respond_with(ResponseTemplate::new(200).set_body_string(sse(&[
+            r#"{"choices":[{"delta":{"content":"ok"}}],"usage":null}"#,
+            r#"{"choices":[],"usage":{"prompt_tokens":11,"completion_tokens":3}}"#,
+            "[DONE]",
+        ])))
+        .mount(&server)
+        .await;
+
+    let p = provider(&server);
+    let (channel, _) = capture();
+    let reply = p
+        .stream_chat(req(), channel, CancellationToken::new())
+        .await
+        .unwrap();
+    assert_eq!(
+        reply.usage,
+        Usage {
+            tokens_in: Some(11),
+            tokens_out: Some(3)
+        }
+    );
+}
+
+#[tokio::test]
+async fn no_usage_chunk_means_no_usage() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(sse(&[
+            r#"{"choices":[{"delta":{"content":"ok"}}]}"#,
+            "[DONE]",
+        ])))
+        .mount(&server)
+        .await;
+
+    let p = provider(&server);
+    let (channel, _) = capture();
+    let reply = p
+        .stream_chat(req(), channel, CancellationToken::new())
+        .await
+        .unwrap();
+    assert_eq!(reply.usage, Usage::default());
+}
+
+#[tokio::test]
+async fn retries_once_without_stream_options_when_refused() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .and(body_partial_json(json!({ "stream_options": { "include_usage": true } })))
+        .respond_with(ResponseTemplate::new(400).set_body_json(json!({
+            "error": { "message": "Unrecognized key(s) in object: 'stream_options'" }
+        })))
+        .expect(1)
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(sse(&[
+            r#"{"choices":[{"delta":{"content":"ok"}}]}"#,
+            "[DONE]",
+        ])))
+        .mount(&server)
+        .await;
+
+    let p = provider(&server);
+    let (channel, events) = capture();
+    p.stream_chat(req(), channel, CancellationToken::new())
+        .await
+        .unwrap();
+    assert_eq!(deltas(&events), vec!["ok"]);
+
+    let requests = server.received_requests().await.unwrap();
+    assert_eq!(requests.len(), 2);
+    let retry: serde_json::Value = serde_json::from_slice(&requests[1].body).unwrap();
+    assert!(retry.get("stream_options").is_none());
+    assert_eq!(retry["stream"], true);
+}
+
+#[tokio::test]
+async fn other_400s_are_not_retried() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(ResponseTemplate::new(400).set_body_json(json!({
+            "error": { "message": "temperature must be at most 2" }
+        })))
+        .mount(&server)
+        .await;
+
+    let p = provider(&server);
+    let (channel, _) = capture();
+    let err = p
+        .stream_chat(req(), channel, CancellationToken::new())
+        .await
+        .unwrap_err();
+    assert_eq!(
+        err,
+        ProviderError::Provider {
+            message: "HTTP 400: temperature must be at most 2".to_string()
+        }
+    );
+    assert_eq!(server.received_requests().await.unwrap().len(), 1);
+}
