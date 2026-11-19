@@ -1,7 +1,8 @@
 #![allow(clippy::unwrap_used)]
 
 use aidp_lib::gateway::ProviderError;
-use aidp_lib::ollama::{valid_model_name, Ollama, PullEvent};
+use aidp_lib::connections::Services;
+use aidp_lib::ollama::{service, valid_model_name, Ollama, OllamaStatus, PullEvent};
 use serde_json::json;
 use std::sync::{Arc, Mutex};
 use tauri::ipc::{Channel, InvokeResponseBody};
@@ -335,4 +336,57 @@ fn valid_model_name_table() {
     assert!(!valid_model_name("a b"));
     assert!(!valid_model_name("x;y"));
     assert!(!valid_model_name("a\\b"));
+}
+
+fn services_for(server: &MockServer) -> Services {
+    let conn = aidp_lib::db::open_in_memory().unwrap();
+    let store = Arc::new(aidp_lib::secrets::MemoryStore::default());
+    Services::new(conn, store, reqwest::Client::new()).with_ollama_url(server.uri())
+}
+
+async fn mount_running(server: &MockServer) {
+    Mock::given(method("GET"))
+        .and(path("/api/version"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"version": "0.12.0"})))
+        .mount(server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/api/tags"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "models": [{"name": "a:1b", "size": 1_000_000, "details": {}}]
+        })))
+        .mount(server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/api/show"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "capabilities": [], "model_info": {}
+        })))
+        .mount(server)
+        .await;
+}
+
+#[tokio::test]
+async fn status_when_running_syncs_local_models() {
+    let server = MockServer::start().await;
+    mount_running(&server).await;
+    let services = services_for(&server);
+
+    let status = service::status(&services).await;
+    assert_eq!(status, OllamaStatus::Running { version: "0.12.0".to_string() });
+    let models = services.chat_models().unwrap();
+    assert_eq!(models.len(), 1);
+    assert_eq!(models[0].model_id, "a:1b");
+    assert!(models[0].is_local);
+}
+
+#[tokio::test]
+async fn ensure_running_when_already_up_skips_the_start() {
+    let server = MockServer::start().await;
+    mount_running(&server).await;
+    let services = services_for(&server);
+
+    let status = service::ensure_running(&services).await.unwrap();
+    assert_eq!(status, OllamaStatus::Running { version: "0.12.0".to_string() });
+    assert_eq!(services.chat_models().unwrap().len(), 1);
 }

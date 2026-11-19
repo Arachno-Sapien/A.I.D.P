@@ -1,7 +1,6 @@
 use crate::connections::{AppError, Services};
 use crate::ollama::{LocalModelView, OllamaStatus, PullEvent};
 use std::sync::{Mutex, PoisonError};
-use std::time::Duration;
 use tauri::ipc::Channel;
 use tauri::State;
 use tokio_util::sync::CancellationToken;
@@ -42,58 +41,13 @@ impl OllamaState {
 #[tauri::command]
 #[specta::specta]
 pub async fn ollama_status(services: State<'_, Services>) -> Result<OllamaStatus, AppError> {
-    let ollama = services.ollama();
-    match ollama.version().await {
-        Ok(version) => {
-            let _ = services.ensure_ollama_connection();
-            let _ = services.sync_local_models().await;
-            Ok(OllamaStatus::Running { version })
-        }
-        Err(_) => {
-            if crate::ollama::process::find_binary().is_some() {
-                Ok(OllamaStatus::Stopped)
-            } else {
-                Ok(OllamaStatus::NotInstalled)
-            }
-        }
-    }
+    Ok(crate::ollama::service::status(&services).await)
 }
 
 #[tauri::command]
 #[specta::specta]
 pub async fn ollama_start(services: State<'_, Services>) -> Result<OllamaStatus, AppError> {
-    let ollama = services.ollama();
-    if let Ok(version) = ollama.version().await {
-        let _ = services.ensure_ollama_connection();
-        let _ = services.sync_local_models().await;
-        return Ok(OllamaStatus::Running { version });
-    }
-
-    let bin = match crate::ollama::process::find_binary() {
-        Some(b) => b,
-        None => {
-            return Err(AppError::Ollama {
-                message: "Ollama isn't installed.".to_string(),
-            });
-        }
-    };
-
-    crate::ollama::process::start_serve(&bin).map_err(|e| AppError::Ollama {
-        message: e.to_string(),
-    })?;
-
-    for _ in 0..30 {
-        tokio::time::sleep(Duration::from_millis(500)).await;
-        if let Ok(version) = ollama.version().await {
-            let _ = services.ensure_ollama_connection();
-            let _ = services.sync_local_models().await;
-            return Ok(OllamaStatus::Running { version });
-        }
-    }
-
-    Err(AppError::Ollama {
-        message: "Ollama didn't start. Try starting it from the Start menu.".to_string(),
-    })
+    crate::ollama::service::ensure_running(&services).await
 }
 
 #[tauri::command]
