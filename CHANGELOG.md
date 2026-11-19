@@ -9,10 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0-rc.8] - 2026-11-19
+
 ### Changed
 - **Settings:** Updates is now the last section, after Outside tools and Commands that run without asking. Each outside tool shows its command on its own full-width line, and long allowed commands wrap at spaces.
 - **Faster:** cloud models appear in the picker without waiting for Ollama; the AI panel no longer copies the open file on every streamed chunk; Chat, the model picker, the AI panel, Settings and Models no longer re-render on every Ollama download progress line; workspace search lowercases each file once; deleting a chat and the start-up attachment clean-up are much faster with a long history; a chat with PDFs no longer reads each whole PDF again on every send.
 - **Editor tabs** can be reached and switched with the keyboard and are announced by screen readers.
+- **Under the hood:** the agent loop sends each tool result through one helper instead of about twenty copies, agent steps share the conversation and its images instead of copying them each step, and Ollama start-up moved out of the commands into the Ollama module.
 
 ### Fixed
 - **Security:** an Anthropic key could follow a provider's redirect to another host or to plain http. Provider requests now follow redirects only within the same origin.

@@ -12,7 +12,7 @@ A.I.D.P, short for AI Integrated Development Platform, is a desktop app for work
 
 ## Status
 
-v0.1 is in release candidates, and the latest is 0.1.0-rc.7. Everything listed under "What v0.1 does" below is built: cloud models through OpenAI-compatible APIs and Anthropic, local models through Ollama, keys in the system keychain, the coding workspace with AI edits as diffs and agent tools that ask before every command, outside tools over MCP with a Browser checks preset, a terminal, attachments, themes, chat history, settings, and signed updates.
+v0.1 is in release candidates, and the latest is 0.1.0-rc.8. Everything listed under "What v0.1 does" below is built: cloud models through OpenAI-compatible APIs and Anthropic, local models through Ollama, keys in the system keychain, the coding workspace with AI edits as diffs and agent tools that ask before every command, outside tools over MCP with a Browser checks preset, a terminal, attachments, themes, chat history, settings, and signed updates.
 
 It runs on Windows, macOS and Linux. Windows is the development machine and gets the most testing. CI builds and tests all three, but the Linux and macOS builds haven't been tried by hand yet, and neither has an 8 GB RAM machine.
 
@@ -36,7 +36,7 @@ The installers aren't code-signed yet (see the [code signing policy](#code-signi
 - Support for OpenAI-compatible APIs (OpenAI, OpenRouter, Groq, DeepSeek, Gemini's compatible endpoint, LM Studio or any custom endpoint), Anthropic, and Ollama.
 - Ollama control from inside the app: detect it, start it, download models with a progress bar, delete them, and free the memory a loaded model is holding.
 - Streamed replies with a Stop button, Markdown and code blocks you can copy, and chat history that survives a restart. The chat list can be hidden (Ctrl+B) or resized, and chats can be pinned, archived or deleted.
-- Attachments: images, text or code files and PDFs, up to five per message, from the paperclip, a drop on the window, or a paste. Images go to models that can read them. A file's text, or a PDF's, goes in with your message.
+- Attachments: images, text or code files and PDFs, up to five per message, from the paperclip, a drop on the window, or a paste. Images go to models that can read them. A file's text, or a PDF's, goes in with your message. PDFs are read by a separate helper process with a time limit and a 1 GB memory cap, so a broken or booby-trapped PDF can't freeze the app or your computer.
 - Themes: Dark, Light, Glass, Soft, Cyber and Elegant, or follow your system's light or dark setting.
 - A small footprint. The target is under 150 MB of RAM at idle with no model loaded, so your memory goes to the models instead of the app. The installed app measures about 128 MB on Windows.
 
@@ -44,13 +44,13 @@ The installers aren't code-signed yet (see the [code signing policy](#code-signi
 
 Keys are the one thing this app can't get wrong, so the rules are strict. A key goes into your operating system's keychain (Windows Credential Manager, macOS Keychain, or Secret Service on Linux) and nowhere else. The database only keeps the last four characters so you can tell your keys apart.
 
-The UI hands a key over once, when you add a connection, and never gets it back. Only the Rust core reads it, and only to call that key's own provider. Keys are never logged, cloud calls have to use HTTPS, and model replies render as Markdown with raw HTML switched off, so a reply can't run scripts inside the app.
+The UI hands a key over once, when you add a connection, and never gets it back. Only the Rust core reads it, and only to call that key's own provider. Keys are never logged, cloud calls have to use HTTPS, a provider's redirect is followed only to the same server (so a key can't be passed on to another host), and model replies render as Markdown with raw HTML switched off, so a reply can't run scripts inside the app.
 
 If your Linux system has no Secret Service, the app says so. It won't fall back to keeping keys in a plain file. See [docs/security.md](docs/security.md) for the full security architecture and threat model.
 
 ## What the AI is allowed to touch
 
-Letting a model edit code and run commands is a bigger risk than storing a key, so the workspace has its own rules. The AI only sees the folder you opened. Anything outside it is refused, including paths that try to climb out with `..` or a symlink. Every change it suggests appears as a diff and is written only when you accept it, or, if you tick Review at end for a bigger task, is written as it works and listed for you to keep or undo when it finishes. Every command it wants to run shows you the exact command first and waits for you, unless you tick Run commands without asking for one task or chose Always allow for that exact command in this folder. Outside tools such as the browser ask too, unless you set that one server to run without asking. Files that look like secrets, such as `.env` files and private keys, are kept out of what the model can read unless you add them yourself.
+Letting a model edit code and run commands is a bigger risk than storing a key, so the workspace has its own rules. The AI only sees the folder you opened. Anything outside it is refused, including paths that try to climb out with `..` or a symlink. Every change it suggests appears as a diff and is written only when you accept it, or, if you tick Review at end for a bigger task, is written as it works and listed for you to keep or undo when it finishes. Every command it wants to run shows you the exact command first and waits for you, unless you tick Run commands without asking for one task or chose Always allow for that exact command in this folder. Outside tools such as the browser ask too, unless you set that one server to run without asking, and a server you turn off is stopped and can't be called again until you turn it back on. Files that look like secrets, such as `.env` files and private keys, are kept out of what the model can read unless you add them yourself.
 
 If the folder isn't a git repository, the app warns you before the first AI edit, because there's no easy way back. Commands you type into the terminal yourself are yours and run as normal.
 
@@ -135,7 +135,7 @@ v0.1 is split into seven milestones, and each one ends with an app that runs. Th
 4. M3: the coding workspace. File tree, editor, the AI panel, and edits as diffs. Done.
 5. M4: agent tools and a terminal. The model can read, search and edit files and run commands, each with your approval. Done.
 6. M5: Ollama, chat history and settings. Done.
-7. M6: the v0.1 release. Installers for Windows, macOS and Linux built by CI, auto-update, outside tools (MCP + Playwright Browser checks), and a test run on an 8 GB RAM machine. In progress: CI builds and signs the installers, seven release candidates are out, auto-update works on Windows, and outside tools (the MCP client and the Browser checks preset) are built. Still to do: a full live Browser checks run with a RAM reading while a server runs, hand checks on Linux, macOS and an 8 GB RAM machine, then 0.1.0.
+7. M6: the v0.1 release. Installers for Windows, macOS and Linux built by CI, auto-update, outside tools (MCP + Playwright Browser checks), and a test run on an 8 GB RAM machine. In progress: CI builds and signs the installers, eight release candidates are out, auto-update works on Windows, and outside tools (the MCP client and the Browser checks preset) are built. Still to do: a full live Browser checks run with a RAM reading while a server runs, hand checks on Linux, macOS and an 8 GB RAM machine, then 0.1.0.
 
 After v0.1 comes the practice area.
 
