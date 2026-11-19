@@ -47,6 +47,28 @@ pub struct Hub {
     /// How many agent runs use each server. A held server is never idle: a run can
     /// spend over 10 minutes on commands and approvals between two calls.
     holds: Arc<Mutex<HashMap<u32, usize>>>,
+    /// The cancel token of each Test in flight, with a number unique to that Test, so
+    /// an older Test ending can't remove a newer one's token.
+    tests: Arc<Mutex<Tests>>,
+}
+
+/// The last Test number given out, and each server's Test in flight: (number, token).
+type Tests = (u64, HashMap<u32, (u64, CancellationToken)>);
+
+/// Removes a Test's cancel token when the Test ends, unless a newer Test replaced it.
+struct TestGuard {
+    tests: Arc<Mutex<Tests>>,
+    id: u32,
+    generation: u64,
+}
+
+impl Drop for TestGuard {
+    fn drop(&mut self) {
+        let mut guard = self.tests.lock().unwrap_or_else(PoisonError::into_inner);
+        if guard.1.get(&self.id).is_some_and(|(g, _)| *g == self.generation) {
+            guard.1.remove(&self.id);
+        }
+    }
 }
 
 /// Keeps servers from the idle stop while it lives (one agent run).
@@ -90,6 +112,7 @@ impl Hub {
             off: Arc::new(Mutex::new(HashSet::new())),
             starting: Arc::new(Mutex::new(HashMap::new())),
             holds: Arc::new(Mutex::new(HashMap::new())),
+            tests: Arc::new(Mutex::new((0, HashMap::new()))),
         }
     }
 
@@ -280,6 +303,17 @@ impl Hub {
     /// it started itself and no agent run holds.
     pub async fn test(&self, config: &ServerConfig) -> Result<Vec<String>, McpError> {
         let cancel = CancellationToken::new();
+        let _test = {
+            let mut guard = self.tests.lock().unwrap_or_else(PoisonError::into_inner);
+            guard.0 += 1;
+            let generation = guard.0;
+            guard.1.insert(config.id, (generation, cancel.clone()));
+            TestGuard {
+                tests: Arc::clone(&self.tests),
+                id: config.id,
+                generation,
+            }
+        };
         let _turn = self.start_turn(config.id, &cancel).await?;
         let (_, spawned) = self.start_in_turn(config, &cancel, false).await?;
         let names = self
@@ -302,6 +336,14 @@ impl Hub {
             }
         }
         Ok(names)
+    }
+
+    /// Cancel in Settings: ends the Test of server `id` in flight, if any.
+    pub fn cancel_test(&self, id: u32) {
+        let guard = self.tests.lock().unwrap_or_else(PoisonError::into_inner);
+        if let Some((_, cancel)) = guard.1.get(&id) {
+            cancel.cancel();
+        }
     }
 
     /// The tools of the running servers among `ids`, in `id` order.
@@ -400,6 +442,7 @@ impl Hub {
             *stops.entry(id).or_insert(0) += 1;
             self.off.lock().unwrap_or_else(PoisonError::into_inner).insert(id);
         }
+        self.cancel_test(id);
         let entry = {
             let mut guard = self.running.lock().await;
             guard.remove(&id)

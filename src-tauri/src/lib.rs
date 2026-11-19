@@ -105,6 +105,7 @@ fn specta_builder() -> Builder<tauri::Wry> {
         commands::mcp::set_mcp_server_auto_approve,
         commands::mcp::delete_mcp_server,
         commands::mcp::test_mcp_server,
+        commands::mcp::cancel_mcp_test,
         commands::updates::app_version,
         commands::updates::check_update,
         commands::updates::install_update,

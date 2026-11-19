@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useId, useState } from "react";
+import { type FormEvent, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { commands, type ServerConfig } from "../../lib/bindings";
 import { appErrorText } from "../chat/appErrorText";
@@ -29,6 +29,8 @@ export function OutsideTools() {
 
   const [testingId, setTestingId] = useState<number | null>(null);
   const [testResults, setTestResults] = useState<Record<number, TestStatus>>({});
+  // Servers whose Test the user cancelled: the error that ends it is not shown.
+  const cancelledTests = useRef(new Set<number>());
   const [removing, setRemoving] = useState<ServerConfig | null>(null);
   const [trusting, setTrusting] = useState<ServerConfig | null>(null);
 
@@ -108,7 +110,13 @@ export function OutsideTools() {
     });
     try {
       const res = await commands.testMcpServer(server.id);
-      if (res.status === "ok") {
+      const cancelled = cancelledTests.current.delete(server.id);
+      if (res.status === "error" && cancelled) {
+        setTestResults((prev) => ({
+          ...prev,
+          [server.id]: { ok: true, text: "Test cancelled." },
+        }));
+      } else if (res.status === "ok") {
         setTestResults((prev) => ({
           ...prev,
           [server.id]: {
@@ -128,6 +136,11 @@ export function OutsideTools() {
     } finally {
       setTestingId((prev) => (prev === server.id ? null : prev));
     }
+  }
+
+  function handleCancelTest(server: ServerConfig) {
+    cancelledTests.current.add(server.id);
+    void commands.cancelMcpTest(server.id);
   }
 
   async function handleRemove(server: ServerConfig) {
@@ -211,12 +224,19 @@ export function OutsideTools() {
                     </label>
                     <button
                       type="button"
-                      aria-label={`Test ${server.name}`}
-                      disabled={isTesting}
-                      onClick={() => void handleTest(server)}
+                      aria-label={
+                        isTesting
+                          ? `Cancel test of ${server.name}`
+                          : `Test ${server.name}`
+                      }
+                      onClick={() =>
+                        isTesting
+                          ? handleCancelTest(server)
+                          : void handleTest(server)
+                      }
                       className="min-w-[5.25rem] px-2.5 py-1 rounded-lg border border-neutral-800 bg-neutral-900 text-xs text-neutral-200 hover:border-neutral-700 hover:text-white transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-default focus-visible:ring-1 focus-visible:ring-neutral-400 focus-visible:outline-none"
                     >
-                      {isTesting ? "Starting…" : "Test"}
+                      {isTesting ? "Cancel" : "Test"}
                     </button>
                     <button
                       type="button"

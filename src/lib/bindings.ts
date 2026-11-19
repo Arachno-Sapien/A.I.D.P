@@ -85,6 +85,8 @@ export const commands = {
 	setMcpServerAutoApprove: (id: number, on: boolean) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("set_mcp_server_auto_approve", { id, on })),
 	deleteMcpServer: (id: number) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("delete_mcp_server", { id })),
 	testMcpServer: (id: number) => typedError<string[], AppError_Serialize>(__TAURI_INVOKE("test_mcp_server", { id })),
+	/**  Cancel in Settings: ends the Test of server `id` in flight, if any. */
+	cancelMcpTest: (id: number) => __TAURI_INVOKE<void>("cancel_mcp_test", { id }),
 	appVersion: () => __TAURI_INVOKE<string>("app_version"),
 	checkUpdate: () => typedError<UpdateInfo_Serialize | null, AppError_Serialize>(__TAURI_INVOKE("check_update")),
 	/**

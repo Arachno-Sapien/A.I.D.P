@@ -437,3 +437,81 @@ async fn a_call_reaches_only_the_server_the_run_started() {
     assert_eq!(res.text, "x");
     hub.stop_all().await;
 }
+
+/// The pid of each process the fixture spawned for server "fake", in order.
+fn spawned(dir: &std::path::Path) -> Vec<u32> {
+    std::fs::read_to_string(dir.join("fake").join("spawned.txt"))
+        .unwrap_or_default()
+        .lines()
+        .map(|l| l.trim().parse().unwrap())
+        .collect()
+}
+
+fn alive(pid: u32) -> bool {
+    let script = format!("try {{ process.kill({pid}, 0); process.exit(0) }} catch {{ process.exit(1) }}");
+    std::process::Command::new("node").args(["-e", &script]).status().unwrap().success()
+}
+
+/// Waits until the fixture has spawned `n` processes.
+async fn wait_spawned(dir: &std::path::Path, n: usize) -> Vec<u32> {
+    for _ in 0..100 {
+        let pids = spawned(dir);
+        if pids.len() >= n {
+            return pids;
+        }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+    panic!("the fixture did not start");
+}
+
+/// Cancel on a Test of a server that never answers ends it at once and kills the process.
+#[tokio::test]
+async fn cancel_test_ends_a_test_of_a_silent_server() {
+    let dir = TempDir::new();
+    let hub = Hub::new(dir.path().to_path_buf());
+    let h = hub.clone();
+    let task = tokio::spawn(async move { h.test(&fake("silent")).await });
+    let pid = wait_spawned(dir.path(), 1).await[0];
+
+    hub.cancel_test(1);
+    let res = tokio::time::timeout(Duration::from_secs(5), task).await.unwrap().unwrap();
+    assert_eq!(res, Err(McpError::Stopped));
+    assert!(!hub.is_running(1).await);
+    assert!(!alive(pid), "process {pid} still runs");
+}
+
+/// Off or Remove during Test ends the Test at once too.
+#[tokio::test]
+async fn stop_ends_a_test_in_flight() {
+    let dir = TempDir::new();
+    let hub = Hub::new(dir.path().to_path_buf());
+    let h = hub.clone();
+    let task = tokio::spawn(async move { h.test(&fake("silent")).await });
+    let pid = wait_spawned(dir.path(), 1).await[0];
+
+    hub.stop(1).await;
+    let res = tokio::time::timeout(Duration::from_secs(5), task).await.unwrap().unwrap();
+    assert_eq!(res, Err(McpError::Stopped));
+    assert!(!hub.is_running(1).await);
+    assert!(!alive(pid), "process {pid} still runs");
+}
+
+/// An older Test that ends while a newer one waits must not take the newer one's Cancel.
+#[tokio::test]
+async fn an_older_test_does_not_remove_a_newer_tests_cancel() {
+    let dir = TempDir::new();
+    let hub = Hub::new(dir.path().to_path_buf());
+    let h = hub.clone();
+    let older = tokio::spawn(async move { h.test(&fake("slowinit")).await });
+    wait_spawned(dir.path(), 1).await;
+    let h = hub.clone();
+    let newer = tokio::spawn(async move { h.test(&fake("silent")).await });
+
+    assert_eq!(older.await.unwrap().unwrap().len(), 3);
+    let pid = wait_spawned(dir.path(), 2).await[1];
+    hub.cancel_test(1);
+    let res = tokio::time::timeout(Duration::from_secs(5), newer).await.unwrap().unwrap();
+    assert_eq!(res, Err(McpError::Stopped));
+    assert!(!alive(pid), "process {pid} still runs");
+    hub.stop_all().await;
+}
