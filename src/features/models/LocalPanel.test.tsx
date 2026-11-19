@@ -130,7 +130,18 @@ describe("LocalPanel", () => {
     fireEvent.click(cancelBtn);
     expect(commands.ollamaCancelPull).toHaveBeenCalled();
 
-    resolvePull({ status: "ok", data: null });
+    // Until the pull itself returns, Download stays off and Cancel shows it's working.
+    await waitFor(() => expect(screen.getByText("Cancelling…")).toBeDefined());
+    for (const b of screen.getAllByRole("button", { name: /^download$/i })) {
+      expect((b as HTMLButtonElement).disabled).toBe(true);
+    }
+
+    resolvePull({
+      status: "error",
+      error: { kind: "provider", error: { kind: "cancelled" } },
+    });
+    await waitFor(() => expect(useModelsStore.getState().pull).toBeNull());
+    expect(screen.queryByText("Cancelling…")).toBeNull();
   });
 
   it("keeps a download going across screens", async () => {

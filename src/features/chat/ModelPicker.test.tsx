@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { Profiler } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -10,8 +10,12 @@ vi.mock("../../lib/bindings", () => ({
   },
 }));
 
+import { commands } from "../../lib/bindings";
 import { useModelsStore } from "../models/store";
 import { ModelPicker } from "./ModelPicker";
+
+// One test swaps in a spy; the others need the store's own select.
+const realSelect = useModelsStore.getState().select;
 
 describe("ModelPicker", () => {
   beforeEach(() => {
@@ -59,7 +63,7 @@ describe("ModelPicker", () => {
   });
 
   it("selects a local model with a colon", async () => {
-    const selectSpy = vi.fn();
+    const selectSpy = vi.fn().mockResolvedValue(null);
     useModelsStore.setState({
       chatModels: [
         {
@@ -99,6 +103,46 @@ describe("ModelPicker", () => {
       connectionId: 3,
       modelId: "qwen2.5-coder:1.5b",
     });
+  });
+
+  it("shows a failed default save and puts the old model back", async () => {
+    const model = (id: string) => ({
+      connectionId: 1,
+      connectionLabel: "OpenRouter",
+      modelId: id,
+      displayName: id,
+      isDefault: id === "m1",
+      supportsTools: null,
+      isLocal: false,
+      contextTokens: null,
+    });
+    useModelsStore.setState({
+      chatModels: [model("m1"), model("m2")],
+      selected: { connectionId: 1, modelId: "m1" },
+      loaded: true,
+      loadError: null,
+      select: realSelect,
+    });
+    vi.mocked(commands.setDefaultModel).mockResolvedValueOnce({
+      status: "error",
+      error: { kind: "storage", message: "disk full" },
+    });
+
+    render(<ModelPicker />);
+    const select = screen.getByLabelText("Model") as HTMLSelectElement;
+
+    fireEvent.change(select, { target: { value: "1:m2" } });
+
+    expect((await screen.findByRole("alert")).textContent).toBe(
+      "Couldn't read or write the local database: disk full",
+    );
+    expect(select.value).toBe("1:m1");
+    expect(useModelsStore.getState().loadError).toBeNull();
+
+    fireEvent.change(select, { target: { value: "1:m2" } });
+
+    await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
+    expect(select.value).toBe("1:m2");
   });
 
   it("disables local models when Ollama is stopped", () => {

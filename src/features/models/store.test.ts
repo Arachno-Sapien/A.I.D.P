@@ -7,6 +7,14 @@ vi.mock("../../lib/bindings", () => ({
     setDefaultModel: vi.fn(),
     ollamaStatus: vi.fn(),
     ollamaModels: vi.fn(),
+    ollamaPull: vi.fn(),
+    ollamaCancelPull: vi.fn(),
+  },
+}));
+
+vi.mock("@tauri-apps/api/core", () => ({
+  Channel: class {
+    onmessage = (_: unknown) => {};
   },
 }));
 
@@ -142,6 +150,89 @@ describe("useModelsStore", () => {
       connectionId: 2,
       modelId: "m2",
     });
+  });
+
+  it("a failed select puts the old model back and returns why", async () => {
+    useModelsStore.setState({
+      selected: { connectionId: 1, modelId: "m1" },
+      loadError: null,
+    });
+    vi.mocked(commands.setDefaultModel).mockResolvedValue({
+      status: "error",
+      error: { kind: "storage", message: "disk full" },
+    });
+
+    const err = await useModelsStore
+      .getState()
+      .select({ connectionId: 2, modelId: "m2" });
+
+    expect(err).toBe("Couldn't read or write the local database: disk full");
+    expect(useModelsStore.getState().selected).toEqual({
+      connectionId: 1,
+      modelId: "m1",
+    });
+    // loadError would replace the whole chat screen.
+    expect(useModelsStore.getState().loadError).toBeNull();
+  });
+
+  it("cancel keeps the pull until the pull itself returns", async () => {
+    vi.mocked(commands.ollamaCancelPull).mockResolvedValue(undefined);
+    let resolvePull: (v: unknown) => void = () => {};
+    vi.mocked(commands.ollamaPull).mockReturnValue(
+      new Promise((r) => {
+        resolvePull = r;
+      }) as never,
+    );
+    useModelsStore.setState({ pull: null, pullError: null });
+
+    const pulling = useModelsStore.getState().pullModel("a:1b");
+    await useModelsStore.getState().cancelPull();
+
+    expect(useModelsStore.getState().pull).toMatchObject({
+      name: "a:1b",
+      cancelling: true,
+    });
+
+    resolvePull({
+      status: "error",
+      error: { kind: "provider", error: { kind: "cancelled" } },
+    });
+    await pulling;
+    expect(useModelsStore.getState().pull).toBeNull();
+    expect(useModelsStore.getState().pullError).toBeNull();
+  });
+
+  it("a late result from a cancelled pull leaves a newer pull alone", async () => {
+    vi.mocked(commands.ollamaCancelPull).mockResolvedValue(undefined);
+    const resolvers: Array<(v: unknown) => void> = [];
+    vi.mocked(commands.ollamaPull).mockImplementation(
+      () =>
+        new Promise((r) => {
+          resolvers.push(r);
+        }) as never,
+    );
+    vi.mocked(commands.ollamaStatus).mockResolvedValue({
+      status: "ok",
+      data: { state: "notInstalled" } as never,
+    });
+    vi.mocked(commands.listConnections).mockResolvedValue({ status: "ok", data: [] });
+    vi.mocked(commands.chatModels).mockResolvedValue({ status: "ok", data: [] });
+    useModelsStore.setState({ pull: null, pullError: null });
+
+    const first = useModelsStore.getState().pullModel("a:1b");
+    await useModelsStore.getState().cancelPull();
+    const second = useModelsStore.getState().pullModel("b:1b");
+
+    resolvers[0]({
+      status: "error",
+      error: { kind: "provider", error: { kind: "cancelled" } },
+    });
+    await first;
+    expect(useModelsStore.getState().pull?.name).toBe("b:1b");
+
+    resolvers[1]({ status: "ok", data: null });
+    await second;
+    expect(useModelsStore.getState().pull).toBeNull();
   });
 
   it("refresh failure sets loadError", async () => {

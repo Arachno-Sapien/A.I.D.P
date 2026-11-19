@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { parseModelKey, useModelsStore } from "../models/store";
 
@@ -18,6 +18,8 @@ export function ModelPicker({ children, left }: ModelPickerProps = {}) {
     })),
   );
   const { select } = useModelsStore.getState();
+  // Not loadError: ChatScreen swaps the whole chat for that.
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const hasModels = loaded && chatModels.length > 0;
 
@@ -63,7 +65,7 @@ export function ModelPicker({ children, left }: ModelPickerProps = {}) {
               onChange={(e) => {
                 const parsed = parseModelKey(e.target.value);
                 if (parsed) {
-                  void select(parsed);
+                  void select(parsed).then((err) => setSaveError(err ?? null));
                 }
               }}
               className="app-inset bg-neutral-800 border border-neutral-700/80 rounded px-2.5 py-1 text-xs text-neutral-100 focus:outline-none focus:border-neutral-600 cursor-pointer min-w-0 truncate"
@@ -102,6 +104,11 @@ export function ModelPicker({ children, left }: ModelPickerProps = {}) {
                 </optgroup>
               )}
             </select>
+            {saveError && (
+              <span role="alert" className="text-xs text-red-400 min-w-0 truncate" title={saveError}>
+                {saveError}
+              </span>
+            )}
           </>
         )}
       </div>

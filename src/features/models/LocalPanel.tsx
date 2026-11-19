@@ -135,9 +135,10 @@ export function LocalPanel() {
               <button
                 type="button"
                 onClick={() => void cancelPull()}
-                className="px-2 py-0.5 rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-300 hover:text-white text-xs transition-colors cursor-pointer"
+                disabled={pull.cancelling}
+                className="px-2 py-0.5 rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-300 hover:text-white text-xs transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-default"
               >
-                Cancel
+                {pull.cancelling ? "Cancelling…" : "Cancel"}
               </button>
             </div>
           </div>

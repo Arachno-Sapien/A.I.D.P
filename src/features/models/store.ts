@@ -30,7 +30,12 @@ export interface PullProgress {
   status: string;
   completedMb: number;
   totalMb: number;
+  /** Cancel was pressed; the pull hasn't returned yet. */
+  cancelling?: boolean;
 }
+
+// Which pull is current, so a late result from a cancelled one can't clear a newer one.
+let pullSeq = 0;
 
 export interface ModelsStore {
   connections: ConnectionView[];
@@ -48,7 +53,8 @@ export interface ModelsStore {
   ollamaLoading: boolean;
 
   refresh(): Promise<void>;
-  select(m: SelectedModel): Promise<void>;
+  /** Saves the default; on failure puts the old one back and returns why. */
+  select(m: SelectedModel): Promise<string | null>;
   refreshOllama(): Promise<void>;
   startOllama(): Promise<void>;
   openOllamaDownload(): Promise<void>;
@@ -113,8 +119,13 @@ export const useModelsStore = create<ModelsStore>((set, get) => ({
   },
 
   select: async (m: SelectedModel) => {
+    const prev = get().selected;
     set({ selected: m });
-    await commands.setDefaultModel(m.connectionId, m.modelId);
+    const res = await commands.setDefaultModel(m.connectionId, m.modelId);
+    if (res.status === "ok") return null;
+    // Only undo our own pick, not one made while this save was running.
+    if (get().selected === m) set({ selected: prev });
+    return appErrorText(res.error);
   },
 
   refreshOllama: async () => {
@@ -154,6 +165,7 @@ export const useModelsStore = create<ModelsStore>((set, get) => ({
   },
 
   pullModel: async (name: string) => {
+    const seq = ++pullSeq;
     set({
       pull: {
         name,
@@ -165,18 +177,20 @@ export const useModelsStore = create<ModelsStore>((set, get) => ({
     });
     const channel = new Channel<PullEvent>();
     channel.onmessage = (ev: PullEvent) => {
-      if (ev.event === "progress") {
+      if (ev.event === "progress" && seq === pullSeq) {
         set({
           pull: {
             name,
             status: ev.data.status,
             completedMb: ev.data.completedMb,
             totalMb: ev.data.totalMb,
+            cancelling: get().pull?.cancelling,
           },
         });
       }
     };
     const res = await commands.ollamaPull(name, channel);
+    if (seq !== pullSeq) return;
     if (res.status === "ok") {
       set({ pull: null });
       await get().refreshOllama();
@@ -189,8 +203,10 @@ export const useModelsStore = create<ModelsStore>((set, get) => ({
   },
 
   cancelPull: async () => {
+    // pull stays set (Download stays off) until pullModel's own result clears it.
+    const pull = get().pull;
+    if (pull) set({ pull: { ...pull, cancelling: true } });
     await commands.ollamaCancelPull();
-    set({ pull: null });
   },
 
   deleteLocal: async (name: string) => {
