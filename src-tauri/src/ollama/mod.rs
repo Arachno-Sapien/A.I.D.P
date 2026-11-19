@@ -1,4 +1,5 @@
 pub mod process;
+pub mod service;
 
 use crate::gateway::http::{map_http_error, map_reqwest_error, read_json_lines, Step, LIST_TIMEOUT};
 use crate::gateway::ProviderError;
