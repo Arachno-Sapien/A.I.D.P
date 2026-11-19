@@ -49,7 +49,7 @@ async fn sends_an_image_block_before_the_text() {
     request.images = vec![vec![ImageInput {
         mime: "image/jpeg".to_string(),
         data_base64: "/9j/4AAQ".to_string(),
-    }]];
+    }]].into();
     let (channel, _) = capture();
     let _ = p.stream_chat(request, channel, CancellationToken::new()).await;
 
@@ -127,10 +127,10 @@ async fn streams_text_deltas_and_usage() {
                 role: Role::User,
                 content: "hi".to_string(),
             },
-        ],
+        ].into(),
         tools: vec![],
         rounds: vec![],
-        images: vec![],
+        images: Default::default(),
         local: Default::default(),
     };
 
@@ -854,7 +854,7 @@ async fn renders_tool_rounds() {
                 is_error: true,
             },
         ],
-        images: vec![],
+        images: Default::default(),
     }];
 
     p.stream_chat(request, channel, CancellationToken::new())
@@ -1039,7 +1039,7 @@ async fn round_images_follow_the_tool_results() {
         images: vec![ImageInput {
             mime: "image/png".to_string(),
             data_base64: "iVBORw0KGgo=".to_string(),
-        }],
+        }].into(),
     }];
     let (channel, _) = capture();
     test_provider(&server)

@@ -420,7 +420,7 @@ async fn sends_an_image_url_part_with_an_image() {
     with_image.images = vec![vec![ImageInput {
         mime: "image/png".to_string(),
         data_base64: "iVBORw0KGgo=".to_string(),
-    }]];
+    }]].into();
     let (channel, _) = capture();
     p.stream_chat(with_image, channel, CancellationToken::new())
         .await
@@ -753,7 +753,7 @@ async fn renders_tool_rounds() {
                 is_error: true,
             },
         ],
-        images: vec![],
+        images: Default::default(),
     }];
 
     p.stream_chat(request, channel, CancellationToken::new())
@@ -801,7 +801,7 @@ async fn round_images_follow_the_tool_results() {
             content: "[image image/png]".to_string(),
             is_error: false,
         }],
-        images: vec![png()],
+        images: [png()].into(),
     }];
     let (channel, _) = capture();
     provider(&server)

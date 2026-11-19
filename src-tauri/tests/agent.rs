@@ -2273,3 +2273,77 @@ async fn tool_image_never_reaches_a_model_without_vision() {
     assert!(!serde_json::to_string(&msgs).unwrap().contains("image_url"));
     assert_eq!(msgs.last().unwrap()["role"], "tool");
 }
+
+/// Records each step's request; the first asks for a tool, the second ends.
+struct Recorder(Mutex<Vec<aidp_lib::gateway::ChatRequest>>);
+
+#[async_trait::async_trait]
+impl aidp_lib::gateway::ModelProvider for Recorder {
+    async fn list_models(&self) -> Result<Vec<aidp_lib::gateway::ModelInfo>, ProviderError> {
+        Ok(Vec::new())
+    }
+
+    async fn stream_chat(
+        &self,
+        req: aidp_lib::gateway::ChatRequest,
+        _out: tauri::ipc::Channel<ChatEvent>,
+        _cancel: CancellationToken,
+    ) -> Result<aidp_lib::gateway::Reply, ProviderError> {
+        let mut seen = self.0.lock().unwrap();
+        seen.push(req);
+        let tool_calls = if seen.len() == 1 {
+            vec![aidp_lib::gateway::ToolCall {
+                id: "call_1".into(),
+                name: "list_files".into(),
+                input: json!({"path": ""}),
+            }]
+        } else {
+            Vec::new()
+        };
+        Ok(aidp_lib::gateway::Reply {
+            usage: Default::default(),
+            tool_calls,
+            assistant: json!({}),
+        })
+    }
+}
+
+#[tokio::test]
+async fn steps_share_the_conversation() {
+    let temp_dir = TempDir::new();
+    let p = Recorder(Mutex::new(Vec::new()));
+    let (channel, _) = capture();
+    let approvals = Approvals::new();
+    let res = aidp_lib::tools::agent::run_with_images(
+        AgentRun {
+            provider: &p,
+            model: "test-model".into(),
+            messages: vec![ChatMessage {
+                role: Role::User,
+                content: "Look".into(),
+            }],
+            root: temp_dir.path().to_path_buf(),
+            approvals: &approvals,
+            out: channel,
+            cancel: CancellationToken::new(),
+            command_timeout: Duration::from_secs(5),
+            local: Default::default(),
+            text_limit: aidp_lib::tools::READ_LIMIT,
+            review_at_end: false,
+            run_commands: false,
+            command_allowed: &|_| false,
+            vision: true,
+            servers: None,
+            mcp: None,
+        },
+        vec![vec![png()]],
+    )
+    .await;
+    assert!(res.is_ok());
+
+    let seen = p.0.lock().unwrap();
+    assert_eq!(seen.len(), 2);
+    assert!(Arc::ptr_eq(&seen[0].messages, &seen[1].messages));
+    assert!(Arc::ptr_eq(&seen[0].images, &seen[1].images));
+    assert_eq!(seen[1].images[1], vec![png()]);
+}

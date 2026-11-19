@@ -897,8 +897,8 @@ impl Services {
             .stream_chat(
                 ChatRequest {
                     model: model_id,
-                    messages,
-                    images,
+                    messages: messages.into(),
+                    images: images.into(),
                     tools: vec![],
                     rounds: vec![],
                     local,

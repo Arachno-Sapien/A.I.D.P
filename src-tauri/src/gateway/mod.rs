@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use specta::Type;
+use std::sync::Arc;
 use tauri::ipc::Channel;
 use tokio_util::sync::CancellationToken;
 
@@ -140,8 +141,9 @@ pub struct ToolRound {
     pub assistant: serde_json::Value,
     pub results: Vec<ToolOutput>,
     /// Images the round's tools returned, for a model that reads images (decision 0031).
-    /// Each adapter sends them after the round's results.
-    pub images: Vec<ImageInput>,
+    /// Each adapter sends them after the round's results. Shared, so a step's request
+    /// doesn't copy them.
+    pub images: Arc<[ImageInput]>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -170,9 +172,10 @@ pub struct ImageInput {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ChatRequest {
     pub model: String,
-    pub messages: Vec<ChatMessage>,
+    /// Shared, like `images`, so each agent step's request doesn't copy the conversation.
+    pub messages: Arc<[ChatMessage]>,
     /// The images of `messages[i]` are `images[i]`; shorter, or empty, where there are none.
-    pub images: Vec<Vec<ImageInput>>,
+    pub images: Arc<[Vec<ImageInput>]>,
     pub tools: Vec<ToolSpec>,
     pub rounds: Vec<ToolRound>,
     pub local: LocalOptions,

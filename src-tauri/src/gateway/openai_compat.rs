@@ -195,7 +195,7 @@ impl ModelProvider for OpenAiCompat {
         let images = req.images;
         let mut messages_val: Vec<serde_json::Value> = req
             .messages
-            .into_iter()
+            .iter()
             .enumerate()
             .map(|(i, m)| match images.get(i).filter(|list| !list.is_empty()) {
                 None => json!({

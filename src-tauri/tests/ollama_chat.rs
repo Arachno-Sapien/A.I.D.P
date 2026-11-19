@@ -23,10 +23,10 @@ fn base_req() -> ChatRequest {
         messages: vec![ChatMessage {
             role: Role::User,
             content: "hello".to_string(),
-        }],
+        }].into(),
         tools: vec![],
         rounds: vec![],
-        images: vec![],
+        images: Default::default(),
         local: Default::default(),
     }
 }
@@ -47,7 +47,7 @@ async fn sends_images_on_the_message() {
     request.images = vec![vec![ImageInput {
         mime: "image/png".to_string(),
         data_base64: "iVBORw0KGgo=".to_string(),
-    }]];
+    }]].into();
     let (channel, _) = capture();
     adapter
         .stream_chat(request, channel, CancellationToken::new())
@@ -400,7 +400,7 @@ async fn renders_tool_rounds() {
                 is_error: true,
             },
         ],
-        images: vec![],
+        images: Default::default(),
     }];
 
     let adapter = OllamaChat::new(reqwest::Client::new(), server.uri());
@@ -624,7 +624,7 @@ async fn round_images_follow_the_tool_results() {
         images: vec![ImageInput {
             mime: "image/png".to_string(),
             data_base64: "iVBORw0KGgo=".to_string(),
-        }],
+        }].into(),
     }];
     let adapter = OllamaChat::new(reqwest::Client::new(), server.uri());
     let (ch, _) = capture();

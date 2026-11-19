@@ -14,6 +14,7 @@ use crate::mcp::hub::Hub;
 use crate::mcp::{split_name, McpError, ServerConfig, CALL_TIMEOUT};
 use crate::workspace::display_path;
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::Duration;
 use tauri::ipc::Channel;
 use tokio_util::sync::CancellationToken;
@@ -254,6 +255,9 @@ pub async fn run_with_images(
     // The system message has no images, so the rest move down one.
     let mut full_images = vec![Vec::new()];
     full_images.extend(images);
+    // Shared by every step's request, so a step copies pointers, not the conversation.
+    let full_messages: Arc<[ChatMessage]> = full_messages.into();
+    let full_images: Arc<[Vec<ImageInput>]> = full_images.into();
 
     let mut total_usage = Usage::default();
     let mut rounds: Vec<ToolRound> = Vec::new();
@@ -806,13 +810,13 @@ pub async fn run_with_images(
         // their `[image ...]` lines. ponytail: keep the last few if models need them.
         if !round_images.is_empty() {
             for old in &mut rounds {
-                old.images.clear();
+                old.images = Arc::default();
             }
         }
         rounds.push(ToolRound {
             assistant: reply.assistant,
             results,
-            images: round_images,
+            images: round_images.into(),
         });
     }
 

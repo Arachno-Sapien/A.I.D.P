@@ -66,10 +66,10 @@ pub fn req() -> ChatRequest {
         messages: vec![ChatMessage {
             role: Role::User,
             content: "hi".to_string(),
-        }],
+        }].into(),
         tools: vec![],
         rounds: vec![],
-        images: vec![],
+        images: Default::default(),
         local: Default::default(),
     }
 }
