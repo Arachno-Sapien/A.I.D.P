@@ -189,6 +189,8 @@ impl ModelProvider for OpenAiCompat {
         let mut body_map = serde_json::Map::new();
         body_map.insert("model".to_string(), json!(req.model));
         body_map.insert("stream".to_string(), json!(true));
+        // Without this OpenAI never streams the usage chunk (an empty "choices" plus "usage").
+        body_map.insert("stream_options".to_string(), json!({ "include_usage": true }));
 
         let images = req.images;
         let mut messages_val: Vec<serde_json::Value> = req
@@ -256,22 +258,26 @@ impl ModelProvider for OpenAiCompat {
             body_map.insert("tools".to_string(), json!(tools_val));
         }
 
-        let body = serde_json::Value::Object(body_map);
+        let mut body = serde_json::Value::Object(body_map);
 
-        let request = self
-            .client
-            .post(&url)
-            .header(reqwest::header::AUTHORIZATION, auth_header)
-            .json(&body);
+        let resp = loop {
+            let request = self
+                .client
+                .post(&url)
+                .header(reqwest::header::AUTHORIZATION, auth_header.clone())
+                .json(&body);
 
-        let send_fut = request.send();
-        let resp = match cancel.run_until_cancelled(send_fut).await {
-            Some(Ok(resp)) => resp,
-            Some(Err(err)) => return Err(map_reqwest_error(err)),
-            None => return Err(ProviderError::Cancelled),
-        };
+            let send_fut = request.send();
+            let resp = match cancel.run_until_cancelled(send_fut).await {
+                Some(Ok(resp)) => resp,
+                Some(Err(err)) => return Err(map_reqwest_error(err)),
+                None => return Err(ProviderError::Cancelled),
+            };
 
-        if !resp.status().is_success() {
+            if resp.status().is_success() {
+                break resp;
+            }
+
             let status = resp.status().as_u16();
             let retry_after = resp
                 .headers()
@@ -286,8 +292,18 @@ impl ModelProvider for OpenAiCompat {
                 None => return Err(ProviderError::Cancelled),
             };
 
+            // Servers that reject unknown fields (older LM Studio, some custom endpoints) name
+            // the field. Only then retry, once: the second body has no stream_options to remove.
+            if matches!(status, 400 | 422)
+                && body_text.to_ascii_lowercase().contains("stream_options")
+                && let Some(map) = body.as_object_mut()
+                && map.remove("stream_options").is_some()
+            {
+                continue;
+            }
+
             return Err(map_http_error(status, retry_after.as_deref(), &body_text));
-        }
+        };
 
         let mut final_usage = Usage::default();
         let mut accumulated_text = String::new();
