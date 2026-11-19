@@ -18,6 +18,7 @@ vi.mock("../../lib/bindings", () => ({
     setMcpServerAutoApprove: vi.fn().mockResolvedValue({ status: "ok", data: null }),
     deleteMcpServer: vi.fn().mockResolvedValue({ status: "ok", data: null }),
     testMcpServer: vi.fn(),
+    cancelMcpTest: vi.fn().mockResolvedValue(null),
   },
 }));
 
@@ -261,8 +262,9 @@ describe("OutsideTools", () => {
     })) as HTMLButtonElement;
     fireEvent.click(testBtn);
 
-    expect(await screen.findByText("Starting…")).toBeDefined();
-    expect(testBtn.disabled).toBe(true);
+    expect(
+      await screen.findByRole("button", { name: "Cancel test of fake" }),
+    ).toBe(testBtn);
     // Removing or turning it off mid-start is held until the start ends.
     const onBox = screen.getByRole("checkbox", { name: "fake on" }) as HTMLInputElement;
     const removeBtn = screen.getByRole("button", { name: "Remove fake" }) as HTMLButtonElement;
@@ -286,6 +288,33 @@ describe("OutsideTools", () => {
     expect(
       await screen.findByText("The server could not be started: boom"),
     ).toBeDefined();
+  });
+
+  it("Cancel during Test cancels it and says so, not as an error", async () => {
+    vi.mocked(commands.listMcpServers).mockResolvedValue({
+      status: "ok",
+      data: [{ id: 3, name: "fake", command: "node fake.js", enabled: true, autoApprove: false }],
+    });
+    let resolveTest!: (v: { status: "error"; error: { kind: "invalidInput"; message: string } }) => void;
+    vi.mocked(commands.testMcpServer).mockImplementationOnce(
+      () =>
+        new Promise((r) => {
+          resolveTest = r;
+        }),
+    );
+
+    render(<OutsideTools />);
+    fireEvent.click(await screen.findByRole("button", { name: "Test fake" }));
+    const cancelBtn = await screen.findByRole("button", { name: "Cancel test of fake" });
+    expect(cancelBtn.textContent).toBe("Cancel");
+    fireEvent.click(cancelBtn);
+    expect(commands.cancelMcpTest).toHaveBeenCalledWith(3);
+
+    resolveTest({ status: "error", error: { kind: "invalidInput", message: "Stopped." } });
+    const line = await screen.findByText("Test cancelled.");
+    expect(line.getAttribute("role")).toBeNull();
+    expect(screen.queryByText("Stopped.")).toBeNull();
+    expect(screen.getByRole("button", { name: "Test fake" })).toBeDefined();
   });
 
   it("the preset hint says a browser window opens (the preset is not headless)", async () => {

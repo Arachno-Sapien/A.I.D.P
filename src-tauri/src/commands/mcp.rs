@@ -76,3 +76,10 @@ pub async fn test_mcp_server(
     })
 }
 
+/// Cancel in Settings: ends the Test of server `id` in flight, if any.
+#[tauri::command]
+#[specta::specta]
+pub fn cancel_mcp_test(hub: State<'_, Hub>, id: u32) {
+    hub.cancel_test(id);
+}
+
