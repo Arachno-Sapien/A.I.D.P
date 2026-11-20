@@ -4,6 +4,7 @@ import { commands, type ModelInfo } from "../../lib/bindings";
 import { appErrorText } from "../chat/appErrorText";
 import { AddConnectionDialog } from "./AddConnectionDialog";
 import { ChooseModels } from "./ChooseModels";
+import { EffortSelect } from "./EffortSelect";
 import { LocalPanel } from "./LocalPanel";
 import { useModelsStore } from "./store";
 
@@ -27,6 +28,7 @@ export function ModelsScreen({
     })),
   );
   const refresh = () => useModelsStore.getState().refresh();
+  const setEffort = useModelsStore.getState().setEffort;
   const cloudConnections = connections.filter((c) => c.kind !== "ollama");
   const [internalAdding, setInternalAdding] = useState(false);
   const [testingId, setTestingId] = useState<number | null>(null);
@@ -334,7 +336,7 @@ export function ModelsScreen({
                         .map((m) => (
                           <li
                             key={m.modelId}
-                            className="flex items-center justify-between gap-3 text-xs"
+                            className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs"
                           >
                             <span className="text-neutral-300 truncate min-w-0" title={m.modelId}>
                               {m.displayName}
@@ -358,6 +360,14 @@ export function ModelsScreen({
                                 <option value="no">No</option>
                               </select>
                             </label>
+                            <EffortSelect
+                              model={m}
+                              onChange={(e) =>
+                                void setEffort(m, e).then((err) =>
+                                  err && setTestResult({ id: c.id, text: err, isError: true }),
+                                )
+                              }
+                            />
                           </li>
                         ))}
                     </ul>

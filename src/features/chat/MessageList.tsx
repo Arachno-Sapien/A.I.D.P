@@ -193,6 +193,11 @@ const MessageItem = memo(function MessageItem({
                 {msg.status === "streaming" && (
                   <span className="inline-block w-2 h-4 bg-neutral-400 animate-pulse ml-1 align-middle" />
                 )}
+                {msg.effortIgnored && (
+                  <div className="text-xs text-neutral-400 mt-2">
+                    This model ignored the effort level, so it's now off for this model.
+                  </div>
+                )}
                 {msg.status === "stopped" && (
                   <div className="text-xs text-neutral-400 mt-2">Stopped</div>
                 )}

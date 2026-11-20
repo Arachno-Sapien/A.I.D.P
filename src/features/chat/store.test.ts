@@ -78,6 +78,21 @@ describe("useChatStore", () => {
     expect(state.streaming).toBe(false);
   });
 
+  it("a reply whose effort was ignored says so", () => {
+    useChatStore.setState({
+      conversationId: 7,
+      messages: [{ id: "1", role: "assistant", text: "Hi", status: "streaming" }],
+      streaming: true,
+    });
+    useChatStore.getState().applyEvent("1", {
+      event: "done",
+      data: { tokensIn: 1, tokensOut: 1, effortIgnored: true },
+    });
+    expect(useChatStore.getState().messages[0]?.effortIgnored).toBe(true);
+    const saved = vi.mocked(commands.appendMessage).mock.lastCall?.[1];
+    expect(JSON.parse(saved!.contentParts).effortIgnored).toBe(true);
+  });
+
   it("marks cancelled replies stopped", () => {
     useChatStore.setState({
       messages: [

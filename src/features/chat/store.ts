@@ -113,6 +113,8 @@ export interface UiMessage {
   modelName?: string;
   error?: ProviderError;
   commandError?: AppError;
+  /** The model ignored the effort level, so it was turned off for that model. */
+  effortIgnored?: boolean;
 }
 
 export interface ChatHooks {
@@ -549,9 +551,13 @@ export const createChatStore = (surface: ChatSurface, hooks?: ChatHooks) => {
           : isCancelled
             ? "stopped"
             : "error";
+        const ignored =
+          ev.event === "done" &&
+          ((ev.data as any)?.usage ?? ev.data)?.effortIgnored === true;
         const end = (m: UiMessage): UiMessage => ({
           ...m,
           status,
+          ...(ignored ? { effortIgnored: true } : {}),
           ...(failed ? { error: isCancelled ? undefined : failed } : {}),
           parts: withStepsStopped(m.parts),
         });

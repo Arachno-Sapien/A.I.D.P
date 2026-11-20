@@ -11,6 +11,7 @@ export interface StoredEnvelope {
   attachments?: UiMessage["attachments"];
   /** The whole error, so a provider error keeps its message after a restart. */
   error?: UiMessage["error"];
+  effortIgnored?: true;
 }
 
 /** Tool images show only while the app runs; a saved chat keeps their text (decision 0031). */
@@ -32,6 +33,7 @@ export function toStored(m: UiMessage): string {
     parts: withoutImages(m.parts),
     attachments: m.attachments,
     error: m.error,
+    effortIgnored: m.effortIgnored ? true : undefined,
   };
   return JSON.stringify(envelope);
 }
@@ -88,5 +90,6 @@ export function fromStored(rowOrJson: StoredMessage | string): UiMessage {
     status,
     modelName,
     error,
+    ...(parsed?.effortIgnored ? { effortIgnored: true } : {}),
   };
 }

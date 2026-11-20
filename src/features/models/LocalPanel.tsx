@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { EffortSelect } from "./EffortSelect";
 import { useModelsStore } from "./store";
 
 const SUGGESTIONS = [
@@ -25,6 +26,8 @@ export function LocalPanel() {
     deleteLocal,
     unloadLocal,
     setContext,
+    chatModels,
+    setEffort,
   } = useModelsStore();
 
   const [customModel, setCustomModel] = useState("");
@@ -271,7 +274,7 @@ export function LocalPanel() {
                     </div>
                   )}
 
-                  <div className="flex items-center gap-2 text-xs text-neutral-400 pt-1 border-t border-neutral-900">
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-neutral-400 pt-1 border-t border-neutral-900">
                     <label
                       htmlFor={`ctx-${m.name}`}
                       className="text-xs text-neutral-400"
@@ -295,6 +298,15 @@ export function LocalPanel() {
                         </option>
                       ))}
                     </select>
+                    {(() => {
+                      const cm = chatModels.find((c) => c.isLocal && c.modelId === m.name);
+                      return cm ? (
+                        <EffortSelect
+                          model={cm}
+                          onChange={(e) => void setEffort(cm, e)}
+                        />
+                      ) : null;
+                    })()}
                   </div>
                 </div>
               );

@@ -4,6 +4,7 @@ import {
   commands,
   type ChatModel,
   type ConnectionView,
+  type Effort,
   type LocalModelView,
   type OllamaStatus,
   type PullEvent,
@@ -55,6 +56,8 @@ export interface ModelsStore {
   refresh(): Promise<void>;
   /** Saves the default; on failure puts the old one back and returns why. */
   select(m: SelectedModel): Promise<string | null>;
+  /** Saves a model's effort level, then reloads the list; returns why it failed. */
+  setEffort(model: ChatModel, effort: Effort | null): Promise<string | null>;
   refreshOllama(): Promise<void>;
   startOllama(): Promise<void>;
   openOllamaDownload(): Promise<void>;
@@ -126,6 +129,12 @@ export const useModelsStore = create<ModelsStore>((set, get) => ({
     // Only undo our own pick, not one made while this save was running.
     if (get().selected === m) set({ selected: prev });
     return appErrorText(res.error);
+  },
+
+  setEffort: async (model, effort) => {
+    const res = await commands.setModelEffort(model.connectionId, model.modelId, effort);
+    await get().refresh();
+    return res.status === "error" ? appErrorText(res.error) : null;
   },
 
   refreshOllama: async () => {

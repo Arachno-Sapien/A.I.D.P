@@ -7,6 +7,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../../lib/bindings", () => ({
   commands: {
     setDefaultModel: vi.fn().mockResolvedValue({ status: "ok", data: null }),
+    setModelEffort: vi.fn().mockResolvedValue({ status: "ok", data: null }),
+    listConnections: vi.fn().mockResolvedValue({ status: "ok", data: [] }),
+    chatModels: vi.fn().mockResolvedValue({ status: "ok", data: [] }),
   },
 }));
 
@@ -225,5 +228,35 @@ describe("ModelPicker", () => {
     expect(optgroups.length).toBe(2);
     expect(optgroups[0]?.getAttribute("label")).toBe("OpenRouter");
     expect(optgroups[1]?.getAttribute("label")).toBe("Local · Ollama");
+  });
+
+  it("the effort select follows the current model", async () => {
+    const a = {
+      connectionId: 1, connectionLabel: "OpenRouter", modelId: "a", displayName: "Model A",
+      isDefault: true, supportsTools: null, isLocal: false, contextTokens: null,
+      effort: "high" as const,
+    };
+    const b = { ...a, modelId: "b", displayName: "Model B", isDefault: false, effort: "low" as const };
+    useModelsStore.setState({ chatModels: [a, b], selected: { connectionId: 1, modelId: "a" }, loaded: true });
+    render(<ModelPicker />);
+
+    const effort = () => screen.getByRole("combobox", { name: /effort$/ }) as HTMLSelectElement;
+    expect(effort().value).toBe("high");
+
+    fireEvent.change(screen.getByLabelText("Model"), { target: { value: "1:b" } });
+    await waitFor(() => expect(effort().value).toBe("low"));
+
+    // The reload after a save brings the stored list back (b is now the saved default), old value included.
+    vi.mocked(commands.chatModels).mockResolvedValue({ status: "ok", data: [{ ...a, isDefault: false }, { ...b, isDefault: true }] });
+    vi.mocked(commands.setModelEffort).mockResolvedValueOnce({
+      status: "error",
+      error: { kind: "storage", message: "locked" } as never,
+    });
+    fireEvent.change(effort(), { target: { value: "medium" } });
+    await waitFor(() => {
+      expect(commands.setModelEffort).toHaveBeenCalledWith(1, "b", "medium");
+      expect(screen.getByRole("alert")).toBeDefined();
+    });
+    expect(effort().value).toBe("low");
   });
 });

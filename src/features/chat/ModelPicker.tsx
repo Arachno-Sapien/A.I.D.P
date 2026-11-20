@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { parseModelKey, useModelsStore } from "../models/store";
+import { EffortSelect } from "../models/EffortSelect";
 
 export interface ModelPickerProps {
   children?: ReactNode;
@@ -17,7 +18,7 @@ export function ModelPicker({ children, left }: ModelPickerProps = {}) {
       ollama: s.ollama,
     })),
   );
-  const { select } = useModelsStore.getState();
+  const { select, setEffort } = useModelsStore.getState();
   // Not loadError: ChatScreen swaps the whole chat for that.
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -104,6 +105,16 @@ export function ModelPicker({ children, left }: ModelPickerProps = {}) {
                 </optgroup>
               )}
             </select>
+            {currentModel && (
+              <span className="text-xs">
+                <EffortSelect
+                  model={currentModel}
+                  onChange={(e) =>
+                    void setEffort(currentModel, e).then((err) => setSaveError(err ?? null))
+                  }
+                />
+              </span>
+            )}
             {saveError && (
               <span role="alert" className="text-xs text-red-400 min-w-0 truncate" title={saveError}>
                 {saveError}

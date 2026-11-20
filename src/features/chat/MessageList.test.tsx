@@ -131,4 +131,11 @@ describe("MessageList", () => {
       }
     }
   });
+
+  it("a reply whose effort was ignored says so, and others don't", () => {
+    const ignored: UiMessage = { id: "a1", role: "assistant", text: "one", status: "complete", effortIgnored: true };
+    const plain: UiMessage = { id: "a2", role: "assistant", text: "two", status: "complete" };
+    const { getAllByText } = render(<MessageList messages={[ignored, plain]} />);
+    expect(getAllByText("This model ignored the effort level, so it's now off for this model.")).toHaveLength(1);
+  });
 });

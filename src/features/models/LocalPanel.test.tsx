@@ -22,6 +22,7 @@ vi.mock("../../lib/bindings", () => ({
     ollamaDelete: vi.fn().mockResolvedValue({ status: "ok", data: null }),
     ollamaUnload: vi.fn().mockResolvedValue({ status: "ok", data: null }),
     setModelContext: vi.fn().mockResolvedValue({ status: "ok", data: null }),
+    setModelEffort: vi.fn().mockResolvedValue({ status: "ok", data: null }),
   },
 }));
 
@@ -273,6 +274,43 @@ describe("LocalPanel", () => {
       "qwen2.5-coder:1.5b",
       4096,
     );
+  });
+
+  it("sets a local model's effort", async () => {
+    const local = {
+      connectionId: 9,
+      connectionLabel: "Ollama",
+      modelId: "qwen3:4b",
+      displayName: "qwen3:4b",
+      isDefault: false,
+      supportsTools: true,
+      isLocal: true,
+      contextTokens: null,
+      effortSupport: "toggle" as const,
+    };
+    useModelsStore.setState({
+      ollama: { state: "running", version: "0.5.0" },
+      chatModels: [local],
+      localModels: [
+        {
+          name: "qwen3:4b",
+          sizeMb: 2500,
+          parameterSize: "4B",
+          quantization: "Q4_K_M",
+          supportsTools: true,
+          contextLength: 32768,
+          numCtx: 8192,
+          loaded: null,
+        },
+      ],
+    });
+
+    render(<LocalPanel />);
+    const select = screen.getByRole("combobox", { name: "qwen3:4b effort" }) as HTMLSelectElement;
+    fireEvent.change(select, { target: { value: "low" } });
+    await waitFor(() => {
+      expect(commands.setModelEffort).toHaveBeenCalledWith(9, "qwen3:4b", "low");
+    });
   });
 });
 
