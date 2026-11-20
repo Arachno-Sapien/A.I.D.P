@@ -99,8 +99,8 @@ Bugs, gotchas, and approaches that failed. Newest first. If you hit one of the "
 
 - **`fixed` inside a blurred bar is clipped (2026-11-11):** an ancestor with `backdrop-filter` (Tailwind `backdrop-blur`) becomes the containing block for `position: fixed` children, so a modal rendered inside `ModelPicker` was pinned to the bar. Modals go through `createPortal(..., document.body)` (`ConfirmDialog.tsx`).
 
-- **2026-11-21 · DeepSeek needs `reasoning_content` back with tools.** It thinks by default and answers 400 on the next round if the assistant message lacks it; OpenRouter wants `reasoning_details` back the same way. `gateway/url.rs::reasoning_echo` picks by exact host (or `.`-suffix), never substring, so a custom endpoint never gets another provider's fields. Decision 0033.
+- **2026-11-21 · (from docs, not seen live) DeepSeek needs `reasoning_content` back with tools.** It thinks by default and answers 400 on the next round if the assistant message lacks it; OpenRouter wants `reasoning_details` back the same way. `gateway/url.rs::reasoning_echo` picks by exact host (or `.`-suffix), never substring, so a custom endpoint never gets another provider's fields. Decision 0033.
 
-- **2026-11-21 · Anthropic thinking counts toward `max_tokens`.** At High the request uses a 32,000 budget so the answer still has room; a small `max_tokens` would leave no text. Decision 0033.
-- **2026-11-21 · Ollama answers 400 if `think` goes to a model that can't think.** Unknown support never sends it; only models reported as able to think get `think`.
-- **2026-11-21 · OpenAI-compatible effort retry.** Never match the retry on the plain word "reasoning" in an error: many unrelated errors contain it. Match only errors naming the effort field.
+- **2026-11-21 · (from docs, not seen live) Anthropic thinking counts toward `max_tokens`.** At High the request uses a 32,000 budget so the answer still has room; a small `max_tokens` would leave no text. Decision 0033.
+- **2026-11-21 · (from docs, not seen live) Ollama answers 400 if `think` goes to a model that can't think.** Unknown support never sends it; only models reported as able to think get `think`.
+- **2026-11-21 · (from docs, not seen live) OpenAI-compatible effort retry.** Never match the retry on the plain word "reasoning" in an error: many unrelated errors contain it. Match only errors naming the effort field.

@@ -38,4 +38,5 @@ A bug exists today without any effort setting: DeepSeek thinks by default and re
 ## Consequences
 
 - DeepSeek agent runs work past the first tool call.
+- A model learned to be `none` stays `none`. To reset it, untick the model under Choose models and save, then tick it again and save (saving drops the model row, so it comes back with its support unknown, or as the provider reports it, and its effort level is reset). There is no other way to undo it.
 - A new migration, adapter changes and UI selects follow in later tasks of the plan.

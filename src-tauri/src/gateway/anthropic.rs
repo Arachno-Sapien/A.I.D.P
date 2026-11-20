@@ -64,8 +64,6 @@ struct ModelEntry {
 const MAX_TOKENS: u32 = 8192;
 const MAX_TOKENS_WITH_TOOLS: u32 = 32000;
 
-/// Appends a streamed piece to a block's string field in place. A block that
-/// is not an object (a broken proxy) is left as it is instead of panicking.
 /// Room for the reply: High effort needs space to think, like a tool round does.
 fn max_tokens(has_tools: bool, effort: Option<Effort>) -> u32 {
     if has_tools || effort == Some(Effort::High) {
@@ -75,6 +73,8 @@ fn max_tokens(has_tools: bool, effort: Option<Effort>) -> u32 {
     }
 }
 
+/// Appends a streamed piece to a block's string field in place. A block that
+/// is not an object (a broken proxy) is left as it is instead of panicking.
 fn append(block: &mut serde_json::Value, key: &str, piece: &str) {
     let Some(obj) = block.as_object_mut() else {
         return;

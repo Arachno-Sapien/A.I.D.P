@@ -19,6 +19,8 @@ vi.mock("../../lib/bindings", () => ({
     pickAttachments: vi.fn(),
     attachBytes: vi.fn(),
     discardAttachment: vi.fn().mockResolvedValue({ status: "ok", data: null }),
+    listConnections: vi.fn().mockResolvedValue({ status: "ok", data: [] }),
+    chatModels: vi.fn().mockResolvedValue({ status: "ok", data: [] }),
   },
 }));
 
@@ -91,6 +93,23 @@ describe("useChatStore", () => {
     expect(useChatStore.getState().messages[0]?.effortIgnored).toBe(true);
     const saved = vi.mocked(commands.appendMessage).mock.lastCall?.[1];
     expect(JSON.parse(saved!.contentParts).effortIgnored).toBe(true);
+  });
+
+  it("refreshes the models when a reply says its effort was ignored", () => {
+    const original = useModelsStore.getState().refresh;
+    const refresh = vi.fn().mockResolvedValue(undefined);
+    useModelsStore.setState({ refresh });
+    useChatStore.setState({
+      conversationId: 7,
+      messages: [{ id: "1", role: "assistant", text: "Hi", status: "streaming" }],
+      streaming: true,
+    });
+    useChatStore.getState().applyEvent("1", {
+      event: "done",
+      data: { tokensIn: 1, tokensOut: 1, effortIgnored: true },
+    });
+    expect(refresh).toHaveBeenCalledTimes(1);
+    useModelsStore.setState({ refresh: original });
   });
 
   it("marks cancelled replies stopped", () => {

@@ -54,7 +54,7 @@ export function ModelPicker({ children, left }: ModelPickerProps = {}) {
 
   return (
     <div className="app-surface flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 px-6 py-2 border-b border-neutral-800 bg-neutral-900/50 backdrop-blur select-none">
-      <div className="flex items-center gap-2 min-w-0">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
         {left}
         {hasModels && (
           <>
@@ -69,7 +69,7 @@ export function ModelPicker({ children, left }: ModelPickerProps = {}) {
                   void select(parsed).then((err) => setSaveError(err ?? null));
                 }
               }}
-              className="app-inset bg-neutral-800 border border-neutral-700/80 rounded px-2.5 py-1 text-xs text-neutral-100 focus:outline-none focus:border-neutral-600 cursor-pointer min-w-0 truncate"
+              className="app-inset bg-neutral-800 border border-neutral-700/80 rounded px-2.5 py-1 text-xs text-neutral-100 focus:outline-none focus:border-neutral-600 cursor-pointer min-w-0 max-w-full truncate"
             >
               {uniqueCloudConnectionIds.map((connId) => {
                 const groupModels = cloudModels.filter(
@@ -108,6 +108,7 @@ export function ModelPicker({ children, left }: ModelPickerProps = {}) {
             {currentModel && (
               <span className="text-xs">
                 <EffortSelect
+                  compact
                   model={currentModel}
                   onChange={(e) =>
                     void setEffort(currentModel, e).then((err) => setSaveError(err ?? null))

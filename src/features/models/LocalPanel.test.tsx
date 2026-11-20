@@ -312,6 +312,47 @@ describe("LocalPanel", () => {
       expect(commands.setModelEffort).toHaveBeenCalledWith(9, "qwen3:4b", "low");
     });
   });
+
+  it("shows why saving a local model's effort failed", async () => {
+    vi.mocked(commands.setModelEffort).mockResolvedValueOnce({
+      status: "error",
+      error: { kind: "invalidInput", message: "Could not save the effort." },
+    });
+    useModelsStore.setState({
+      ollama: { state: "running", version: "0.5.0" },
+      chatModels: [
+        {
+          connectionId: 9,
+          connectionLabel: "Ollama",
+          modelId: "qwen3:4b",
+          displayName: "qwen3:4b",
+          isDefault: false,
+          supportsTools: true,
+          isLocal: true,
+          contextTokens: null,
+          effortSupport: "toggle" as const,
+        },
+      ],
+      localModels: [
+        {
+          name: "qwen3:4b",
+          sizeMb: 2500,
+          parameterSize: "4B",
+          quantization: "Q4_K_M",
+          supportsTools: true,
+          contextLength: 32768,
+          numCtx: 8192,
+          loaded: null,
+        },
+      ],
+    });
+
+    render(<LocalPanel />);
+    fireEvent.change(screen.getByRole("combobox", { name: "qwen3:4b effort" }), {
+      target: { value: "low" },
+    });
+    expect(await screen.findByText("Could not save the effort.")).toBeDefined();
+  });
 });
 
 describe("LocalPanel errors", () => {

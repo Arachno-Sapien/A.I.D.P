@@ -37,4 +37,14 @@ describe("EffortSelect", () => {
     expect(select.disabled).toBe(true);
     expect(screen.getByText("This model doesn't take an effort level.")).toBeDefined();
   });
+
+  it("compact mode keeps the hint off the screen but still describes the select", () => {
+    render(<EffortSelect compact model={{ ...base, effortSupport: "none" }} onChange={vi.fn()} />);
+    const select = screen.getByRole("combobox", { name: "Claude effort" }) as HTMLSelectElement;
+    expect(select.disabled).toBe(true);
+    expect(select.title).toBe("This model doesn't take an effort level.");
+    const hint = screen.getByText("This model doesn't take an effort level.");
+    expect(hint.className).toContain("sr-only");
+    expect(select.getAttribute("aria-describedby")).toBe(hint.id);
+  });
 });

@@ -189,6 +189,7 @@ export function LocalPanel() {
           <div className="space-y-2">
             {localModels.map((m) => {
               const isConfirming = confirmDeleteName === m.name;
+              const effortModel = chatModels.find((c) => c.isLocal && c.modelId === m.name);
               return (
                 <div
                   key={m.name}
@@ -298,15 +299,16 @@ export function LocalPanel() {
                         </option>
                       ))}
                     </select>
-                    {(() => {
-                      const cm = chatModels.find((c) => c.isLocal && c.modelId === m.name);
-                      return cm ? (
-                        <EffortSelect
-                          model={cm}
-                          onChange={(e) => void setEffort(cm, e)}
-                        />
-                      ) : null;
-                    })()}
+                    {effortModel && (
+                      <EffortSelect
+                        model={effortModel}
+                        onChange={(e) =>
+                          void setEffort(effortModel, e).then((err) =>
+                            useModelsStore.setState({ ollamaError: err }),
+                          )
+                        }
+                      />
+                    )}
                   </div>
                 </div>
               );

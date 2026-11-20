@@ -551,9 +551,9 @@ export const createChatStore = (surface: ChatSurface, hooks?: ChatHooks) => {
           : isCancelled
             ? "stopped"
             : "error";
-        const ignored =
-          ev.event === "done" &&
-          ((ev.data as any)?.usage ?? ev.data)?.effortIgnored === true;
+        const ignored = ev.event === "done" && ev.data.effortIgnored === true;
+        // Rust already cleared the level for this model: refresh the picker.
+        if (ignored) void useModelsStore.getState().refresh();
         const end = (m: UiMessage): UiMessage => ({
           ...m,
           status,

@@ -127,9 +127,9 @@ Effort levels (decision 0033) done 2026-11-21 by Claude Code (Sonnet 5.5, subage
 
 ## Next 3 tasks
 
-1. Task 8 live check: test Outside tools & Browser checks preset (`@playwright/mcp@0.0.85`) in `npm run tauri dev`, and measure Task Manager RAM with a server running (plus RAM with Dark/Glass and `.ts` worker).
-2. The Linux and 8 GB check, and macOS, when the human is ready (deferred by the human on 2026-10-31).
-3. Review the whole M6 diff, then `0.1.0` and close M6 with the human (Task 8).
+1. Effort live check with the human's keys (checklist in `.ai/memory/log/2026-11-21-m6-effort-levels.md`), then review and merge `m6-effort-levels`.
+2. Task 8 live check: test Outside tools & Browser checks preset (`@playwright/mcp@0.0.85`) in `npm run tauri dev`, and measure Task Manager RAM with a server running (plus RAM with Dark/Glass and `.ts` worker).
+3. The Linux and 8 GB check, and macOS, when the human is ready (deferred by the human on 2026-10-31); then review the whole M6 diff, `0.1.0`, and close M6 with the human (Task 8).
 
 UI polish (2026-11-12, Claude Code, Opus 5.5): AI panel options wrap and dialog portal (`1da4e84`); centred Chat/Workspace tabs, styled drop-down lists, aligned message box (`b17ee63`). Version `0.1.0-rc.7` for the human's "push & publish".
 Pushed `487815c`; CI run 43243156895 green on three OSes. Release run 43244030376 (started by Claude Code at the human's "push & publish") passed; every update file signed by key EE9A69E11D7D346C; `v0.1.0-rc.7` published by Claude Code 2026-11-12 15:14 UTC as a normal release, `releases/latest/download/latest.json` serves 0.1.0-rc.7.
