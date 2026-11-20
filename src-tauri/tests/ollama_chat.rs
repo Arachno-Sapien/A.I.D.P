@@ -2,9 +2,9 @@
 
 mod common;
 
-use aidp_lib::gateway::ollama_chat::OllamaChat;
+use aidp_lib::gateway::ollama_chat::{think_value, OllamaChat};
 use aidp_lib::gateway::{
-    ChatMessage, ChatRequest, ImageInput, LocalOptions, ModelProvider, ProviderError, Role,
+    ChatMessage, Effort, EffortSupport, ChatRequest, ImageInput, LocalOptions, ModelProvider, ProviderError, Role,
     ToolCall, ToolOutput, ToolRound, ToolSpec, TOOLS_UNSUPPORTED,
 };
 use common::{capture, deltas};
@@ -646,4 +646,90 @@ async fn round_images_follow_the_tool_results() {
             "images": ["iVBORw0KGgo="]
         })
     );
+}
+
+#[test]
+fn think_value_table() {
+    use EffortSupport::{Levels, Toggle};
+    assert_eq!(think_value(None, Some(Levels)), None);
+    assert_eq!(think_value(None, None), None);
+    assert_eq!(think_value(Some(Effort::Medium), Some(Levels)), Some(json!("medium")));
+    assert_eq!(think_value(Some(Effort::Low), Some(Toggle)), Some(json!(true)));
+    assert_eq!(think_value(Some(Effort::High), Some(EffortSupport::None)), None);
+    assert_eq!(think_value(Some(Effort::High), None), None);
+}
+
+async fn body_sent_with(local: LocalOptions) -> serde_json::Value {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/api/chat"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(ndjson(&[r#"{"done":true}"#])))
+        .mount(&server)
+        .await;
+    let adapter = OllamaChat::new(reqwest::Client::new(), server.uri());
+    let mut req = base_req();
+    req.local = local;
+    let (ch, _) = capture();
+    let result = adapter.stream_chat(req, ch, CancellationToken::new()).await;
+    assert!(result.is_ok(), "{result:?}");
+    let received = server.received_requests().await.unwrap_or_default();
+    serde_json::from_slice(&received[0].body).unwrap_or_default()
+}
+
+#[tokio::test]
+async fn sends_think_only_when_supported() {
+    let levels = body_sent_with(LocalOptions {
+        effort: Some(Effort::Low),
+        effort_support: Some(EffortSupport::Levels),
+        ..Default::default()
+    })
+    .await;
+    assert_eq!(levels["think"], json!("low"));
+
+    let toggle = body_sent_with(LocalOptions {
+        effort: Some(Effort::High),
+        effort_support: Some(EffortSupport::Toggle),
+        ..Default::default()
+    })
+    .await;
+    assert_eq!(toggle["think"], json!(true));
+}
+
+#[tokio::test]
+async fn think_is_never_sent_without_thinking_support() {
+    for support in [Some(EffortSupport::None), None] {
+        let body = body_sent_with(LocalOptions {
+            effort: Some(Effort::High),
+            effort_support: support,
+            ..Default::default()
+        })
+        .await;
+        assert!(body.get("think").is_none(), "{support:?}: {body}");
+    }
+}
+
+#[tokio::test]
+async fn ollama_thinking_used_the_whole_reply() {
+    let server = MockServer::start().await;
+    let body = ndjson(&[
+        r#"{"message":{"role":"assistant","content":"","thinking":"Hmm."},"done":false}"#,
+        r#"{"done":true,"done_reason":"length"}"#,
+    ]);
+    Mock::given(method("POST"))
+        .and(path("/api/chat"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(body))
+        .mount(&server)
+        .await;
+    let adapter = OllamaChat::new(reqwest::Client::new(), server.uri());
+    let (ch, _) = capture();
+    let err = adapter
+        .stream_chat(base_req(), ch, CancellationToken::new())
+        .await
+        .expect_err("thinking used the reply");
+    match err {
+        ProviderError::Provider { message } => {
+            assert_eq!(message, aidp_lib::gateway::THINKING_USED_THE_REPLY)
+        }
+        other => panic!("{other:?}"),
+    }
 }

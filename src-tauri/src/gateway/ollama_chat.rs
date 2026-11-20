@@ -1,6 +1,6 @@
 use crate::gateway::http::{map_http_error, map_reqwest_error, read_json_lines, Step};
 use crate::gateway::{
-    ChatEvent, ChatRequest, ModelInfo, ModelProvider, ProviderError, Reply, ToolCall, Usage,
+    ChatEvent, ChatRequest, Effort, EffortSupport, ModelInfo, ModelProvider, ProviderError, Reply, ToolCall, Usage, THINKING_USED_THE_REPLY,
 };
 use crate::ollama::Ollama;
 use async_trait::async_trait;
@@ -9,6 +9,19 @@ use tauri::ipc::Channel;
 use tokio_util::sync::CancellationToken;
 
 const CUT_OFF_TOOL_ERROR: &str = "The reply was cut off before its tool call was complete.";
+
+/// The `think` value for /api/chat. Only a model known to think gets one: Ollama
+/// answers 400 to a model that can't, so unknown support sends nothing.
+pub fn think_value(
+    effort: Option<Effort>,
+    support: Option<EffortSupport>,
+) -> Option<serde_json::Value> {
+    match (effort?, support?) {
+        (e, EffortSupport::Levels) => Some(json!(e.as_str())),
+        (_, EffortSupport::Toggle) => Some(json!(true)),
+        (_, EffortSupport::None) => None,
+    }
+}
 
 pub struct OllamaChat {
     client: reqwest::Client,
@@ -139,6 +152,10 @@ impl ModelProvider for OllamaChat {
             body["keep_alive"] = json!(keep_alive);
         }
 
+        if let Some(think) = think_value(req.local.effort, req.local.effort_support) {
+            body["think"] = think;
+        }
+
         // Ollama answers only once the model is loaded, which can take a
         // minute: Stop must end the wait too, not just the stream after it.
         let send = self.client.post(&url).json(&body).send();
@@ -251,13 +268,17 @@ impl ModelProvider for OllamaChat {
                     tokens_out = Some(tout as u32);
                 }
 
-                if let Some(reason) = val.get("done_reason").and_then(|v| v.as_str())
-                    && reason == "length"
-                    && !tool_calls.is_empty()
-                {
-                    return Err(ProviderError::Provider {
-                        message: CUT_OFF_TOOL_ERROR.to_string(),
-                    });
+                if val.get("done_reason").and_then(|v| v.as_str()) == Some("length") {
+                    if !tool_calls.is_empty() {
+                        return Err(ProviderError::Provider {
+                            message: CUT_OFF_TOOL_ERROR.to_string(),
+                        });
+                    }
+                    if accumulated_content.is_empty() && !accumulated_thinking.is_empty() {
+                        return Err(ProviderError::Provider {
+                            message: THINKING_USED_THE_REPLY.to_string(),
+                        });
+                    }
                 }
 
                 return Ok(Step::Done);
