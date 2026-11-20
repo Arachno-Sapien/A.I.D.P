@@ -2,7 +2,7 @@ use crate::gateway::http::{
     list_error, map_http_error, map_reqwest_error, read_sse, Step, LIST_TIMEOUT,
 };
 use crate::gateway::{
-    ChatEvent, ChatRequest, ModelInfo, ModelProvider, ProviderError, Reply, Role, Usage,
+    ChatEvent, ChatRequest, Effort, ModelInfo, ModelProvider, ProviderError, Reply, Role, Usage,
 };
 use async_trait::async_trait;
 use reqwest::header::HeaderValue;
@@ -66,6 +66,15 @@ const MAX_TOKENS_WITH_TOOLS: u32 = 32000;
 
 /// Appends a streamed piece to a block's string field in place. A block that
 /// is not an object (a broken proxy) is left as it is instead of panicking.
+/// Room for the reply: High effort needs space to think, like a tool round does.
+fn max_tokens(has_tools: bool, effort: Option<Effort>) -> u32 {
+    if has_tools || effort == Some(Effort::High) {
+        MAX_TOKENS_WITH_TOOLS
+    } else {
+        MAX_TOKENS
+    }
+}
+
 fn append(block: &mut serde_json::Value, key: &str, piece: &str) {
     let Some(obj) = block.as_object_mut() else {
         return;
@@ -277,11 +286,8 @@ impl ModelProvider for Anthropic {
             }));
         }
 
-        let max_tokens = if req.tools.is_empty() {
-            MAX_TOKENS
-        } else {
-            MAX_TOKENS_WITH_TOOLS
-        };
+        let effort = super::effort_to_send(&req.local);
+        let max_tokens = max_tokens(!req.tools.is_empty(), effort);
 
         let mut body_map = serde_json::Map::new();
         body_map.insert("model".to_string(), json!(req.model));
@@ -291,6 +297,9 @@ impl ModelProvider for Anthropic {
             body_map.insert("system".to_string(), json!(system_parts.join("\n\n")));
         }
         body_map.insert("messages".to_string(), json!(anthropic_messages));
+        if let Some(effort) = effort {
+            body_map.insert("output_config".to_string(), json!({ "effort": effort.as_str() }));
+        }
 
         if !req.tools.is_empty() {
             let tools_val: Vec<serde_json::Value> = req
@@ -307,42 +316,54 @@ impl ModelProvider for Anthropic {
             body_map.insert("tools".to_string(), json!(tools_val));
         }
 
-        let body_json = serde_json::Value::Object(body_map);
+        let mut body_json = serde_json::Value::Object(body_map);
 
         let url = format!("{}/messages", self.base_url);
-        let request = self
-            .client
-            .post(&url)
-            .header("x-api-key", self.key_header()?)
-            .header("anthropic-version", "2026-10-21")
-            .header("content-type", "application/json")
-            .json(&body_json);
+        let mut effort_ignored = false;
+        let resp = loop {
+            let request = self
+                .client
+                .post(&url)
+                .header("x-api-key", self.key_header()?)
+                .header("anthropic-version", "2026-10-21")
+                .header("content-type", "application/json")
+                .json(&body_json);
 
-        let resp = match cancel.run_until_cancelled(request.send()).await {
-            Some(res) => res.map_err(map_reqwest_error)?,
-            None => return Err(ProviderError::Cancelled),
-        };
+            let resp = match cancel.run_until_cancelled(request.send()).await {
+                Some(res) => res.map_err(map_reqwest_error)?,
+                None => return Err(ProviderError::Cancelled),
+            };
 
-        let status = resp.status();
-        let retry_after = resp
-            .headers()
-            .get("retry-after")
-            .and_then(|v| v.to_str().ok())
-            .map(|s| s.to_string());
-
-        if !status.is_success() {
+            let status = resp.status();
+            if status.is_success() {
+                break resp;
+            }
+            let retry_after = resp
+                .headers()
+                .get("retry-after")
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.to_string());
             let body = match cancel.run_until_cancelled(resp.text()).await {
                 Some(text) => text.unwrap_or_default(),
                 None => return Err(ProviderError::Cancelled),
             };
-            return Err(map_http_error(
-                status.as_u16(),
-                retry_after.as_deref(),
-                &body,
-            ));
-        }
+            // A model that refuses effort names it. Drop it and retry once: the map
+            // loses the key on the first pass, so the loop is bounded.
+            if status.as_u16() == 400
+                && body.to_ascii_lowercase().contains("effort")
+                && let Some(map) = body_json.as_object_mut()
+                && map.remove("output_config").is_some()
+            {
+                effort_ignored = true;
+                continue;
+            }
+            return Err(map_http_error(status.as_u16(), retry_after.as_deref(), &body));
+        };
 
-        let mut usage = Usage::default();
+        let mut usage = Usage {
+            effort_ignored,
+            ..Usage::default()
+        };
         let mut blocks: std::collections::BTreeMap<u32, serde_json::Value> =
             std::collections::BTreeMap::new();
         let mut input_buffers: std::collections::BTreeMap<u32, String> =
@@ -484,6 +505,18 @@ impl ModelProvider for Anthropic {
         if last_stop_reason.as_deref() == Some("max_tokens") && has_tool_use {
             return Err(ProviderError::Provider {
                 message: "The reply was cut off before its tool call was complete.".to_string(),
+            });
+        }
+
+        if last_stop_reason.as_deref() == Some("max_tokens")
+            && !has_tool_use
+            && !blocks.values().any(|b| {
+                b.get("type").and_then(|t| t.as_str()) == Some("text")
+                    && b.get("text").and_then(|t| t.as_str()).is_some_and(|t| !t.is_empty())
+            })
+        {
+            return Err(ProviderError::Provider {
+                message: super::THINKING_USED_THE_REPLY.to_string(),
             });
         }
 

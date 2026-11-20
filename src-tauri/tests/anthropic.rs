@@ -4,8 +4,8 @@ mod common;
 
 use aidp_lib::gateway::{
     anthropic::Anthropic, provider, ChatEvent, ChatMessage, ChatRequest, ConnectionKind,
-    ImageInput, ModelInfo, ModelProvider, ProviderError, Role, ToolCall, ToolOutput, ToolRound,
-    ToolSpec, Usage,
+    Effort, EffortSupport, ImageInput, LocalOptions, ModelInfo, ModelProvider, ProviderError, Role, ToolCall, ToolOutput, ToolRound,
+    ToolSpec, Usage, THINKING_USED_THE_REPLY,
 };
 use common::{capture, deltas, events, req};
 use secrecy::SecretString;
@@ -1084,4 +1084,124 @@ async fn list_models_reads_effort_support() {
     let models = test_provider(&server).list_models().await.unwrap();
     let support: Vec<_> = models.iter().map(|m| m.effort_support.as_deref()).collect();
     assert_eq!(support, vec![Some("levels"), Some("none"), None]);
+}
+
+fn effort_req(effort: Option<Effort>, support: Option<EffortSupport>) -> ChatRequest {
+    let mut r = req();
+    r.local = LocalOptions {
+        effort,
+        effort_support: support,
+        ..Default::default()
+    };
+    r
+}
+
+async fn sent_bodies(server: &MockServer) -> Vec<serde_json::Value> {
+    server
+        .received_requests()
+        .await
+        .unwrap()
+        .iter()
+        .map(|r| serde_json::from_slice(&r.body).unwrap())
+        .collect()
+}
+
+fn ok_stop() -> ResponseTemplate {
+    ResponseTemplate::new(200)
+        .set_body_string(events(&[("message_stop", r#"{"type":"message_stop"}"#)]))
+}
+
+#[tokio::test]
+async fn sends_output_config_effort_only_when_set() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/v1/messages"))
+        .respond_with(ok_stop())
+        .mount(&server)
+        .await;
+    let p = test_provider(&server);
+    for r in [
+        effort_req(Some(Effort::Medium), Some(EffortSupport::Levels)),
+        effort_req(Some(Effort::High), Some(EffortSupport::Levels)),
+        effort_req(None, Some(EffortSupport::Levels)),
+        effort_req(Some(Effort::High), Some(EffortSupport::None)),
+    ] {
+        let (channel, _) = capture();
+        p.stream_chat(r, channel, CancellationToken::new()).await.unwrap();
+    }
+    let sent = sent_bodies(&server).await;
+    assert_eq!(sent[0]["output_config"], json!({"effort": "medium"}));
+    assert_eq!(sent[0]["max_tokens"], 8192);
+    assert_eq!(sent[1]["output_config"], json!({"effort": "high"}));
+    assert_eq!(sent[1]["max_tokens"], 32000);
+    assert!(sent[2].get("output_config").is_none());
+    assert_eq!(sent[2]["max_tokens"], 8192);
+    assert!(sent[3].get("output_config").is_none());
+    assert_eq!(sent[3]["max_tokens"], 8192);
+}
+
+#[tokio::test]
+async fn anthropic_effort_refused_by_name_is_dropped_once() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/v1/messages"))
+        .and(body_partial_json(json!({ "output_config": { "effort": "low" } })))
+        .respond_with(ResponseTemplate::new(400).set_body_json(json!({
+            "type": "error",
+            "error": {"type": "invalid_request_error", "message": "output_config.effort: not supported for this model"}
+        })))
+        .expect(1)
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/v1/messages"))
+        .respond_with(ok_stop())
+        .mount(&server)
+        .await;
+    let p = test_provider(&server);
+    let (channel, _) = capture();
+    let reply = p
+        .stream_chat(effort_req(Some(Effort::Low), None), channel, CancellationToken::new())
+        .await
+        .unwrap();
+    assert!(reply.usage.effort_ignored);
+    let sent = sent_bodies(&server).await;
+    assert_eq!(sent.len(), 2);
+    assert!(sent[1].get("output_config").is_none());
+}
+
+#[tokio::test]
+async fn anthropic_thinking_used_the_whole_reply() {
+    let server = MockServer::start().await;
+    let body = events(&[
+        (
+            "content_block_start",
+            r#"{"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":"","signature":""}}"#,
+        ),
+        (
+            "content_block_delta",
+            r#"{"type":"content_block_delta","index":0,"delta":{"type":"signature_delta","signature":"sig"}}"#,
+        ),
+        ("content_block_stop", r#"{"type":"content_block_stop","index":0}"#),
+        (
+            "message_delta",
+            r#"{"type":"message_delta","delta":{"stop_reason":"max_tokens"}}"#,
+        ),
+        ("message_stop", r#"{"type":"message_stop"}"#),
+    ]);
+    Mock::given(method("POST"))
+        .and(path("/v1/messages"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(body))
+        .mount(&server)
+        .await;
+    let p = test_provider(&server);
+    let (channel, _) = capture();
+    let err = p
+        .stream_chat(req(), channel, CancellationToken::new())
+        .await
+        .unwrap_err();
+    match err {
+        ProviderError::Provider { message } => assert_eq!(message, THINKING_USED_THE_REPLY),
+        other => panic!("unexpected {other:?}"),
+    }
 }
