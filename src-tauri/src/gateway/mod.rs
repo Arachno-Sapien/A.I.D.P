@@ -156,11 +156,71 @@ pub struct Reply {
     pub assistant: serde_json::Value,
 }
 
+/// The effort (thinking) level the user picked for a model.
+#[derive(Serialize, Deserialize, Type, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum Effort {
+    Low,
+    Medium,
+    High,
+}
+
+impl Effort {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Low => "low",
+            Self::Medium => "medium",
+            Self::High => "high",
+        }
+    }
+
+    /// Stored text back to a level; anything unknown is None.
+    pub fn from_str_opt(s: Option<&str>) -> Option<Self> {
+        match s {
+            Some("low") => Some(Self::Low),
+            Some("medium") => Some(Self::Medium),
+            Some("high") => Some(Self::High),
+            _ => None,
+        }
+    }
+}
+
+/// Whether a model takes an effort level: levels, an on/off toggle, or nothing.
+#[derive(Serialize, Deserialize, Type, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum EffortSupport {
+    Levels,
+    Toggle,
+    None,
+}
+
+impl EffortSupport {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Levels => "levels",
+            Self::Toggle => "toggle",
+            Self::None => "none",
+        }
+    }
+
+    pub fn from_str_opt(s: Option<&str>) -> Option<Self> {
+        match s {
+            Some("levels") => Some(Self::Levels),
+            Some("toggle") => Some(Self::Toggle),
+            Some("none") => Some(Self::None),
+            _ => None,
+        }
+    }
+}
+
+/// Per-model options for this request. num_ctx and keep_alive apply to Ollama only; effort to every provider.
 #[derive(Serialize, Deserialize, Type, Clone, Debug, Default, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct LocalOptions {
     pub num_ctx: Option<u32>,
     pub keep_alive: Option<i32>,
+    pub effort: Option<Effort>,
+    pub effort_support: Option<EffortSupport>,
 }
 
 /// An image attached to one message, as base64 (decision 0019), or returned by an
@@ -189,6 +249,9 @@ pub struct ChatRequest {
 pub struct Usage {
     pub tokens_in: Option<u32>,
     pub tokens_out: Option<u32>,
+    /// The provider took the request but ignored the effort setting.
+    #[serde(default)]
+    pub effort_ignored: bool,
 }
 
 #[derive(Serialize, Deserialize, Type, Clone, Debug, PartialEq)]
@@ -247,6 +310,16 @@ mod tests {
     use super::*;
 
     #[test]
+    fn effort_wire_names() {
+        assert_eq!(serde_json::to_value(Effort::High).unwrap(), serde_json::json!("high"));
+        assert_eq!(Effort::from_str_opt(Some("max")), None);
+        assert_eq!(
+            EffortSupport::from_str_opt(Some("toggle")),
+            Some(EffortSupport::Toggle)
+        );
+    }
+
+    #[test]
     fn chat_event_json_shape() {
         assert_eq!(
             serde_json::to_string(&ChatEvent::Delta("hi".into())).unwrap(),
@@ -262,10 +335,11 @@ mod tests {
         assert_eq!(
             serde_json::to_string(&ChatEvent::Done(Usage {
                 tokens_in: Some(10),
-                tokens_out: Some(20)
+                tokens_out: Some(20),
+                ..Default::default()
             }))
             .unwrap(),
-            r#"{"event":"done","data":{"tokensIn":10,"tokensOut":20}}"#
+            r#"{"event":"done","data":{"tokensIn":10,"tokensOut":20,"effortIgnored":false}}"#
         );
         assert_eq!(
             serde_json::to_string(&ChatEvent::ToolCall {

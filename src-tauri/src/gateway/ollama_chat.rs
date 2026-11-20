@@ -285,6 +285,7 @@ impl ModelProvider for OllamaChat {
             usage: Usage {
                 tokens_in,
                 tokens_out,
+                ..Default::default()
             },
             tool_calls,
             assistant,

@@ -121,6 +121,7 @@ async fn sends_options_only_when_set() {
     req_with_options.local = LocalOptions {
         num_ctx: Some(8192),
         keep_alive: Some(1800),
+        ..Default::default()
     };
 
     let (ch1, _) = capture();

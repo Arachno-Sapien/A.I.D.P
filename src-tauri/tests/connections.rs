@@ -5,7 +5,7 @@ mod common;
 use aidp_lib::connections::{AppError, NewConnection, Services};
 use aidp_lib::db;
 use aidp_lib::gateway::{
-    ChatMessage, ConnectionKind, ModelInfo, ProviderError, Role, Usage,
+    ChatMessage, ConnectionKind, Effort, EffortSupport, ModelInfo, ProviderError, Role, Usage,
 };
 use aidp_lib::secrets::{MemoryStore, SecretStore};
 use common::{capture, capture_pull, deltas, events, sse};
@@ -1229,4 +1229,95 @@ async fn vision_of_a_local_model_comes_from_ollama_not_the_user() {
         .set_model_vision(ollama_id, "gpt-4o".to_string(), Some(true))
         .unwrap_err();
     assert!(matches!(err, AppError::InvalidInput { .. }));
+}
+
+fn cloud(services: &Services) -> u32 {
+    let db = services.db_conn().unwrap();
+    db::connections::insert_connection(
+        &db,
+        ConnectionKind::OpenaiCompat,
+        "Cloud",
+        "https://api.openai.com/v1",
+        "1234",
+        1,
+    )
+    .unwrap()
+}
+
+#[tokio::test]
+async fn effort_reaches_model_options_for_cloud_and_local() {
+    let server = MockServer::start().await;
+    let services =
+        create_services(Arc::new(MemoryStore::default())).with_ollama_url(server.uri());
+    let cloud_id = cloud(&services);
+    services.set_models(cloud_id, vec![gpt4o()]).unwrap();
+    services
+        .set_model_effort(cloud_id, "gpt-4o".to_string(), Some(Effort::High))
+        .unwrap();
+    let opts = services.model_options(cloud_id, "gpt-4o");
+    assert_eq!(opts.effort, Some(Effort::High));
+    assert_eq!(opts.num_ctx, None);
+
+    let ollama_id = services.ensure_ollama_connection().unwrap();
+    services.set_models(ollama_id, vec![gpt4o()]).unwrap();
+    services
+        .set_model_effort(ollama_id, "gpt-4o".to_string(), Some(Effort::Low))
+        .unwrap();
+    let opts = services.model_options(ollama_id, "gpt-4o");
+    assert_eq!(opts.effort, Some(Effort::Low));
+    assert!(opts.num_ctx.is_some());
+}
+
+#[tokio::test]
+async fn effort_on_a_model_that_refuses_it_is_rejected() {
+    let services = create_services(Arc::new(MemoryStore::default()));
+    let id = cloud(&services);
+    services.set_models(id, vec![gpt4o()]).unwrap();
+    {
+        let db = services.db_conn().unwrap();
+        assert!(db::connections::set_effort_support(&db, id, "gpt-4o", Some("none")).unwrap());
+    }
+    let err = services
+        .set_model_effort(id, "gpt-4o".to_string(), Some(Effort::High))
+        .unwrap_err();
+    assert!(matches!(
+        err,
+        AppError::InvalidInput { message } if message == "This model doesn't take an effort level."
+    ));
+    services.set_model_effort(id, "gpt-4o".to_string(), None).unwrap();
+    let err = services
+        .set_model_effort(id, "missing".to_string(), None)
+        .unwrap_err();
+    assert!(matches!(err, AppError::NotFound));
+}
+
+#[tokio::test]
+async fn mark_effort_ignored_turns_it_off() {
+    let services = create_services(Arc::new(MemoryStore::default()));
+    let id = cloud(&services);
+    services.set_models(id, vec![gpt4o()]).unwrap();
+    services
+        .set_model_effort(id, "gpt-4o".to_string(), Some(Effort::Medium))
+        .unwrap();
+    services.mark_effort_ignored(id, "gpt-4o");
+    let m = &services.chat_models().unwrap()[0];
+    assert_eq!(m.effort, None);
+    assert_eq!(m.effort_support, Some(EffortSupport::None));
+}
+
+#[tokio::test]
+async fn chat_models_carry_effort() {
+    let services = create_services(Arc::new(MemoryStore::default()));
+    let id = cloud(&services);
+    services.set_models(id, vec![gpt4o()]).unwrap();
+    {
+        let db = services.db_conn().unwrap();
+        db::connections::set_effort(&db, id, "gpt-4o", Some("medium")).unwrap();
+    }
+    assert_eq!(services.chat_models().unwrap()[0].effort, Some(Effort::Medium));
+    {
+        let db = services.db_conn().unwrap();
+        db::connections::set_effort(&db, id, "gpt-4o", Some("bogus")).unwrap();
+    }
+    assert_eq!(services.chat_models().unwrap()[0].effort, None);
 }

@@ -58,7 +58,8 @@ async fn streams_deltas_and_returns_usage() {
         reply.usage,
         Usage {
             tokens_in: Some(5),
-            tokens_out: Some(2)
+            tokens_out: Some(2),
+            ..Default::default()
         }
     );
 }
@@ -854,7 +855,8 @@ async fn asks_for_usage_in_the_stream() {
         reply.usage,
         Usage {
             tokens_in: Some(11),
-            tokens_out: Some(3)
+            tokens_out: Some(3),
+            ..Default::default()
         }
     );
 }

@@ -142,6 +142,7 @@ async fn streams_text_deltas_and_usage() {
         Usage {
             tokens_in: Some(25),
             tokens_out: Some(12),
+            ..Default::default()
         }
     );
 }
@@ -227,6 +228,7 @@ async fn ignores_unknown_events_and_non_text_deltas() {
         Usage {
             tokens_in: Some(10),
             tokens_out: Some(5),
+            ..Default::default()
         }
     );
 }

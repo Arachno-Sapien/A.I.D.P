@@ -4,7 +4,7 @@ use crate::db::connections::{
 };
 use crate::gateway::url::check_base_url;
 use crate::gateway::{
-    provider, ChatEvent, ChatMessage, ChatRequest, ConnectionKind, ImageInput, LocalOptions,
+    provider, ChatEvent, ChatMessage, ChatRequest, ConnectionKind, Effort, EffortSupport, ImageInput, LocalOptions,
     ModelInfo, ModelProvider, ProviderError, Usage,
 };
 use crate::ollama::{local_num_ctx, valid_model_name, LocalModelView, Ollama};
@@ -85,6 +85,10 @@ pub struct ChatModel {
     pub supports_vision: Option<bool>,
     pub is_local: bool,
     pub context_tokens: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub effort: Option<Effort>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub effort_support: Option<EffortSupport>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type, Default)]
@@ -539,6 +543,8 @@ impl Services {
                     supports_vision: r.supports_vision,
                     is_local,
                     context_tokens,
+                    effort: Effort::from_str_opt(r.effort.as_deref()),
+                    effort_support: EffortSupport::from_str_opt(r.effort_support.as_deref()),
                 }
             })
             .collect())
@@ -575,6 +581,53 @@ impl Services {
             return Err(AppError::NotFound);
         }
         Ok(())
+    }
+
+    /// The user's effort level for a model; works for every connection kind.
+    pub fn set_model_effort(
+        &self,
+        connection_id: u32,
+        model_id: String,
+        effort: Option<Effort>,
+    ) -> Result<(), AppError> {
+        let db = self.db.lock().map_err(|e| AppError::Storage {
+            message: e.to_string(),
+        })?;
+        let support = match db.query_row(
+            "SELECT effort_support FROM models WHERE connection_id = ?1 AND model_id = ?2",
+            rusqlite::params![connection_id, model_id],
+            |r| r.get::<_, Option<String>>(0),
+        ) {
+            Ok(s) => s,
+            Err(rusqlite::Error::QueryReturnedNoRows) => return Err(AppError::NotFound),
+            Err(e) => {
+                return Err(AppError::Storage {
+                    message: e.to_string(),
+                })
+            }
+        };
+        if effort.is_some()
+            && EffortSupport::from_str_opt(support.as_deref()) == Some(EffortSupport::None)
+        {
+            return Err(AppError::InvalidInput {
+                message: "This model doesn't take an effort level.".to_string(),
+            });
+        }
+        crate::db::connections::set_effort(&db, connection_id, &model_id, effort.map(Effort::as_str))?;
+        Ok(())
+    }
+
+    /// After a reply the provider ignored the effort: remember the model takes none.
+    /// Runs after the reply, so a storage error is dropped.
+    pub fn mark_effort_ignored(&self, connection_id: u32, model_id: &str) {
+        let Ok(db) = self.db.lock() else { return };
+        let _ = crate::db::connections::set_effort(&db, connection_id, model_id, None);
+        let _ = crate::db::connections::set_effort_support(
+            &db,
+            connection_id,
+            model_id,
+            Some(EffortSupport::None.as_str()),
+        );
     }
 
     pub fn setting(&self, key: &str) -> Result<Option<String>, AppError> {
@@ -674,8 +727,24 @@ impl Services {
             Ok(Some(r)) => r,
             _ => return LocalOptions::default(),
         };
+        let effort_row: rusqlite::Result<(Option<String>, Option<String>)> = db.query_row(
+            "SELECT effort, effort_support FROM models WHERE connection_id = ?1 AND model_id = ?2",
+            rusqlite::params![connection_id, model_id],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        );
+        let (effort, effort_support) = match effort_row {
+            Ok((e, s)) => (
+                Effort::from_str_opt(e.as_deref()),
+                EffortSupport::from_str_opt(s.as_deref()),
+            ),
+            Err(_) => (None, None),
+        };
         if row.kind != ConnectionKind::Ollama {
-            return LocalOptions::default();
+            return LocalOptions {
+                effort,
+                effort_support,
+                ..Default::default()
+            };
         }
         let query_res: rusqlite::Result<(Option<i64>, Option<i64>)> = db.query_row(
             "SELECT num_ctx, context_window FROM models WHERE connection_id = ?1 AND model_id = ?2",
@@ -691,6 +760,8 @@ impl Services {
         LocalOptions {
             num_ctx: Some(local_num_ctx(num_ctx_val, context_window_val)),
             keep_alive,
+            effort,
+            effort_support,
         }
     }
 

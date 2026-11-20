@@ -14,6 +14,7 @@ export const commands = {
 	chatModels: () => typedError<ChatModel_Serialize[], AppError_Serialize>(__TAURI_INVOKE("chat_models")),
 	setDefaultModel: (connectionId: number, modelId: string) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("set_default_model", { connectionId, modelId })),
 	setModelVision: (connectionId: number, modelId: string, supports: boolean | null) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("set_model_vision", { connectionId, modelId, supports })),
+	setModelEffort: (connectionId: number, modelId: string, effort: Effort | null) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("set_model_effort", { connectionId, modelId, effort })),
 	sendMessage: (surface: ChatSurface, connectionId: number, modelId: string, messages: ChatInput_Deserialize[], onEvent: Channel<ChatEvent_Deserialize>) => typedError<null, AppError_Serialize>(__TAURI_INVOKE("send_message", { surface, connectionId, modelId, messages, onEvent })),
 	stopReply: (surface: ChatSurface) => __TAURI_INVOKE<void>("stop_reply", { surface }),
 	openFolder: () => typedError<WorkspaceInfo | null, WorkspaceError>(__TAURI_INVOKE("open_folder")),
@@ -231,6 +232,8 @@ export type ChatModel_Deserialize = {
 	supportsVision?: boolean | null,
 	isLocal: boolean,
 	contextTokens?: number | null,
+	effort?: Effort | null,
+	effortSupport?: EffortSupport | null,
 };
 
 export type ChatModel_Serialize = {
@@ -244,6 +247,8 @@ export type ChatModel_Serialize = {
 	supportsVision?: boolean,
 	isLocal: boolean,
 	contextTokens: number | null,
+	effort?: Effort,
+	effortSupport?: EffortSupport,
 };
 
 export type ChatSurface = "chat" | "workspace";
@@ -297,6 +302,12 @@ export type DirEntry = {
 	path: string,
 	isDir: boolean,
 };
+
+/**  The effort (thinking) level the user picked for a model. */
+export type Effort = "low" | "medium" | "high";
+
+/**  Whether a model takes an effort level: levels, an on/off toggle, or nothing. */
+export type EffortSupport = "levels" | "toggle" | "none";
 
 export type FileContent = {
 	path: string,
@@ -513,11 +524,15 @@ export type Usage = Usage_Serialize | Usage_Deserialize;
 export type Usage_Deserialize = {
 	tokensIn?: number | null,
 	tokensOut?: number | null,
+	/**  The provider took the request but ignored the effort setting. */
+	effortIgnored?: boolean,
 };
 
 export type Usage_Serialize = {
 	tokensIn: number | null,
 	tokensOut: number | null,
+	/**  The provider took the request but ignored the effort setting. */
+	effortIgnored: boolean,
 };
 
 export type WorkspaceError = { kind: "noFolder" } | { kind: "outsideFolder" } | { kind: "notFound" } | { kind: "alreadyExists" } | 

@@ -1,7 +1,7 @@
 use crate::connections::{
     AddedConnection, AppError, ChatModel, ConnectionView, NewConnection, Services,
 };
-use crate::gateway::ModelInfo;
+use crate::gateway::{Effort, ModelInfo};
 use tauri::State;
 
 #[tauri::command]
@@ -86,4 +86,15 @@ pub fn set_model_vision(
     supports: Option<bool>,
 ) -> Result<(), AppError> {
     services.set_model_vision(connection_id, model_id, supports)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn set_model_effort(
+    services: State<'_, Services>,
+    connection_id: u32,
+    model_id: String,
+    effort: Option<Effort>,
+) -> Result<(), AppError> {
+    services.set_model_effort(connection_id, model_id, effort)
 }
