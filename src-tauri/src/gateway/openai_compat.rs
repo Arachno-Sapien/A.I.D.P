@@ -1,6 +1,7 @@
 use crate::gateway::http::{
     list_error, map_http_error, map_reqwest_error, read_sse, Step, LIST_TIMEOUT,
 };
+use crate::gateway::url::{reasoning_echo, ReasoningEcho};
 use crate::gateway::{
     ChatEvent, ChatRequest, ImageInput, ModelInfo, ModelProvider, ProviderError, Reply, Usage,
 };
@@ -16,16 +17,51 @@ pub struct OpenAiCompat {
     client: reqwest::Client,
     base_url: String,
     api_key: SecretString,
+    echo: ReasoningEcho,
 }
 
 impl OpenAiCompat {
     pub fn new(client: reqwest::Client, base_url: String, api_key: SecretString) -> Self {
+        let echo = reasoning_echo(&base_url);
+        Self::with_echo(client, base_url, api_key, echo)
+    }
+
+    /// For tests: a fake server can't have a real provider's host.
+    pub fn with_echo(
+        client: reqwest::Client,
+        base_url: String,
+        api_key: SecretString,
+        echo: ReasoningEcho,
+    ) -> Self {
         Self {
             client,
             base_url: base_url.trim_end_matches('/').to_string(),
             api_key,
+            echo,
         }
     }
+}
+
+/// Adds one reasoning_details fragment: fragments sharing an `index` merge by
+/// concatenating `text`; other fields come from the first fragment.
+fn merge_reasoning_detail(details: &mut Vec<serde_json::Value>, frag: &serde_json::Value) {
+    let index = frag.get("index");
+    if index.is_some()
+        && let Some(existing) = details.iter_mut().find(|d| d.get("index") == index)
+    {
+        if let Some(text) = frag.get("text").and_then(|t| t.as_str())
+            && let Some(obj) = existing.as_object_mut()
+        {
+            let joined = format!(
+                "{}{}",
+                obj.get("text").and_then(|t| t.as_str()).unwrap_or(""),
+                text
+            );
+            obj.insert("text".to_string(), serde_json::Value::String(joined));
+        }
+        return;
+    }
+    details.push(frag.clone());
 }
 
 #[derive(Deserialize)]
@@ -50,6 +86,9 @@ struct ChunkDeltaToolCall {
 struct ChunkChoiceDelta {
     content: Option<String>,
     tool_calls: Option<Vec<ChunkDeltaToolCall>>,
+    reasoning_content: Option<String>,
+    reasoning: Option<String>,
+    reasoning_details: Option<Vec<serde_json::Value>>,
 }
 
 #[derive(Deserialize)]
@@ -307,6 +346,8 @@ impl ModelProvider for OpenAiCompat {
 
         let mut final_usage = Usage::default();
         let mut accumulated_text = String::new();
+        let mut reasoning_text = String::new();
+        let mut reasoning_details: Vec<serde_json::Value> = Vec::new();
         let mut accumulated_tool_calls: std::collections::BTreeMap<u32, PartialCall> =
             std::collections::BTreeMap::new();
         let mut last_finish_reason: Option<String> = None;
@@ -353,6 +394,18 @@ impl ModelProvider for OpenAiCompat {
                 }
 
                 if let Some(delta) = &choice.delta {
+                    if let Some(r) = delta
+                        .reasoning_content
+                        .as_deref()
+                        .or(delta.reasoning.as_deref())
+                    {
+                        reasoning_text.push_str(r);
+                    }
+                    if let Some(frags) = &delta.reasoning_details {
+                        for frag in frags {
+                            merge_reasoning_detail(&mut reasoning_details, frag);
+                        }
+                    }
                     if let Some(content) = delta.content.as_deref()
                         && !content.is_empty()
                     {
@@ -452,6 +505,21 @@ impl ModelProvider for OpenAiCompat {
                 "content".to_string(),
                 serde_json::Value::String(accumulated_text),
             );
+        }
+        match self.echo {
+            ReasoningEcho::DeepSeek if !reasoning_text.is_empty() => {
+                assistant_map.insert(
+                    "reasoning_content".to_string(),
+                    serde_json::Value::String(reasoning_text),
+                );
+            }
+            ReasoningEcho::OpenRouter if !reasoning_details.is_empty() => {
+                assistant_map.insert(
+                    "reasoning_details".to_string(),
+                    serde_json::Value::Array(reasoning_details),
+                );
+            }
+            _ => {}
         }
         if !tool_calls_json.is_empty() {
             assistant_map.insert(

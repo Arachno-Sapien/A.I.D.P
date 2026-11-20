@@ -98,3 +98,5 @@ Bugs, gotchas, and approaches that failed. Newest first. If you hit one of the "
 - **Ollama on Windows** usually runs as a tray app that starts the server itself. Spawn `ollama serve` only when `/api/version` fails and the binary exists.
 
 - **`fixed` inside a blurred bar is clipped (2026-11-11):** an ancestor with `backdrop-filter` (Tailwind `backdrop-blur`) becomes the containing block for `position: fixed` children, so a modal rendered inside `ModelPicker` was pinned to the bar. Modals go through `createPortal(..., document.body)` (`ConfirmDialog.tsx`).
+
+- **2026-11-21 · DeepSeek needs `reasoning_content` back with tools.** It thinks by default and answers 400 on the next round if the assistant message lacks it; OpenRouter wants `reasoning_details` back the same way. `gateway/url.rs::reasoning_echo` picks by exact host (or `.`-suffix), never substring, so a custom endpoint never gets another provider's fields. Decision 0033.

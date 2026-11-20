@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- DeepSeek agent runs no longer fail after the first tool call: its thinking is sent back as DeepSeek requires. OpenRouter's reasoning is kept with tool calls too.
+
 ## [0.1.0-rc.8] - 2026-11-19
 
 ### Changed

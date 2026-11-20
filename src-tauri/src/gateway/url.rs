@@ -45,9 +45,59 @@ pub fn check_base_url(url: &str) -> Option<Transport> {
     }
 }
 
+/// Which provider wants its reasoning sent back with tool calls.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ReasoningEcho {
+    DeepSeek,
+    OpenRouter,
+    None,
+}
+
+/// Compares the parsed host exactly, or as a `.`-prefixed suffix, never as a substring.
+pub fn reasoning_echo(base_url: &str) -> ReasoningEcho {
+    let Ok(parsed) = reqwest::Url::parse(base_url) else {
+        return ReasoningEcho::None;
+    };
+    let Some(host) = parsed.host_str() else {
+        return ReasoningEcho::None;
+    };
+    let is = |domain: &str| host == domain || host.ends_with(&format!(".{domain}"));
+    if is("api.deepseek.com") {
+        ReasoningEcho::DeepSeek
+    } else if is("openrouter.ai") {
+        ReasoningEcho::OpenRouter
+    } else {
+        ReasoningEcho::None
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reasoning_echo_matches_hosts_exactly() {
+        assert_eq!(
+            reasoning_echo("https://api.deepseek.com/v1"),
+            ReasoningEcho::DeepSeek
+        );
+        assert_eq!(
+            reasoning_echo("https://openrouter.ai/api/v1"),
+            ReasoningEcho::OpenRouter
+        );
+        assert_eq!(
+            reasoning_echo("https://api.openai.com/v1"),
+            ReasoningEcho::None
+        );
+        assert_eq!(
+            reasoning_echo("https://evil-openrouter.ai.example.com/v1"),
+            ReasoningEcho::None
+        );
+        assert_eq!(
+            reasoning_echo("https://notdeepseek.com"),
+            ReasoningEcho::None
+        );
+    }
 
     #[test]
     fn url_rules() {

@@ -3,7 +3,7 @@
 mod common;
 
 use aidp_lib::gateway::{
-    openai_compat::OpenAiCompat, ImageInput, ModelProvider, ProviderError, ToolCall, ToolOutput,
+    openai_compat::OpenAiCompat, url::ReasoningEcho, ImageInput, ModelProvider, ProviderError, ToolCall, ToolOutput,
     ToolRound, ToolSpec, Usage,
 };
 use common::{capture, deltas, req, sse};
@@ -937,4 +937,91 @@ async fn other_400s_are_not_retried() {
         }
     );
     assert_eq!(server.received_requests().await.unwrap().len(), 1);
+}
+
+async fn reasoning_reply(echo: ReasoningEcho, chunks: &[&str]) -> (Vec<String>, serde_json::Value) {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(sse(chunks)))
+        .mount(&server)
+        .await;
+    let p = OpenAiCompat::with_echo(
+        reqwest::Client::new(),
+        format!("{}/v1", server.uri()),
+        SecretString::from("sk-test".to_string()),
+        echo,
+    );
+    let (channel, events) = capture();
+    let reply = p
+        .stream_chat(req(), channel, CancellationToken::new())
+        .await
+        .unwrap();
+    (deltas(&events), reply.assistant)
+}
+
+const TOOL_CHUNK: &str = r#"{"choices":[{"delta":{"tool_calls":[{"index":0,"id":"c1","type":"function","function":{"name":"fn1","arguments":"{}"}}]}}]}"#;
+
+#[tokio::test]
+async fn deepseek_reasoning_is_kept_for_replay_not_shown() {
+    let (shown, assistant) = reasoning_reply(
+        ReasoningEcho::DeepSeek,
+        &[
+            r#"{"choices":[{"delta":{"reasoning_content":"think 1"}}]}"#,
+            r#"{"choices":[{"delta":{"reasoning_content":" think 2"}}]}"#,
+            TOOL_CHUNK,
+            "[DONE]",
+        ],
+    )
+    .await;
+    assert!(shown.is_empty());
+    assert_eq!(assistant["reasoning_content"], "think 1 think 2");
+}
+
+#[tokio::test]
+async fn openrouter_reasoning_details_are_kept_in_order() {
+    let (_, assistant) = reasoning_reply(
+        ReasoningEcho::OpenRouter,
+        &[
+            r#"{"choices":[{"delta":{"reasoning_details":[{"type":"reasoning.text","text":"a","index":0}]}}]}"#,
+            r#"{"choices":[{"delta":{"reasoning_details":[{"type":"reasoning.text","text":"b","index":0}]}}]}"#,
+            TOOL_CHUNK,
+            "[DONE]",
+        ],
+    )
+    .await;
+    assert_eq!(
+        assistant["reasoning_details"],
+        json!([{"type":"reasoning.text","text":"ab","index":0}])
+    );
+}
+
+#[tokio::test]
+async fn other_hosts_send_no_reasoning_back() {
+    let (_, assistant) = reasoning_reply(
+        ReasoningEcho::None,
+        &[
+            r#"{"choices":[{"delta":{"reasoning_content":"think"}}]}"#,
+            r#"{"choices":[{"delta":{"reasoning_details":[{"type":"reasoning.text","text":"a","index":0}]}}]}"#,
+            TOOL_CHUNK,
+            "[DONE]",
+        ],
+    )
+    .await;
+    assert!(assistant.get("reasoning_content").is_none());
+    assert!(assistant.get("reasoning_details").is_none());
+}
+
+#[tokio::test]
+async fn reasoning_never_reaches_content() {
+    let (shown, assistant) = reasoning_reply(
+        ReasoningEcho::None,
+        &[
+            r#"{"choices":[{"delta":{"reasoning":"x","content":"answer"}}]}"#,
+            "[DONE]",
+        ],
+    )
+    .await;
+    assert_eq!(shown, vec!["answer"]);
+    assert_eq!(assistant["content"], "answer");
 }
