@@ -182,6 +182,7 @@ impl ModelProvider for Anthropic {
                 id: entry.id,
                 context_window: entry.max_input_tokens,
                 supports_tools: Some(true),
+                effort_support: None,
             })
             .collect();
 

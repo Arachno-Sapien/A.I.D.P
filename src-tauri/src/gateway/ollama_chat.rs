@@ -36,6 +36,7 @@ impl ModelProvider for OllamaChat {
                 display_name: m.name,
                 context_window: None,
                 supports_tools: None,
+                effort_support: None,
             })
             .collect();
         Ok(models)

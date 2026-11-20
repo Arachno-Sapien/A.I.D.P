@@ -358,6 +358,8 @@ export type ModelInfo_Deserialize = {
 	displayName: string,
 	contextWindow?: number | null,
 	supportsTools?: boolean | null,
+	/**  What the provider says about effort: "levels", "toggle" or "none". None = no report. */
+	effortSupport?: string | null,
 };
 
 export type ModelInfo_Serialize = {
@@ -365,6 +367,8 @@ export type ModelInfo_Serialize = {
 	displayName: string,
 	contextWindow: number | null,
 	supportsTools: boolean | null,
+	/**  What the provider says about effort: "levels", "toggle" or "none". None = no report. */
+	effortSupport: string | null,
 };
 
 export type NewConnection = {

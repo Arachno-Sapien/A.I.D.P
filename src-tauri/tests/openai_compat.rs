@@ -283,12 +283,14 @@ async fn list_models_parses_ids_names_and_context() {
                 display_name: "a-model".to_string(),
                 context_window: None,
                 supports_tools: None,
+                effort_support: None,
             },
             aidp_lib::gateway::ModelInfo {
                 id: "b/model-b".to_string(),
                 display_name: "Model B".to_string(),
                 context_window: Some(128000),
                 supports_tools: None,
+                effort_support: None,
             },
         ]
     );

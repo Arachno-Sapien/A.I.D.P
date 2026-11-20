@@ -618,6 +618,7 @@ async fn list_models_parses_display_name_and_context() {
             display_name: "Claude Sonnet 5.5".to_string(),
             context_window: Some(1000000),
             supports_tools: Some(true),
+            effort_support: None,
         }]
     );
 }

@@ -437,6 +437,7 @@ async fn delete_removes_row_models_and_keychain_entry() {
                 display_name: "M1".to_string(),
                 context_window: None,
                 supports_tools: None,
+                effort_support: None,
             }],
         )
         .unwrap();
@@ -509,12 +510,14 @@ async fn set_models_default_and_chat_models() {
                     display_name: "Model One".to_string(),
                     context_window: None,
                     supports_tools: None,
+                    effort_support: None,
                 },
                 ModelInfo {
                     id: "m2".to_string(),
                     display_name: "Model Two".to_string(),
                     context_window: None,
                     supports_tools: None,
+                    effort_support: None,
                 },
             ],
         )
@@ -886,12 +889,14 @@ async fn model_options_defaults() {
                     id: "large:32k".to_string(),
                     display_name: "large:32k".to_string(),
                     supports_tools: Some(true),
+                    effort_support: None,
                     context_window: Some(32768),
                 },
                 ModelInfo {
                     id: "small:4k".to_string(),
                     display_name: "small:4k".to_string(),
                     supports_tools: Some(true),
+                    effort_support: None,
                     context_window: Some(4096),
                 },
             ],
@@ -938,6 +943,7 @@ async fn set_model_context_bounds() {
                 id: "local:16k".to_string(),
                 display_name: "local:16k".to_string(),
                 supports_tools: Some(true),
+                effort_support: None,
                 context_window: Some(16384),
             }],
         )
@@ -968,6 +974,7 @@ async fn set_model_context_bounds() {
                 id: "gpt-4o".to_string(),
                 display_name: "gpt-4o".to_string(),
                 supports_tools: Some(true),
+                effort_support: None,
                 context_window: Some(128_000),
             }],
         )
@@ -998,6 +1005,7 @@ async fn set_model_context_targets_the_local_model() {
         id: "same:1b".to_string(),
         display_name: "same:1b".to_string(),
         supports_tools: Some(true),
+        effort_support: None,
         context_window: Some(cw),
     };
     services.set_models(cloud_id, vec![same(4096)]).unwrap();
@@ -1167,6 +1175,7 @@ fn gpt4o() -> ModelInfo {
         id: "gpt-4o".to_string(),
         display_name: "gpt-4o".to_string(),
         supports_tools: Some(true),
+        effort_support: None,
         context_window: Some(128_000),
     }
 }

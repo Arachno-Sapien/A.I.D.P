@@ -202,6 +202,7 @@ impl ModelProvider for OpenAiCompat {
                     display_name,
                     context_window: m.context_length,
                     supports_tools,
+                effort_support: None,
                 })
             })
             .collect();

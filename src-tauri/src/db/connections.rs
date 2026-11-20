@@ -12,6 +12,9 @@ pub struct ConnectionRow {
     pub last_test_ok: Option<bool>,
 }
 
+/// Per-model settings kept across a refreshed list: num_ctx, vision, effort, effort support.
+type SavedSettings = (Option<u32>, Option<i64>, Option<String>, Option<String>);
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ChatModelRow {
     pub connection_id: u32,
@@ -24,6 +27,10 @@ pub struct ChatModelRow {
     pub connection_kind: ConnectionKind,
     pub context_window: Option<u32>,
     pub num_ctx: Option<u32>,
+    /// Raw stored text: the user's chosen effort level, if any.
+    pub effort: Option<String>,
+    /// Raw stored text: "levels", "toggle" or "none".
+    pub effort_support: Option<String>,
 }
 
 fn parse_connection_row(row: &rusqlite::Row) -> rusqlite::Result<ConnectionRow> {
@@ -148,22 +155,24 @@ pub fn set_models(
         |row| row.get(0),
     )?;
 
-    // Settings the user made per model (context length, reads images) survive a new list.
+    // Settings the user made per model (context length, reads images, effort) survive a new list.
     let mut prev_settings =
-        std::collections::HashMap::<String, (Option<u32>, Option<i64>)>::new();
+        std::collections::HashMap::<String, SavedSettings>::new();
     {
         let mut prev_stmt = tx.prepare(
-            "SELECT model_id, num_ctx, supports_vision FROM models WHERE connection_id = ?1",
+            "SELECT model_id, num_ctx, supports_vision, effort, effort_support FROM models WHERE connection_id = ?1",
         )?;
         let prev_rows = prev_stmt.query_map(params![connection_id], |row| {
             let mid: String = row.get(0)?;
             let nctx: Option<u32> = row.get(1)?;
             let vision: Option<i64> = row.get(2)?;
-            Ok((mid, nctx, vision))
+            let effort: Option<String> = row.get(3)?;
+            let support: Option<String> = row.get(4)?;
+            Ok((mid, (nctx, vision, effort, support)))
         })?;
         for r in prev_rows {
-            let (mid, nctx, vision) = r?;
-            prev_settings.insert(mid, (nctx, vision));
+            let (mid, saved) = r?;
+            prev_settings.insert(mid, saved);
         }
     }
 
@@ -183,12 +192,13 @@ pub fn set_models(
     };
 
     let mut stmt = tx.prepare(
-        "INSERT INTO models (connection_id, model_id, display_name, context_window, is_default, supports_tools, num_ctx, supports_vision) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+        "INSERT INTO models (connection_id, model_id, display_name, context_window, is_default, supports_tools, num_ctx, supports_vision, effort, effort_support) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
     )?;
 
     for model in models {
         let is_default = target_default_model_id.as_deref() == Some(&model.id);
-        let (num_ctx, vision) = prev_settings.remove(&model.id).unwrap_or_default();
+        let (num_ctx, vision, effort, previous_support) =
+            prev_settings.remove(&model.id).unwrap_or_default();
         stmt.execute(params![
             connection_id,
             model.id,
@@ -198,6 +208,9 @@ pub fn set_models(
             model.supports_tools.map(|b| if b { 1i64 } else { 0i64 }),
             num_ctx,
             vision,
+            effort,
+            // What the provider reports wins; a refusal the app learned stays until then.
+            model.effort_support.clone().or(previous_support),
         ])?;
     }
     drop(stmt);
@@ -220,9 +233,37 @@ pub fn set_supports_vision(
     Ok(changed > 0)
 }
 
+/// Records the effort level the user picked for a model (None = default). False when no such row.
+pub fn set_effort(
+    conn: &Connection,
+    connection_id: u32,
+    model_id: &str,
+    effort: Option<&str>,
+) -> rusqlite::Result<bool> {
+    let changed = conn.execute(
+        "UPDATE models SET effort = ?1 WHERE connection_id = ?2 AND model_id = ?3",
+        params![effort, connection_id, model_id],
+    )?;
+    Ok(changed > 0)
+}
+
+/// Records whether a model takes an effort level (None = unknown). False when no such row.
+pub fn set_effort_support(
+    conn: &Connection,
+    connection_id: u32,
+    model_id: &str,
+    support: Option<&str>,
+) -> rusqlite::Result<bool> {
+    let changed = conn.execute(
+        "UPDATE models SET effort_support = ?1 WHERE connection_id = ?2 AND model_id = ?3",
+        params![support, connection_id, model_id],
+    )?;
+    Ok(changed > 0)
+}
+
 pub fn list_chat_models(conn: &Connection) -> rusqlite::Result<Vec<ChatModelRow>> {
     let mut stmt = conn.prepare(
-        "SELECT m.connection_id, c.label, m.model_id, m.display_name, m.is_default, m.supports_tools, c.kind, m.context_window, m.num_ctx, m.supports_vision
+        "SELECT m.connection_id, c.label, m.model_id, m.display_name, m.is_default, m.supports_tools, c.kind, m.context_window, m.num_ctx, m.supports_vision, m.effort, m.effort_support
          FROM models m
          JOIN connections c ON m.connection_id = c.id
          ORDER BY m.is_default DESC, m.connection_id ASC, m.display_name ASC",
@@ -248,6 +289,8 @@ pub fn list_chat_models(conn: &Connection) -> rusqlite::Result<Vec<ChatModelRow>
         let num_ctx = num_ctx_i64.map(|v| v as u32);
         let supports_vision_int: Option<i64> = row.get(9)?;
         let supports_vision = supports_vision_int.map(|v| v != 0);
+        let effort: Option<String> = row.get(10)?;
+        let effort_support: Option<String> = row.get(11)?;
 
         Ok(ChatModelRow {
             connection_id,
@@ -260,6 +303,8 @@ pub fn list_chat_models(conn: &Connection) -> rusqlite::Result<Vec<ChatModelRow>
             connection_kind,
             context_window,
             num_ctx,
+            effort,
+            effort_support,
         })
     })?;
 

@@ -83,6 +83,10 @@ CREATE TABLE allowed_commands (
   PRIMARY KEY (folder, command)
 );
 "#,
+    r#"
+ALTER TABLE models ADD COLUMN effort TEXT;
+ALTER TABLE models ADD COLUMN effort_support TEXT;
+"#,
 ];
 
 pub fn open(path: &Path) -> rusqlite::Result<Connection> {
@@ -125,13 +129,58 @@ mod tests {
         let version: i32 = conn
             .query_row("PRAGMA user_version;", [], |row| row.get(0))
             .unwrap();
-        assert_eq!(version, 9);
+        assert_eq!(version, 10);
 
         migrate(&mut conn).unwrap();
         let version_after: i32 = conn
             .query_row("PRAGMA user_version;", [], |row| row.get(0))
             .unwrap();
-        assert_eq!(version_after, 9);
+        assert_eq!(version_after, 10);
+    }
+
+    fn model_with_support(id: &str, support: Option<&str>) -> ModelInfo {
+        ModelInfo {
+            id: id.to_string(),
+            display_name: id.to_string(),
+            context_window: None,
+            supports_tools: None,
+            effort_support: support.map(str::to_string),
+        }
+    }
+
+    fn row<'a>(rows: &'a [ChatModelRow], id: &str) -> &'a ChatModelRow {
+        rows.iter().find(|r| r.model_id == id).unwrap()
+    }
+
+    #[test]
+    fn set_models_preserves_effort_and_refreshes_support() {
+        let mut conn = open_in_memory().unwrap();
+        let id = insert_connection(&conn, ConnectionKind::OpenaiCompat, "c", "https://x.test", "1234", 100).unwrap();
+        set_models(&mut conn, id, &[model_with_support("a", Some("levels")), model_with_support("b", None)]).unwrap();
+        assert!(set_effort(&conn, id, "a", Some("high")).unwrap());
+        set_models(&mut conn, id, &[model_with_support("a", Some("none")), model_with_support("b", None)]).unwrap();
+        let rows = list_chat_models(&conn).unwrap();
+        assert_eq!(row(&rows, "a").effort.as_deref(), Some("high"));
+        assert_eq!(row(&rows, "a").effort_support.as_deref(), Some("none"));
+        assert_eq!(row(&rows, "b").effort, None);
+    }
+
+    #[test]
+    fn effort_support_kept_when_the_provider_says_nothing() {
+        let mut conn = open_in_memory().unwrap();
+        let id = insert_connection(&conn, ConnectionKind::OpenaiCompat, "c", "https://x.test", "1234", 100).unwrap();
+        set_models(&mut conn, id, &[model_with_support("a", None)]).unwrap();
+        assert!(set_effort_support(&conn, id, "a", Some("none")).unwrap());
+        set_models(&mut conn, id, &[model_with_support("a", None)]).unwrap();
+        let rows = list_chat_models(&conn).unwrap();
+        assert_eq!(row(&rows, "a").effort_support.as_deref(), Some("none"));
+    }
+
+    #[test]
+    fn set_effort_on_a_missing_model_changes_nothing() {
+        let conn = open_in_memory().unwrap();
+        assert!(!set_effort(&conn, 1, "nope", Some("high")).unwrap());
+        assert!(!set_effort_support(&conn, 1, "nope", Some("none")).unwrap());
     }
 
     #[test]
@@ -152,18 +201,21 @@ mod tests {
             display_name: "M1".to_string(),
             context_window: None,
             supports_tools: Some(true),
+            effort_support: None,
         };
         let m2 = ModelInfo {
             id: "m2".to_string(),
             display_name: "M2".to_string(),
             context_window: None,
             supports_tools: Some(false),
+            effort_support: None,
         };
         let m3 = ModelInfo {
             id: "m3".to_string(),
             display_name: "M3".to_string(),
             context_window: None,
             supports_tools: None,
+            effort_support: None,
         };
 
         set_models(&mut conn, id, &[m1, m2, m3]).unwrap();
@@ -194,6 +246,7 @@ mod tests {
             display_name: id.to_string(),
             context_window: None,
             supports_tools: None,
+            effort_support: None,
         };
         set_models(&mut conn, id, &[model("yes"), model("no"), model("unset")]).unwrap();
         set_supports_vision(&conn, id, "yes", Some(true)).unwrap();
@@ -225,12 +278,14 @@ mod tests {
             display_name: "M1".to_string(),
             context_window: Some(32768),
             supports_tools: Some(true),
+            effort_support: None,
         };
         let m2 = ModelInfo {
             id: "m2".to_string(),
             display_name: "M2".to_string(),
             context_window: Some(8192),
             supports_tools: Some(true),
+            effort_support: None,
         };
 
         set_models(&mut conn, id, &[m1.clone(), m2.clone()]).unwrap();
@@ -248,6 +303,7 @@ mod tests {
             display_name: "M1 (Renamed)".to_string(),
             context_window: Some(32768),
             supports_tools: Some(true),
+            effort_support: None,
         };
         set_models(&mut conn, id, &[m1_updated, m2]).unwrap();
 
@@ -293,6 +349,7 @@ mod tests {
                 display_name: "Model 1".to_string(),
                 context_window: Some(4096),
                 supports_tools: None,
+                effort_support: None,
             }],
         )
         .unwrap();
@@ -329,18 +386,21 @@ mod tests {
             display_name: "A".to_string(),
             context_window: None,
             supports_tools: None,
+            effort_support: None,
         };
         let m_b = ModelInfo {
             id: "b".to_string(),
             display_name: "B".to_string(),
             context_window: None,
             supports_tools: None,
+            effort_support: None,
         };
         let m_c = ModelInfo {
             id: "c".to_string(),
             display_name: "C".to_string(),
             context_window: None,
             supports_tools: None,
+            effort_support: None,
         };
 
         set_models(&mut conn, id, &[m_a, m_b.clone()]).unwrap();
@@ -384,18 +444,21 @@ mod tests {
             display_name: "M1".to_string(),
             context_window: None,
             supports_tools: None,
+            effort_support: None,
         };
         let m2 = ModelInfo {
             id: "m2".to_string(),
             display_name: "M2".to_string(),
             context_window: None,
             supports_tools: None,
+            effort_support: None,
         };
         let m3 = ModelInfo {
             id: "m3".to_string(),
             display_name: "M3".to_string(),
             context_window: None,
             supports_tools: None,
+            effort_support: None,
         };
 
         set_models(&mut conn, id1, &[m1, m2]).unwrap();
@@ -429,12 +492,14 @@ mod tests {
             display_name: "M1".to_string(),
             context_window: None,
             supports_tools: None,
+            effort_support: None,
         };
         let m2 = ModelInfo {
             id: "m2".to_string(),
             display_name: "M2".to_string(),
             context_window: None,
             supports_tools: None,
+            effort_support: None,
         };
 
         set_models(&mut conn, id, &[m1, m2]).unwrap();
@@ -469,12 +534,14 @@ mod tests {
             display_name: "A Model".to_string(),
             context_window: None,
             supports_tools: None,
+            effort_support: None,
         };
         let m2 = ModelInfo {
             id: "z_model".to_string(),
             display_name: "Z Model".to_string(),
             context_window: None,
             supports_tools: None,
+            effort_support: None,
         };
 
         set_models(&mut conn, id, &[m1, m2]).unwrap();

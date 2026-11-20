@@ -652,6 +652,7 @@ impl Services {
                 display_name: tag.name,
                 supports_tools,
                 context_window,
+            effort_support: None,
             });
         }
         self.set_models(ollama_id, models)?;

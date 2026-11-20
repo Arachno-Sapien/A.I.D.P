@@ -74,6 +74,9 @@ pub struct ModelInfo {
     pub display_name: String,
     pub context_window: Option<u32>,
     pub supports_tools: Option<bool>,
+    /// What the provider says about effort: "levels", "toggle" or "none". None = no report.
+    #[serde(default)]
+    pub effort_support: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Type, Clone, Debug, PartialEq)]
