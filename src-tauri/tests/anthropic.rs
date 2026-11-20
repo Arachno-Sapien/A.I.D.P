@@ -1064,3 +1064,24 @@ async fn round_images_follow_the_tool_results() {
         })
     );
 }
+
+#[tokio::test]
+async fn list_models_reads_effort_support() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/v1/models"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "data": [
+                { "id": "a", "capabilities": { "effort": { "supported": true } } },
+                { "id": "b", "capabilities": { "effort": { "supported": false } } },
+                { "id": "c" }
+            ],
+            "has_more": false
+        })))
+        .mount(&server)
+        .await;
+
+    let models = test_provider(&server).list_models().await.unwrap();
+    let support: Vec<_> = models.iter().map(|m| m.effort_support.as_deref()).collect();
+    assert_eq!(support, vec![Some("levels"), Some("none"), None]);
+}

@@ -390,3 +390,16 @@ async fn ensure_running_when_already_up_skips_the_start() {
     assert_eq!(status, OllamaStatus::Running { version: "0.12.0".to_string() });
     assert_eq!(services.chat_models().unwrap().len(), 1);
 }
+
+#[test]
+fn effort_support_from_show() {
+    use aidp_lib::gateway::EffortSupport::{Levels, Toggle, None as No};
+    use aidp_lib::ollama::ollama_effort_support as f;
+    assert_eq!(f(&json!({"thinking":{"values":["low","medium","high"]}}), "x"), Some(Levels));
+    assert_eq!(f(&json!({"thinking":{"values":[false,true]}}), "x"), Some(Toggle));
+    assert_eq!(f(&json!({"thinking":{"values":[false]}}), "x"), Some(No));
+    assert_eq!(f(&json!({"capabilities":["completion","thinking"]}), "qwen3:8b"), Some(Toggle));
+    assert_eq!(f(&json!({"capabilities":["completion","thinking"]}), "gpt-oss:20b"), Some(Levels));
+    assert_eq!(f(&json!({"capabilities":["completion","tools"]}), "qwen3:8b"), Some(No));
+    assert_eq!(f(&json!({}), "x"), None);
+}

@@ -1321,3 +1321,28 @@ async fn chat_models_carry_effort() {
     }
     assert_eq!(services.chat_models().unwrap()[0].effort, None);
 }
+
+#[tokio::test]
+async fn sync_writes_local_effort_support() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/api/tags"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "models": [{ "name": "qwen3:8b", "size": 1048576 }]
+        })))
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/api/show"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "capabilities": ["completion", "thinking"], "model_info": {}
+        })))
+        .mount(&server)
+        .await;
+    let services =
+        create_services(Arc::new(MemoryStore::default())).with_ollama_url(server.uri());
+    services.sync_local_models().await.unwrap();
+    let models = services.chat_models().unwrap();
+    let m = models.iter().find(|m| m.model_id == "qwen3:8b").unwrap();
+    assert_eq!(m.effort_support, Some(aidp_lib::gateway::EffortSupport::Toggle));
+}

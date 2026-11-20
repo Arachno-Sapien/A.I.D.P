@@ -99,7 +99,7 @@ pub trait ModelProvider: Send + Sync {
 - `ProviderError` (5xx and anything unexpected)
 - `Cancelled`
 
-**Capabilities per model.** Each model record stores streaming, tool calling, vision, and context window as yes / no / unknown. Fill them from the provider where it reports them (Ollama's /api/show does for local models); otherwise the user can set them. Agent tools (M4) only appear for models that support tool calling; the rest get the M3 workspace.
+**Capabilities per model.** Each model record stores streaming, tool calling, vision, and context window as yes / no / unknown, plus effort (levels / toggle / none / unknown). Anthropic, OpenRouter and Ollama report effort support in their model lists. Fill them from the provider where it reports them (Ollama's /api/show does for local models); otherwise the user can set them. Agent tools (M4) only appear for models that support tool calling; the rest get the M3 workspace.
 
 **Leave room for later.** Store message content as a list of parts (text now, tool calls from M4, images later), and keep `ChatEvent` open for the `ToolCall` event M4 adds. This makes adding MCP support in M6 an addition, not a rewrite.
 

@@ -58,6 +58,7 @@ struct ModelEntry {
     id: String,
     display_name: Option<String>,
     max_input_tokens: Option<u32>,
+    capabilities: Option<serde_json::Value>,
 }
 
 const MAX_TOKENS: u32 = 8192;
@@ -178,11 +179,15 @@ impl ModelProvider for Anthropic {
             .data
             .into_iter()
             .map(|entry| ModelInfo {
+                effort_support: entry
+                    .capabilities
+                    .as_ref()
+                    .and_then(|c| c["effort"]["supported"].as_bool())
+                    .map(|b| if b { "levels" } else { "none" }.to_string()),
                 display_name: entry.display_name.unwrap_or_else(|| entry.id.clone()),
                 id: entry.id,
                 context_window: entry.max_input_tokens,
                 supports_tools: Some(true),
-                effort_support: None,
             })
             .collect();
 

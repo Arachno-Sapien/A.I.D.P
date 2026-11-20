@@ -196,13 +196,18 @@ impl ModelProvider for OpenAiCompat {
                 let display_name = m.name.unwrap_or_else(|| id.clone());
                 let supports_tools = m
                     .supported_parameters
+                    .as_ref()
                     .map(|params| params.iter().any(|p| p == "tools"));
+                let effort_support = m.supported_parameters.as_ref().map(|params| {
+                    let takes = params.iter().any(|p| p == "reasoning" || p == "reasoning_effort");
+                    if takes { "levels" } else { "none" }.to_string()
+                });
                 Some(ModelInfo {
                     id,
                     display_name,
                     context_window: m.context_length,
                     supports_tools,
-                effort_support: None,
+                    effort_support,
                 })
             })
             .collect();

@@ -695,9 +695,13 @@ impl Services {
         let mut vision = Vec::with_capacity(tags.len());
         for tag in tags {
             let details = ollama.show(&tag.name).await.ok();
-            let (supports_tools, context_window) = match &details {
-                Some(d) => (Some(d.supports_tools), d.context_length),
-                None => (None, None),
+            let (supports_tools, context_window, effort_support) = match &details {
+                Some(d) => (
+                    Some(d.supports_tools),
+                    d.context_length,
+                    d.effort_support.map(|e| e.as_str().to_string()),
+                ),
+                None => (None, None, None),
             };
             vision.push((tag.name.clone(), details.and_then(|d| d.supports_vision)));
             models.push(ModelInfo {
@@ -705,7 +709,7 @@ impl Services {
                 display_name: tag.name,
                 supports_tools,
                 context_window,
-            effort_support: None,
+                effort_support,
             });
         }
         self.set_models(ollama_id, models)?;

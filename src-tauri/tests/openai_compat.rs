@@ -1029,3 +1029,23 @@ async fn reasoning_never_reaches_content() {
     assert_eq!(shown, vec!["answer"]);
     assert_eq!(assistant["content"], "answer");
 }
+
+#[tokio::test]
+async fn openrouter_supported_parameters_give_effort_support() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/v1/models"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "data": [
+                { "id": "a", "supported_parameters": ["tools", "reasoning"] },
+                { "id": "b", "supported_parameters": ["tools"] },
+                { "id": "c" }
+            ]
+        })))
+        .mount(&server)
+        .await;
+
+    let models = provider(&server).list_models().await.unwrap();
+    let support: Vec<_> = models.iter().map(|m| m.effort_support.as_deref()).collect();
+    assert_eq!(support, vec![Some("levels"), Some("none"), None]);
+}

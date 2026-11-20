@@ -2,7 +2,7 @@ pub mod process;
 pub mod service;
 
 use crate::gateway::http::{map_http_error, map_reqwest_error, read_json_lines, Step, LIST_TIMEOUT};
-use crate::gateway::ProviderError;
+use crate::gateway::{EffortSupport, ProviderError};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use specta::Type;
@@ -85,6 +85,32 @@ pub struct ModelDetails {
     /// None when Ollama doesn't say (older versions send no capabilities).
     pub supports_vision: Option<bool>,
     pub context_length: Option<u32>,
+    /// None when Ollama doesn't say.
+    pub effort_support: Option<EffortSupport>,
+}
+
+/// Reads whether a model takes a thinking level from an `/api/show` reply.
+/// Newer Ollama lists the values; older says only "thinking", which takes
+/// level strings on gpt-oss alone (before 0.17.7).
+pub fn ollama_effort_support(show: &serde_json::Value, model: &str) -> Option<EffortSupport> {
+    if let Some(values) = show["thinking"]["values"].as_array() {
+        let named = |l: &str| values.iter().any(|v| v.as_str() == Some(l));
+        return Some(if named("low") || named("medium") || named("high") {
+            EffortSupport::Levels
+        } else if values.iter().any(|v| v.as_bool() == Some(true)) {
+            EffortSupport::Toggle
+        } else {
+            EffortSupport::None
+        });
+    }
+    let caps = show["capabilities"].as_array()?;
+    Some(if !caps.iter().any(|v| v.as_str() == Some("thinking")) {
+        EffortSupport::None
+    } else if model.starts_with("gpt-oss") {
+        EffortSupport::Levels
+    } else {
+        EffortSupport::Toggle
+    })
 }
 
 #[derive(Serialize, Deserialize, Type, Clone, Debug, PartialEq)]
@@ -253,6 +279,7 @@ impl Ollama {
             supports_tools,
             supports_vision,
             context_length,
+            effort_support: ollama_effort_support(&val, name),
         })
     }
 
