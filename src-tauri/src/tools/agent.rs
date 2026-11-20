@@ -261,6 +261,8 @@ pub async fn run_with_images(
 
     let mut total_usage = Usage::default();
     let mut rounds: Vec<ToolRound> = Vec::new();
+    // Dropped for the rest of the run once a provider refuses it (decision 0033).
+    let mut local = args.local.clone();
 
     for step in 1..=MAX_STEPS {
         let req = ChatRequest {
@@ -269,7 +271,7 @@ pub async fn run_with_images(
             images: full_images.clone(),
             tools: specs_list.clone(),
             rounds: rounds.clone(),
-            local: args.local.clone(),
+            local: local.clone(),
         };
 
         let reply = args
@@ -282,6 +284,11 @@ pub async fn run_with_images(
         }
         if let Some(t_out) = reply.usage.tokens_out {
             total_usage.tokens_out = Some(total_usage.tokens_out.unwrap_or(0) + t_out);
+        }
+
+        if reply.usage.effort_ignored {
+            local.effort = None;
+            total_usage.effort_ignored = true;
         }
 
         if reply.tool_calls.is_empty() {

@@ -2347,3 +2347,97 @@ async fn steps_share_the_conversation() {
     assert!(Arc::ptr_eq(&seen[0].images, &seen[1].images));
     assert_eq!(seen[1].images[1], vec![png()]);
 }
+
+/// Step 1 asks for a tool (and reports the effort ignored when `refuse`); step 2 ends.
+/// Records the effort each step was sent with.
+struct EffortProbe {
+    refuse: bool,
+    seen: Mutex<Vec<Option<aidp_lib::gateway::Effort>>>,
+}
+
+#[async_trait::async_trait]
+impl aidp_lib::gateway::ModelProvider for EffortProbe {
+    async fn list_models(&self) -> Result<Vec<aidp_lib::gateway::ModelInfo>, ProviderError> {
+        Ok(Vec::new())
+    }
+
+    async fn stream_chat(
+        &self,
+        req: aidp_lib::gateway::ChatRequest,
+        _out: tauri::ipc::Channel<ChatEvent>,
+        _cancel: CancellationToken,
+    ) -> Result<aidp_lib::gateway::Reply, ProviderError> {
+        let mut seen = self.seen.lock().unwrap();
+        seen.push(req.local.effort);
+        let first = seen.len() == 1;
+        Ok(aidp_lib::gateway::Reply {
+            usage: aidp_lib::gateway::Usage {
+                effort_ignored: first && self.refuse,
+                ..Default::default()
+            },
+            tool_calls: if first {
+                vec![aidp_lib::gateway::ToolCall {
+                    id: "call_1".into(),
+                    name: "list_files".into(),
+                    input: json!({"path": ""}),
+                }]
+            } else {
+                Vec::new()
+            },
+            assistant: json!({}),
+        })
+    }
+}
+
+async fn run_effort_probe(
+    refuse: bool,
+) -> (Vec<Option<aidp_lib::gateway::Effort>>, aidp_lib::gateway::Usage) {
+    let temp_dir = TempDir::new();
+    let p = EffortProbe {
+        refuse,
+        seen: Mutex::new(Vec::new()),
+    };
+    let (channel, _) = capture();
+    let approvals = Approvals::new();
+    let usage = run(AgentRun {
+        provider: &p,
+        model: "test-model".into(),
+        messages: vec![ChatMessage {
+            role: Role::User,
+            content: "Look".into(),
+        }],
+        root: temp_dir.path().to_path_buf(),
+        approvals: &approvals,
+        out: channel,
+        cancel: CancellationToken::new(),
+        command_timeout: Duration::from_secs(5),
+        local: aidp_lib::gateway::LocalOptions {
+            effort: Some(aidp_lib::gateway::Effort::High),
+            ..Default::default()
+        },
+        text_limit: aidp_lib::tools::READ_LIMIT,
+        review_at_end: false,
+        run_commands: false,
+        command_allowed: &|_| false,
+        vision: false,
+        servers: None,
+        mcp: None,
+    })
+    .await
+    .unwrap();
+    let seen = p.seen.lock().unwrap().clone();
+    (seen, usage)
+}
+
+#[tokio::test]
+async fn a_refused_effort_is_not_resent_in_later_steps() {
+    use aidp_lib::gateway::Effort::High;
+    let (seen, usage) = run_effort_probe(true).await;
+    assert_eq!(seen, vec![Some(High), None]);
+    assert!(usage.effort_ignored);
+
+    // Nothing refused: both steps share the effort (D6).
+    let (seen, usage) = run_effort_probe(false).await;
+    assert_eq!(seen, vec![Some(High), Some(High)]);
+    assert!(!usage.effort_ignored);
+}

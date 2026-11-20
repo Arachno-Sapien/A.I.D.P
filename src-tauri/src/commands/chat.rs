@@ -64,11 +64,14 @@ pub async fn send_message(
         attachments::prepare(&services, &store, connection_id, &model_id, messages)
     })?;
     let result = services
-        .stream(connection_id, model_id, messages, images, on_event.clone(), cancel)
+        .stream(connection_id, model_id.clone(), messages, images, on_event.clone(), cancel)
         .await;
 
     match result {
         Ok(usage) => {
+            if usage.effort_ignored {
+                services.mark_effort_ignored(connection_id, &model_id);
+            }
             let _ = on_event.send(ChatEvent::Done(usage));
             Ok(())
         }
@@ -132,7 +135,7 @@ pub async fn run_agent(
 
     let result = crate::tools::agent::run_with_images(crate::tools::agent::AgentRun {
         provider: provider.as_ref(),
-        model: model_id,
+        model: model_id.clone(),
         messages,
         root,
         approvals: &approvals,
@@ -155,6 +158,9 @@ pub async fn run_agent(
 
     match result {
         Ok(usage) => {
+            if usage.effort_ignored {
+                services.mark_effort_ignored(connection_id, &model_id);
+            }
             let _ = on_event.send(ChatEvent::Done(usage));
             Ok(())
         }

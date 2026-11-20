@@ -236,6 +236,9 @@ impl ModelProvider for OpenAiCompat {
         body_map.insert("stream".to_string(), json!(true));
         // Without this OpenAI never streams the usage chunk (an empty "choices" plus "usage").
         body_map.insert("stream_options".to_string(), json!({ "include_usage": true }));
+        if let Some(effort) = super::effort_to_send(&req.local) {
+            body_map.insert("reasoning_effort".to_string(), json!(effort.as_str()));
+        }
 
         let images = req.images;
         let mut messages_val: Vec<serde_json::Value> = req
@@ -305,6 +308,7 @@ impl ModelProvider for OpenAiCompat {
 
         let mut body = serde_json::Value::Object(body_map);
 
+        let mut effort_ignored = false;
         let resp = loop {
             let request = self
                 .client
@@ -337,20 +341,29 @@ impl ModelProvider for OpenAiCompat {
                 None => return Err(ProviderError::Cancelled),
             };
 
-            // Servers that reject unknown fields (older LM Studio, some custom endpoints) name
-            // the field. Only then retry, once: the second body has no stream_options to remove.
+            // Servers that reject unknown fields name the field. Retry only then, and each
+            // pass removes one key, so the loop is bounded. Match "reasoning_effort" by name,
+            // never plain "reasoning": "unsupported for reasoning models" would strip it wrongly.
             if matches!(status, 400 | 422)
-                && body_text.to_ascii_lowercase().contains("stream_options")
                 && let Some(map) = body.as_object_mut()
-                && map.remove("stream_options").is_some()
             {
-                continue;
+                let lower = body_text.to_ascii_lowercase();
+                if lower.contains("stream_options") && map.remove("stream_options").is_some() {
+                    continue;
+                }
+                if lower.contains("reasoning_effort") && map.remove("reasoning_effort").is_some() {
+                    effort_ignored = true;
+                    continue;
+                }
             }
 
             return Err(map_http_error(status, retry_after.as_deref(), &body_text));
         };
 
-        let mut final_usage = Usage::default();
+        let mut final_usage = Usage {
+            effort_ignored,
+            ..Usage::default()
+        };
         let mut accumulated_text = String::new();
         let mut reasoning_text = String::new();
         let mut reasoning_details: Vec<serde_json::Value> = Vec::new();
@@ -456,6 +469,15 @@ impl ModelProvider for OpenAiCompat {
         if last_finish_reason.as_deref() == Some("length") && !accumulated_tool_calls.is_empty() {
             return Err(ProviderError::Provider {
                 message: "The reply was cut off before its tool call was complete.".to_string(),
+            });
+        }
+
+        if last_finish_reason.as_deref() == Some("length")
+            && accumulated_text.is_empty()
+            && accumulated_tool_calls.is_empty()
+        {
+            return Err(ProviderError::Provider {
+                message: super::THINKING_USED_THE_REPLY.to_string(),
             });
         }
 

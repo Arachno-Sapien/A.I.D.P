@@ -65,6 +65,7 @@ The database file contains **no secret keys**. Even if the database file is extr
 - **Redirects stay on one origin:** the shared HTTP client follows a redirect only to the same scheme, host and port, so a key header (`Authorization`, `x-api-key`) never reaches another host or travels over plain http.
 - **One retry for usage counts:** OpenAI-compatible streaming requests ask for token usage (`stream_options.include_usage`). A server that answers 400/422 naming `stream_options` gets the same request once more without it, to the same provider only.
 - **Update check:** the only call that isn't to a provider or Ollama goes to `github.com` over HTTPS, for the release's `latest.json` and, after you click Install, the installer (see section 11).
+- **One retry for effort:** when a provider refuses `reasoning_effort` (or Anthropic's `output_config`) by name, the request is sent once more without it, to the same provider only.
 
 ---
 

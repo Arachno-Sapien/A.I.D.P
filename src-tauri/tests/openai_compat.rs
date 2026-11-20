@@ -3,8 +3,8 @@
 mod common;
 
 use aidp_lib::gateway::{
-    openai_compat::OpenAiCompat, url::ReasoningEcho, ImageInput, ModelProvider, ProviderError, ToolCall, ToolOutput,
-    ToolRound, ToolSpec, Usage,
+    openai_compat::OpenAiCompat, url::ReasoningEcho, Effort, EffortSupport, ImageInput, LocalOptions, ModelProvider, ProviderError, ToolCall, ToolOutput,
+    ToolRound, ToolSpec, Usage, THINKING_USED_THE_REPLY,
 };
 use common::{capture, deltas, req, sse};
 use secrecy::SecretString;
@@ -1048,4 +1048,181 @@ async fn openrouter_supported_parameters_give_effort_support() {
     let models = provider(&server).list_models().await.unwrap();
     let support: Vec<_> = models.iter().map(|m| m.effort_support.as_deref()).collect();
     assert_eq!(support, vec![Some("levels"), Some("none"), None]);
+}
+
+fn ok_stream() -> ResponseTemplate {
+    ResponseTemplate::new(200).set_body_string(sse(&[
+        r#"{"choices":[{"delta":{"content":"ok"}}]}"#,
+        "[DONE]",
+    ]))
+}
+
+async fn bodies(server: &MockServer) -> Vec<serde_json::Value> {
+    server
+        .received_requests()
+        .await
+        .unwrap()
+        .iter()
+        .map(|r| serde_json::from_slice(&r.body).unwrap())
+        .collect()
+}
+
+fn req_with(effort: Option<Effort>, support: Option<EffortSupport>) -> aidp_lib::gateway::ChatRequest {
+    let mut r = req();
+    r.local = LocalOptions {
+        effort,
+        effort_support: support,
+        ..Default::default()
+    };
+    r
+}
+
+#[tokio::test]
+async fn sends_reasoning_effort_only_when_set() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(ok_stream())
+        .mount(&server)
+        .await;
+    let p = provider(&server);
+    for r in [
+        req_with(Some(Effort::High), None),
+        req_with(None, None),
+        req_with(Some(Effort::High), Some(EffortSupport::None)),
+    ] {
+        let (channel, _) = capture();
+        p.stream_chat(r, channel, CancellationToken::new()).await.unwrap();
+    }
+    let sent = bodies(&server).await;
+    assert_eq!(sent[0]["reasoning_effort"], "high");
+    assert!(sent[1].get("reasoning_effort").is_none());
+    assert!(sent[2].get("reasoning_effort").is_none());
+}
+
+#[tokio::test]
+async fn effort_refused_by_name_is_dropped_once() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .and(body_partial_json(json!({ "reasoning_effort": "high" })))
+        .respond_with(ResponseTemplate::new(400).set_body_json(json!({
+            "error": { "message": "Invalid 'reasoning_effort' for non-reasoning model" }
+        })))
+        .expect(1)
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(ok_stream())
+        .mount(&server)
+        .await;
+    let p = provider(&server);
+    let (channel, _) = capture();
+    let reply = p
+        .stream_chat(req_with(Some(Effort::High), None), channel, CancellationToken::new())
+        .await
+        .unwrap();
+    assert!(reply.usage.effort_ignored);
+    let sent = bodies(&server).await;
+    assert_eq!(sent.len(), 2);
+    assert!(sent[1].get("reasoning_effort").is_none());
+}
+
+#[tokio::test]
+async fn other_400s_keep_the_effort_error() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(ResponseTemplate::new(400).set_body_json(json!({
+            "error": { "message": "temperature must be at most 2" }
+        })))
+        .mount(&server)
+        .await;
+    let p = provider(&server);
+    let (channel, _) = capture();
+    let err = p
+        .stream_chat(req_with(Some(Effort::High), None), channel, CancellationToken::new())
+        .await
+        .unwrap_err();
+    assert!(matches!(err, ProviderError::Provider { .. }));
+    assert_eq!(server.received_requests().await.unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn both_refusals_in_one_reply() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .and(body_partial_json(json!({ "stream_options": { "include_usage": true } })))
+        .respond_with(ResponseTemplate::new(400).set_body_json(json!({
+            "error": { "message": "Unrecognized key(s) in object: 'stream_options'" }
+        })))
+        .expect(1)
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .and(body_partial_json(json!({ "reasoning_effort": "low" })))
+        .respond_with(ResponseTemplate::new(400).set_body_json(json!({
+            "error": { "message": "Unknown parameter: 'reasoning_effort'" }
+        })))
+        .expect(1)
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(ok_stream())
+        .mount(&server)
+        .await;
+    let p = provider(&server);
+    let (channel, _) = capture();
+    let reply = p
+        .stream_chat(req_with(Some(Effort::Low), None), channel, CancellationToken::new())
+        .await
+        .unwrap();
+    assert!(reply.usage.effort_ignored);
+    let sent = bodies(&server).await;
+    assert_eq!(sent.len(), 3);
+    assert!(sent[2].get("stream_options").is_none());
+    assert!(sent[2].get("reasoning_effort").is_none());
+}
+
+#[tokio::test]
+async fn openai_thinking_used_the_whole_reply() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(sse(&[
+            r#"{"choices":[{"delta":{},"finish_reason":"length"}]}"#,
+            "[DONE]",
+        ])))
+        .up_to_n_times(1)
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(sse(&[
+            r#"{"choices":[{"delta":{"content":"par"},"finish_reason":"length"}]}"#,
+            "[DONE]",
+        ])))
+        .mount(&server)
+        .await;
+    let p = provider(&server);
+    let (channel, _) = capture();
+    let err = p
+        .stream_chat(req(), channel, CancellationToken::new())
+        .await
+        .unwrap_err();
+    assert_eq!(
+        err,
+        ProviderError::Provider {
+            message: THINKING_USED_THE_REPLY.to_string()
+        }
+    );
+    let (channel, events) = capture();
+    p.stream_chat(req(), channel, CancellationToken::new())
+        .await
+        .unwrap();
+    assert_eq!(deltas(&events), vec!["par"]);
 }

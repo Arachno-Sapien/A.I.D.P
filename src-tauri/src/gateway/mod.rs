@@ -223,6 +223,18 @@ pub struct LocalOptions {
     pub effort_support: Option<EffortSupport>,
 }
 
+/// The effort to put on the wire: the user's pick, unless the model is known to take none.
+pub fn effort_to_send(local: &LocalOptions) -> Option<Effort> {
+    match local.effort_support {
+        Some(EffortSupport::None) => None,
+        _ => local.effort,
+    }
+}
+
+/// Shown when a reasoning model spends its whole reply budget on thinking.
+pub const THINKING_USED_THE_REPLY: &str =
+    "The model used its whole reply on thinking. Choose a lower effort and try again.";
+
 /// An image attached to one message, as base64 (decision 0019), or returned by an
 /// outside tool (decision 0031).
 #[derive(Serialize, Deserialize, Type, Clone, Debug, PartialEq)]
