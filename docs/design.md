@@ -242,6 +242,7 @@ Four screens: Chat, Workspace, Models, and Settings. A first-time user lands on 
 
 - Connections list: provider, label, masked key, last test result, Test and Delete buttons.
 - Local panel: Ollama status, downloaded models with size, which ones are loaded in memory, Download / Delete / Free memory.
+- Effort (M6, decision 0033): each model has an Effort select (Default, Low, Medium, High) on the Models screen, for local models too, and beside the model picker. It is turned off for a model that doesn't take it.
 
 **Settings:** theme (M6, decision 0020: System, Dark, Light, Glass, Soft, Cyber, Elegant, each a button with its three colours; the editor, diff, code blocks and terminal follow the theme's dark or light base), default model, keep\_alive, chat history location, export all chats. Updates (M6): the version, **Check for updates at start**, and **Check for updates**; a found update shows a bar under the header with **Install and restart** and **Later**. Outside tools (MCP) (M6, decisions 0025–0027): list, add, test, turn on/off and remove stdio MCP servers, plus a **Browser checks** preset.
 

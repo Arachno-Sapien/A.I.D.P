@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Effort:** choose Default, Low, Medium or High for each model on the Models screen or beside the model picker. It is sent in each provider's own form, and a model that doesn't take it is turned off for effort automatically (decision 0033).
+
 ### Fixed
 - DeepSeek agent runs no longer fail after the first tool call: its thinking is sent back as DeepSeek requires. OpenRouter's reasoning is kept with tool calls too.
 

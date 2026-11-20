@@ -65,6 +65,8 @@ A.I.D.P supports both cloud providers (OpenAI, Anthropic, OpenRouter, Groq, Deep
    - The app never saves keys in plain-text files and never displays full keys in the UI.
 5. In the **"Choose models"** step, select which models to show in your picker and click **Save**.
 
+**Effort.** Each model has an **Effort** setting: Default, Low, Medium or High. It tells a model that can think how hard to think before it answers. Set it on the **Models** screen (cloud and local models) or beside the model picker in Chat and the workspace. Default leaves the choice to the provider; an Ollama model that can think still thinks by default. Higher levels use more tokens and take longer. DeepSeek treats Medium and High the same. A model that doesn't take an effort level is shown as "ignored" the first time it refuses one, and its select is then turned off.
+
 ### Local Models (Ollama)
 1. Go to the **Models** tab. The top section manages **Ollama (local models)**.
 2. **If Ollama is not installed:** Click **"Get Ollama"** to open [ollama.com/download](https://ollama.com/download) in your browser.
