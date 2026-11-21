@@ -87,7 +87,23 @@ CREATE TABLE allowed_commands (
 ALTER TABLE models ADD COLUMN effort TEXT;
 ALTER TABLE models ADD COLUMN effort_support TEXT;
 "#,
+    // Which saved message mentions which hex run, so the attachment check is a
+    // lookup instead of a read of every message under the one lock. `long` marks
+    // runs over 64 characters, which can hold an ID inside them.
+    r#"
+CREATE TABLE message_hex (
+  message_id INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+  hex TEXT NOT NULL,
+  long INTEGER NOT NULL,
+  PRIMARY KEY (message_id, hex)
+);
+CREATE INDEX message_hex_by_hex ON message_hex(hex);
+CREATE INDEX message_hex_long ON message_hex(long) WHERE long = 1;
+"#,
 ];
+
+/// The migration that creates `message_hex`; existing messages are indexed with it.
+const HEX_INDEX_MIGRATION: usize = 10;
 
 pub fn open(path: &Path) -> rusqlite::Result<Connection> {
     let mut conn = Connection::open(path)?;
@@ -109,6 +125,9 @@ fn migrate(conn: &mut Connection) -> rusqlite::Result<()> {
     for (idx, sql) in MIGRATIONS.iter().enumerate().skip(start) {
         let tx = conn.transaction()?;
         tx.execute_batch(sql)?;
+        if idx == HEX_INDEX_MIGRATION {
+            conversations::index_all_messages(&tx)?;
+        }
         let next_version = (idx + 1) as i32;
         tx.pragma_update(None, "user_version", next_version)?;
         tx.commit()?;
@@ -129,13 +148,80 @@ mod tests {
         let version: i32 = conn
             .query_row("PRAGMA user_version;", [], |row| row.get(0))
             .unwrap();
-        assert_eq!(version, 10);
+        assert_eq!(version, 11);
 
         migrate(&mut conn).unwrap();
         let version_after: i32 = conn
             .query_row("PRAGMA user_version;", [], |row| row.get(0))
             .unwrap();
-        assert_eq!(version_after, 10);
+        assert_eq!(version_after, 11);
+    }
+
+    fn saved_message(conn: &Connection, text: &str) -> (u32, u32) {
+        use crate::db::conversations::{insert_conversation, insert_message};
+        use crate::gateway::Role;
+        use crate::history::NewMessage;
+        let conv = insert_conversation(conn, "c", None, 100).unwrap();
+        let msg = NewMessage {
+            role: Role::User,
+            content_parts: text.to_string(),
+            model_ref: None,
+            model_name: None,
+            status: "complete".to_string(),
+            error_kind: None,
+            tokens_in: None,
+            tokens_out: None,
+        };
+        (conv, insert_message(conn, conv, &msg, 100).unwrap())
+    }
+
+    fn in_use(conn: &Connection, ids: &[&str]) -> std::collections::HashSet<String> {
+        let ids: Vec<String> = ids.iter().map(|s| s.to_string()).collect();
+        crate::db::conversations::attachments_in_use(conn, &ids).unwrap()
+    }
+
+    /// The check reads the index, not the messages: blanking the stored text after
+    /// saving doesn't hide the reference. An ID inside a longer hex run still counts.
+    #[test]
+    fn attachment_check_reads_the_index() {
+        let conn = open_in_memory().unwrap();
+        let exact = "a".repeat(64);
+        let buried = format!("{}1", "0".repeat(63));
+        let (conv, _) = saved_message(&conn, &format!(r#"{{"id":"{exact}","text":"ab{buried}cd"}}"#));
+        conn.execute("UPDATE messages SET content_parts = ''", []).unwrap();
+
+        let unused = "9".repeat(64);
+        assert_eq!(
+            in_use(&conn, &[&exact, &buried, &unused]),
+            std::collections::HashSet::from([exact.clone(), buried.clone()])
+        );
+
+        crate::db::conversations::delete_conversation(&conn, conv).unwrap();
+        assert!(in_use(&conn, &[&exact, &buried]).is_empty());
+        let left: i64 = conn.query_row("SELECT COUNT(*) FROM message_hex", [], |r| r.get(0)).unwrap();
+        assert_eq!(left, 0, "deleting the chat leaves index rows behind");
+    }
+
+    /// Messages saved before the index existed are indexed by the migration.
+    #[test]
+    fn the_index_migration_backfills_old_messages() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch("PRAGMA foreign_keys = ON;").unwrap();
+        for (idx, sql) in MIGRATIONS.iter().enumerate().take(10) {
+            conn.execute_batch(sql).unwrap();
+            conn.pragma_update(None, "user_version", (idx + 1) as i32).unwrap();
+        }
+        let old = "c".repeat(64);
+        conn.execute("INSERT INTO conversations (title, created_at, updated_at) VALUES ('old', 1, 1)", [])
+            .unwrap();
+        conn.execute(
+            "INSERT INTO messages (conversation_id, role, content_parts, status, created_at) VALUES (1, 'user', ?1, 'complete', 1)",
+            [format!(r#"{{"id":"{old}"}}"#)],
+        )
+        .unwrap();
+
+        migrate(&mut conn).unwrap();
+        assert_eq!(in_use(&conn, &[&old]), std::collections::HashSet::from([old.clone()]));
     }
 
     fn model_with_support(id: &str, support: Option<&str>) -> ModelInfo {

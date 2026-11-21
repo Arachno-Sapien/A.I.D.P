@@ -104,42 +104,73 @@ pub fn delete_conversation(conn: &Connection, id: u32) -> rusqlite::Result<bool>
     Ok(affected > 0)
 }
 
+/// Length of an attachment ID (SHA-256 in hex).
+const ID_LEN: usize = 64;
+
+/// Every run of hex digits at least as long as an attachment ID.
+fn hex_runs(text: &str) -> impl Iterator<Item = &str> {
+    text.split(|c: char| !c.is_ascii_hexdigit())
+        .filter(|run| run.len() >= ID_LEN)
+}
+
+/// Records the hex runs `text` holds against message `message_id`, so the attachment
+/// check never has to read the messages themselves.
+fn index_message(conn: &Connection, message_id: u32, text: &str) -> rusqlite::Result<()> {
+    let mut stmt =
+        conn.prepare_cached("INSERT OR IGNORE INTO message_hex (message_id, hex, long) VALUES (?1, ?2, ?3)")?;
+    for run in hex_runs(text) {
+        stmt.execute(params![message_id, run, run.len() > ID_LEN])?;
+    }
+    Ok(())
+}
+
+/// Indexes every saved message; run once by the migration that creates `message_hex`.
+pub fn index_all_messages(conn: &Connection) -> rusqlite::Result<()> {
+    let mut stmt = conn.prepare("SELECT id, content_parts FROM messages")?;
+    let mut rows = stmt.query([])?;
+    while let Some(row) = rows.next()? {
+        let id: u32 = row.get(0)?;
+        let text: String = row.get(1)?;
+        index_message(conn, id, &text)?;
+    }
+    Ok(())
+}
+
 /// The attachment IDs among `ids` that some message's stored parts mention, anywhere
-/// in the text. One pass over the messages: every 64-character window of each hex run
-/// is looked up, so an ID inside a longer run still counts, as a substring search would.
+/// in the text, as a substring search would find them. An ID that is a whole hex run
+/// is one indexed lookup; one inside a longer run is found by searching only the
+/// (rare) long runs, never the messages.
 pub fn attachments_in_use(
     conn: &Connection,
     ids: &[String],
 ) -> rusqlite::Result<std::collections::HashSet<String>> {
-    const ID_LEN: usize = 64;
-    let wanted: std::collections::HashSet<&str> = ids.iter().map(String::as_str).collect();
     let mut used = std::collections::HashSet::new();
-    if wanted.is_empty() {
+    let mut exact = conn.prepare_cached("SELECT 1 FROM message_hex WHERE hex = ?1 LIMIT 1")?;
+    for id in ids {
+        if exact.exists([id])? {
+            used.insert(id.clone());
+        }
+    }
+    let rest: std::collections::HashSet<&str> = ids
+        .iter()
+        .map(String::as_str)
+        .filter(|id| !used.contains(*id))
+        .collect();
+    if rest.is_empty() {
         return Ok(used);
     }
-    let mut stmt = conn.prepare("SELECT content_parts FROM messages")?;
-    let mut rows = stmt.query([])?;
+    // ponytail: scans every long run; fine while they are rare (pasted hex dumps).
+    let mut long = conn.prepare("SELECT hex FROM message_hex WHERE long = 1")?;
+    let mut rows = long.query([])?;
     while let Some(row) = rows.next()? {
-        let text: String = row.get(0)?;
-        let bytes = text.as_bytes();
-        let mut i = 0;
-        while i < bytes.len() {
-            if !bytes[i].is_ascii_hexdigit() {
-                i += 1;
-                continue;
-            }
-            let start = i;
-            while i < bytes.len() && bytes[i].is_ascii_hexdigit() {
-                i += 1;
-            }
-            // ASCII hex digits only, so every window is on a char boundary.
-            for s in start..(i + 1).saturating_sub(ID_LEN).max(start) {
-                if let Some(id) = wanted.get(&text[s..s + ID_LEN]) {
-                    used.insert((*id).to_string());
-                }
+        let run: String = row.get(0)?;
+        // ASCII hex digits only, so every window is on a char boundary.
+        for s in 0..=run.len() - ID_LEN {
+            if let Some(id) = rest.get(&run[s..s + ID_LEN]) {
+                used.insert((*id).to_string());
             }
         }
-        if used.len() == wanted.len() {
+        if used.len() == ids.len() {
             break;
         }
     }
@@ -175,6 +206,10 @@ pub fn insert_message(
     msg: &NewMessage,
     now: u32,
 ) -> rusqlite::Result<u32> {
+    // One transaction with the index rows: a message saved without them could have
+    // its attachment removed as unused.
+    let tx = conn.unchecked_transaction()?;
+    let conn = &tx;
     conn.execute(
         "INSERT INTO messages (conversation_id, role, content_parts, model_ref, model_name, status, error_kind, tokens_in, tokens_out, created_at)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
@@ -194,11 +229,13 @@ pub fn insert_message(
     let row_id = conn.last_insert_rowid();
     let msg_id =
         u32::try_from(row_id).map_err(|_| rusqlite::Error::IntegralValueOutOfRange(0, row_id))?;
+    index_message(conn, msg_id, &msg.content_parts)?;
 
     conn.execute(
         "UPDATE conversations SET updated_at = CASE WHEN updated_at >= ?1 THEN updated_at + 1 ELSE ?1 END, archived = 0 WHERE id = ?2",
         params![now, conversation_id],
     )?;
+    tx.commit()?;
 
     Ok(msg_id)
 }

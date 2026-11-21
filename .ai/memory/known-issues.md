@@ -4,6 +4,7 @@ Bugs, gotchas, and approaches that failed. Newest first. If you hit one of the "
 
 ## Seen in this repo
 
+- **2026-11-21 · Attachment references live in `message_hex`.** `insert_message` indexes each message's hex runs (64+ characters) in the same transaction, and `attachments_in_use` reads only that table. Any new way to write or change `messages.content_parts` must update `message_hex` too, or a file still in use can be removed as unused. Runs over 64 characters (`long = 1`) are searched window by window; that scan is fine while they are rare.
 - **2026-11-19 · The app has a custom global allocator.** `main.rs` installs `attachments::pdf::CappedAlloc`; it is the system allocator with no cap except in the `--pdf-text` child, which caps its heap at `CHILD_MEMORY` (1 GB). `setrlimit` was not used: macOS ignores `RLIMIT_AS`, and it needed `libc`. tests/pdf_child.rs runs the real child with a 16 MB cap on a 48 MB bomb.
 - **2026-11-19 · A Settings Test of an MCP server has its own cancel token.** `Hub::test` registers a numbered token per server id (`cancel_mcp_test` and `Hub::stop` cancel it); a guard removes it only if the number is still its own. Off and Remove stay disabled during a Test.
 - **2026-11-19 · OpenAI-compatible requests send `stream_options`.** Every OpenAI-compatible kind is one `ConnectionKind`, so the adapter cannot skip it per provider; it retries once without the field only on a 400/422 that names `stream_options`. Don't widen that rule: retrying every 400 hides real errors.

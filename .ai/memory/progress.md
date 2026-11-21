@@ -125,6 +125,8 @@ Audit follow-ups 1-5 done 2026-11-19 by Claude Code (Opus 5.5), the human's "Yea
 
 Effort levels (decision 0033) done 2026-11-21 by Claude Code (Sonnet 5.5, subagent-driven, branch `m6-effort-levels`): per-model effort stored (migration 10), sent per provider (OpenAI-compatible with one retry, Anthropic `output_config`, Ollama `think`), Effort select on Models and beside the picker, DeepSeek/OpenRouter reasoning echoed on tool rounds. Live check with real keys NOT done yet, needs the human's keys: `log/2026-11-21-m6-effort-levels.md`.
 
+Attachment index done 2026-11-21 by Claude Code (Opus 5.5), the human's "Fix it": migration 11 `message_hex`, filled in `insert_message`'s transaction and backfilled by the migration; `attachments_in_use` no longer reads `messages`, so the one DB lock is no longer held for a scan of every message. Gate green (rust 393, vitest 423). Not committed. Next step: the human decides whether to commit; graphify-out/ is still untracked (decide .gitignore).
+
 ## Next 3 tasks
 
 1. Effort live check with the human's keys (checklist in `.ai/memory/log/2026-11-21-m6-effort-levels.md`). The branch was merged into main by fast-forward on the human's "Merge into main" and pushed on "Push main" (`ad2521d`, CI run 44906035289 green on three OSes). No release yet: installed apps stay on rc.8.
