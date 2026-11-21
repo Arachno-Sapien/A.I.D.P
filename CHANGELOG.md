@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0-rc.9] - 2026-11-21
+
 ### Changed
 - **Faster:** checking whether an attachment is still used (when you remove a file from the message box, delete a chat, or start the app) is now an index lookup instead of reading every saved message, so it no longer holds up the app as your history grows. Existing chats are indexed once on the first start.
 

@@ -12,7 +12,7 @@ A.I.D.P, short for AI Integrated Development Platform, is a desktop app for work
 
 ## Status
 
-v0.1 is in release candidates, and the latest is 0.1.0-rc.8. Everything listed under "What v0.1 does" below is built: cloud models through OpenAI-compatible APIs and Anthropic, local models through Ollama, keys in the system keychain, the coding workspace with AI edits as diffs and agent tools that ask before every command, outside tools over MCP with a Browser checks preset, a terminal, attachments, themes, chat history, settings, and signed updates.
+v0.1 is in release candidates, and the latest is 0.1.0-rc.9. Everything listed under "What v0.1 does" below is built: cloud models through OpenAI-compatible APIs and Anthropic, local models through Ollama, keys in the system keychain, the coding workspace with AI edits as diffs and agent tools that ask before every command, outside tools over MCP with a Browser checks preset, a terminal, attachments, themes, chat history, settings, and signed updates.
 
 It runs on Windows, macOS and Linux. Windows is the development machine and gets the most testing. CI builds and tests all three, but the Linux and macOS builds haven't been tried by hand yet, and neither has an 8 GB RAM machine.
 
@@ -32,7 +32,7 @@ The installers aren't code-signed yet (see the [code signing policy](#code-signi
 - AI edits you approve. Suggested changes show up as a diff, and nothing touches the disk until you accept it. For a bigger task, tick **Review at end** and keep or undo every changed file when the agent finishes.
 - An agent that works in your project. Models that support tool calling can read and search your files, ask to run commands (such as your tests), and start a dev server that keeps running in its own terminal tab, which you can watch and stop. Each command waits for your Run, unless you tick **Run commands without asking** for one task or choose **Always allow** for that exact command in this folder.
 - Outside tools. Add stdio MCP servers in Settings and the agent can call their tools, each call shown on a card. The one-click Playwright **Browser checks** preset lets it open your local web app in a visible browser, click through it and take screenshots, which go to models that can read images.
-- One model picker that lists cloud and local models together, with a status for each (key invalid, Ollama stopped, model not downloaded). On the Models screen you can mark a cloud model as reading images, so it gets screenshots and image attachments.
+- One model picker that lists cloud and local models together, with a status for each (key invalid, Ollama stopped, model not downloaded). Each model has an Effort setting (Default, Low, Medium or High) that is sent to its provider in the provider's own form, and switched off by itself for a model that doesn't take it. On the Models screen you can mark a cloud model as reading images, so it gets screenshots and image attachments.
 - Support for OpenAI-compatible APIs (OpenAI, OpenRouter, Groq, DeepSeek, Gemini's compatible endpoint, LM Studio or any custom endpoint), Anthropic, and Ollama.
 - Ollama control from inside the app: detect it, start it, download models with a progress bar, delete them, and free the memory a loaded model is holding.
 - Streamed replies with a Stop button, Markdown and code blocks you can copy, and chat history that survives a restart. The chat list can be hidden (Ctrl+B) or resized, and chats can be pinned, archived or deleted.
@@ -135,7 +135,7 @@ v0.1 is split into seven milestones, and each one ends with an app that runs. Th
 4. M3: the coding workspace. File tree, editor, the AI panel, and edits as diffs. Done.
 5. M4: agent tools and a terminal. The model can read, search and edit files and run commands, each with your approval. Done.
 6. M5: Ollama, chat history and settings. Done.
-7. M6: the v0.1 release. Installers for Windows, macOS and Linux built by CI, auto-update, outside tools (MCP + Playwright Browser checks), and a test run on an 8 GB RAM machine. In progress: CI builds and signs the installers, eight release candidates are out, auto-update works on Windows, and outside tools (the MCP client and the Browser checks preset) are built. Still to do: a full live Browser checks run with a RAM reading while a server runs, hand checks on Linux, macOS and an 8 GB RAM machine, then 0.1.0.
+7. M6: the v0.1 release. Installers for Windows, macOS and Linux built by CI, auto-update, outside tools (MCP + Playwright Browser checks), and a test run on an 8 GB RAM machine. In progress: CI builds and signs the installers, nine release candidates are out, auto-update works on Windows, and outside tools (the MCP client and the Browser checks preset) are built. Still to do: a full live Browser checks run with a RAM reading while a server runs, hand checks on Linux, macOS and an 8 GB RAM machine, then 0.1.0.
 
 After v0.1 comes the practice area.
 
