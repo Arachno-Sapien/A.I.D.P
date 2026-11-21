@@ -127,7 +127,7 @@ Effort levels (decision 0033) done 2026-11-21 by Claude Code (Sonnet 5.5, subage
 
 ## Next 3 tasks
 
-1. Effort live check with the human's keys (checklist in `.ai/memory/log/2026-11-21-m6-effort-levels.md`), then review and merge `m6-effort-levels`.
+1. Effort live check with the human's keys (checklist in `.ai/memory/log/2026-11-21-m6-effort-levels.md`). The branch was merged into main by fast-forward on the human's "Merge into main" and pushed on "Push main" (`ad2521d`, CI run 44906035289 green on three OSes). No release yet: installed apps stay on rc.8.
 2. Task 8 live check: test Outside tools & Browser checks preset (`@playwright/mcp@0.0.85`) in `npm run tauri dev`, and measure Task Manager RAM with a server running (plus RAM with Dark/Glass and `.ts` worker).
 3. The Linux and 8 GB check, and macOS, when the human is ready (deferred by the human on 2026-10-31); then review the whole M6 diff, `0.1.0`, and close M6 with the human (Task 8).
 
